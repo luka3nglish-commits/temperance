@@ -85,6 +85,8 @@ export interface TemperanceStore extends Data {
   ): LogEntry
   updateEntry(id: string, patch: { name?: string; servings?: number; macros?: Macros }, now?: number): void
   deleteEntry(id: string, now?: number): void
+  /** Put a deleted entry back exactly as it was (UNDO). No-op if an entry with that id exists. */
+  restoreEntry(entry: LogEntry, now?: number): void
   /** Copy every entry from `fromDay` into `toDay` (default today). Returns how many were copied. */
   repeatDay(fromDay: string, toDay?: string, now?: number): number
 
@@ -371,6 +373,16 @@ export const useStore = create<TemperanceStore>()(
           const entries = s.entries.filter((e) => e.id !== id)
           const today = localDayKey(new Date(now))
           const pulse = cur.day === today ? makePulse('remove', -cur.macros.kcal, entries, s.settings, now) : s.pulse
+          return { entries, pulse }
+        })
+      },
+
+      restoreEntry(entry, now = Date.now()) {
+        set((s) => {
+          if (s.entries.some((e) => e.id === entry.id)) return {}
+          const entries = [...s.entries, entry].sort((a, b) => a.at - b.at)
+          const today = localDayKey(new Date(now))
+          const pulse = entry.day === today ? makePulse('log', entry.macros.kcal, entries, s.settings, now) : s.pulse
           return { entries, pulse }
         })
       },

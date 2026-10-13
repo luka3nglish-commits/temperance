@@ -1,3 +1,5 @@
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -6,8 +8,20 @@ import { VitePWA } from 'vite-plugin-pwa'
 // Deployed to GitHub Pages at https://<owner>.github.io/temperance/
 const BASE = '/temperance/'
 
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
+let hash = 'dev'
+try {
+  hash = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+} catch {
+  /* not a git checkout */
+}
+
 export default defineConfig({
   base: BASE,
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUILD_HASH__: JSON.stringify(hash),
+  },
   plugins: [
     react(),
     tailwindcss(),
