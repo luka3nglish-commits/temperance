@@ -43,9 +43,12 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
-        manualChunks: {
-          three: ['three'],
-          r3f: ['@react-three/fiber', '@react-three/drei'],
+        // Vite 8 (rolldown) chunking: keep the 3D stack in its own cached chunks.
+        advancedChunks: {
+          groups: [
+            { name: 'three', test: /[\\/]node_modules[\\/]three[\\/]/ },
+            { name: 'r3f', test: /[\\/]node_modules[\\/]@react-three[\\/]/ },
+          ],
         },
       },
     },

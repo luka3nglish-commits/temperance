@@ -96,7 +96,8 @@ describe('built meals from ingredients', () => {
     const meal = s.addBuiltMeal({ name: 'Chicken and rice', components: comps }, T0)
     expect(meal.kind).toBe('built')
     expect(meal.macros.kcal).toBe(130 * 2.5 + 165 * 2)
-    expect(meal.macros.protein).toBe(2.7 * 2.5 + 62)
+    // components are rounded to 1 decimal before summing: 6.75 -> 6.8, plus 62
+    expect(meal.macros.protein).toBe(68.8)
     const e = s.logMeal(meal.id, 1, T0)!
     expect(e.components).toHaveLength(2)
     expect(useStore.getState().ingredients[rice.id].useCount).toBe(1)
