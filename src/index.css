@@ -2,45 +2,192 @@
 
 /*
   TEMPERANCE design tokens. Obsidian and brushed gold. Roman inscription type.
-  The design spec (docs/design-spec.md) is the source of truth; keep these in sync with it.
+  docs/design-spec.md sections 2, 3 and 16 are the source of truth for these values.
 */
+
+/* ---------- fonts (self-hosted, preloaded from index.html) ---------- */
+@font-face {
+  font-family: "Cinzel";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("/fonts/cinzel-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cinzel";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/cinzel-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/cormorant-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/cormorant-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/cormorant-400-italic.woff2") format("woff2");
+}
+/* size-adjusted local fallbacks so a late swap never moves layout */
+@font-face {
+  font-family: "Cinzel Fallback";
+  src: local("Georgia");
+  size-adjust: 92%;
+}
+@font-face {
+  font-family: "Cormorant Fallback";
+  src: local("Georgia");
+  size-adjust: 104%;
+}
+
+/* ---------- theme tokens (Tailwind 4) ---------- */
 @theme {
-  --font-display: "Cinzel", "Times New Roman", serif;
-  --font-body: "Cormorant Garamond", Georgia, serif;
+  --font-display: "Cinzel", "Cinzel Fallback", Georgia, serif;
+  --font-body: "Cormorant Garamond", "Cormorant Fallback", Georgia, serif;
 
-  --color-obsidian-950: #070606;
-  --color-obsidian-900: #0d0b0b;
-  --color-obsidian-800: #141111;
-  --color-obsidian-700: #1d1818;
-  --color-obsidian-600: #292222;
+  /* obsidian: the stone, deepest to lightest */
+  --color-obsidian-950: #050507; /* the void: page, canvas clear, shard fill */
+  --color-obsidian-900: #0b0b0f; /* bars, sheets, tab bar, 3D column colour */
+  --color-obsidian-800: #121218; /* raised slab, inputs, chips */
+  --color-obsidian-700: #1a1a21; /* ring track, ghost arcs, skeleton rows */
+  --color-obsidian-600: #26262e; /* neutral hairlines */
 
-  --color-bone: #ece5d6;
-  --color-bone-dim: #b3aa98;
-  --color-bone-mute: #7d7567;
+  /* bone: the only neutrals for text */
+  --color-bone: #e7e1d2;
+  --color-bone-dim: #9a948a;
+  --color-bone-mute: #5e5a54;
 
-  --color-gold-100: #f8ecc2;
-  --color-gold-200: #efd892;
-  --color-gold-300: #e3c272;
-  --color-gold-400: #d4ab57;
-  --color-gold-500: #c49a45;
-  --color-gold-600: #a37c30;
-  --color-gold-700: #7d5c1f;
-  --color-gold-800: #4f3a12;
+  /* gold ladder */
+  --color-gold-100: #fff7da;
+  --color-gold-200: #f6e3a1;
+  --color-gold-300: #e6cb78;
+  --color-gold-400: #d8b45a;
+  --color-gold-500: #b8902e;
+  --color-gold-600: #9c7b33;
+  --color-gold-700: #7a5e22;
+  --color-gold-800: #5c4418;
 
+  /* ember: over the line */
   --color-ember: #ff5a1f;
-  --color-ember-deep: #8f1e00;
+  --color-ember-deep: #b3300a;
+  --color-ember-text: #ff7a45;
 
-  --color-protein: #e3c272;
-  --color-carbs: #b3aa98;
-  --color-fat: #8a6b3a;
+  /* macro ring, monochrome gold by value */
+  --color-protein: #f2d98a;
+  --color-carbs: #b8923e;
+  --color-fat: #6e5324;
+
+  /* scene and shard flats */
+  --color-dust: #9a8e7a;
+  --color-shard-a: #1a1a20;
+  --color-shard-b: #0a0a0d;
+  --color-shard-c: #26262e;
+}
+
+/* ---------- root variables ---------- */
+@property --tilt-x {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
 }
 
 :root {
   color-scheme: dark;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  /* visual viewport height, written by the sheet's visualViewport listener */
+  --vv-h: 100svh;
+  /* screen y of the goal line and plinth top, written once by the scene at mount */
+  --goal-y: 263px;
+  --plinth-y: 507px;
+
+  /* alpha tokens */
+  --gold-line: rgba(216, 180, 90, 0.16);
+  --gold-line-strong: rgba(216, 180, 90, 0.55);
+  --gold-focus: rgba(216, 180, 90, 0.7);
+  --ember-glow: rgba(255, 90, 31, 0.45);
+  --bone-08: rgba(231, 225, 210, 0.08);
+  --scrim: rgba(5, 5, 7, 0.6);
+
+  /* tilt-driven light: -1 to 1, written by the tilt loop or the goldSweep keyframe */
+  --tilt-x: 0;
+  --tilt-angle: calc(var(--tilt-x) * 18deg);
+
+  --gold-grad: linear-gradient(
+    calc(100deg + var(--tilt-angle)),
+    #5c4418 0%,
+    #9c7b33 22%,
+    #d8b45a 42%,
+    #fff7da 50%,
+    #f6e3a1 56%,
+    #d8b45a 70%,
+    #7a5e22 100%
+  );
+  --gold-grain: repeating-linear-gradient(calc(90deg + var(--tilt-angle)), rgba(0, 0, 0, 0) 0 1px, rgba(0, 0, 0, 0.18) 1px 2px);
+  --gold-border: linear-gradient(calc(120deg + var(--tilt-angle)), #7a5e22 0%, #d8b45a 45%, #fff7da 50%, #d8b45a 55%, #5c4418 100%);
+  --ember-grad: linear-gradient(calc(100deg + var(--tilt-angle)), #b3300a 0%, #ff5a1f 45%, #ffb088 50%, #ff5a1f 55%, #7a2208 100%);
+
+  /* motion tokens (spec section 16) */
+  --ease-cut: cubic-bezier(0.7, 0, 0.2, 1);
+  --ease-stone: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-hit: cubic-bezier(0.6, 0, 1, 0.4);
+  --ease-settle: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-sheet: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --ease-count: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --ease-enter: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --t-hit: 170ms;
+  --t-settle: 120ms;
+  --t-shake: 140ms;
+  --t-dust: 1100ms;
+  --t-capital: 300ms;
+  --t-flash: 90ms;
+  --t-crack: 700ms;
+  --t-crack-out: 600ms;
+  --t-count: 380ms;
+  --t-gold-flash: 600ms;
+  --t-ring: 520ms;
+  --t-sink: 600ms;
+  --t-sheet-in: 320ms;
+  --t-sheet-out: 200ms;
+  --t-tab: 180ms;
+  --t-sweep-wipe: 460ms;
+  --t-row-in: 240ms;
+  --t-digit: 120ms;
+  --t-toast: 4000ms;
+  --t-fade: 160ms;
+  --t-gold-sweep: 9s;
+  --t-opening: 1900ms;
+  --t-opening-short: 700ms;
+  --t-opening-reduced: 240ms;
+
+  /* z-index ladder */
+  --z-backdrop: 0;
+  --z-canvas: 1;
+  --z-inscriptions: 10;
+  --z-tabbar: 30;
+  --z-shards: 40;
+  --z-sheet: 50;
+  --z-toast: 60;
+  --z-opening: 70;
 }
 
+/* ---------- base ---------- */
 html,
 body,
 #root {
@@ -56,46 +203,250 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  overflow-x: hidden;
 }
 
-/* Brushed metallic gold text. Use on the big number and titles. */
+/* polished centre: page vignette under the shards */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-backdrop);
+  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 1px solid var(--gold-focus);
+  outline-offset: 2px;
+}
+
+/* ---------- type utilities ---------- */
+.font-display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+}
+
+/* inscription cut on Cinzel elements that are not gradient text */
+.inscribed {
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.7),
+    0 -1px 0 rgba(255, 247, 218, 0.06);
+}
+
+/* Cormorant numerals: lining and tabular (Cormorant defaults to oldstyle) */
+.num {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Cinzel digits are proportional: lay counting digits in fixed cells so counts never jitter */
+.digits {
+  display: inline-grid;
+  grid-auto-flow: column;
+  justify-content: center;
+}
+.digits > span {
+  display: inline-block;
+  width: 0.62em;
+  text-align: center;
+}
+.digits > span.sep {
+  width: 0.28em;
+}
+
+/* brushed metallic gold text: two layers, no filters */
+.gold-num {
+  position: relative;
+  display: inline-block;
+  contain: paint;
+}
+.gold-num .gold-shadow {
+  position: absolute;
+  inset: 0;
+  transform: translateY(1px);
+  color: rgba(0, 0, 0, 0.55);
+}
+.gold-num .gold-face {
+  position: relative;
+  background: var(--gold-grain), var(--gold-grad);
+  background-blend-mode: multiply, normal;
+  background-size: 100% 100%, 220% 100%;
+  background-position: 0 0, calc(50% + var(--tilt-x) * 60%) 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  will-change: background-position;
+}
+.gold-num.ember .gold-face {
+  background: var(--ember-grad);
+  background-size: 220% 100%;
+  background-position: calc(50% + var(--tilt-x) * 60%) 0;
+}
+/* low tier or no blend support: plain gradient */
+.no-grain .gold-num .gold-face,
 .gold-text {
-  background-image: linear-gradient(
-    100deg,
-    var(--color-gold-700) 0%,
-    var(--color-gold-300) 22%,
-    var(--color-gold-100) 38%,
-    var(--color-gold-400) 52%,
-    var(--color-gold-700) 70%,
-    var(--color-gold-300) 88%,
-    var(--color-gold-600) 100%
-  );
-  background-size: 200% 100%;
-  background-position: var(--gold-shift, 50%) 0;
+  background: var(--gold-grad);
+  background-size: 220% 100%;
+  background-position: calc(50% + var(--tilt-x) * 60%) 0;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-.font-display {
-  font-family: var(--font-display);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+/* gold-filled surfaces (LOG keystone, LOG button) */
+.gold-fill {
+  background: var(--gold-grad);
+  background-size: 220% 100%;
+  background-position: calc(50% + var(--tilt-x) * 60%) 0;
+  color: var(--color-obsidian-900);
 }
 
-.tabular {
-  font-variant-numeric: tabular-nums;
+/* gradient hairline border via mask */
+.gold-border {
+  position: relative;
+}
+.gold-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--gold-border);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
+.hairline-gold {
+  border-color: var(--gold-line);
+}
+
+/* the gold auto sweep until tilt is live */
+@keyframes goldSweep {
+  from {
+    --tilt-x: -1;
+  }
+  to {
+    --tilt-x: 1;
+  }
+}
+:root.auto-sweep {
+  animation: goldSweep var(--t-gold-sweep) ease-in-out infinite alternate;
+}
+:root.auto-sweep.sweep-paused {
+  animation-play-state: paused;
+}
+
+/* entrance stagger for LIBRARY, HISTORY, SETTINGS (mount only) */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise-in {
+  animation: riseIn 500ms var(--ease-enter) backwards;
+}
+.rise-in-1 { animation-delay: 60ms; }
+.rise-in-2 { animation-delay: 120ms; }
+.rise-in-3 { animation-delay: 240ms; }
+.rise-in-4 { animation-delay: 300ms; }
+
+/* stage shake shared by canvas, inscriptions and the fallback */
+@keyframes stageShake {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(3px, -2px); }
+  40% { transform: translate(-3px, 2px); }
+  60% { transform: translate(2px, -1px); }
+  80% { transform: translate(-2px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+.shake {
+  animation: stageShake var(--t-shake) linear;
+}
+
+/* diagonal gold light wipe on tab change (restarted by toggling .tp-sweep-run) */
+.tp-sweep {
+  background: linear-gradient(100deg, transparent 30%, rgba(216, 180, 90, 0.12) 50%, transparent 70%);
+  background-size: 300% 100%;
+  background-position: 100% 0;
+}
+@keyframes tpSweep {
+  from {
+    opacity: 1;
+    background-position: 100% 0;
+  }
+  to {
+    opacity: 0;
+    background-position: 0% 0;
+  }
+}
+.tp-sweep-run {
+  animation: tpSweep var(--t-sweep-wipe) var(--ease-stone) forwards;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :root:not(.force-motion) *,
+  :root:not(.force-motion) *::before,
+  :root:not(.force-motion) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    animation-fill-mode: both !important;
   }
+  :root:not(.force-motion).auto-sweep {
+    animation: none;
+    --tilt-x: 0;
+  }
+}
+:root.reduce-motion *,
+:root.reduce-motion *::before,
+:root.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  animation-fill-mode: both !important;
+}
+:root.reduce-motion.auto-sweep {
+  animation: none;
+  --tilt-x: 0;
 }

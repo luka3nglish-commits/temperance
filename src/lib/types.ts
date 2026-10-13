@@ -77,21 +77,34 @@ export type EnergyUnit = 'kcal' | 'kJ'
 
 export type MacroTargets = { protein: number; carbs: number; fat: number }
 
+export type MotionPref = 'system' | 'on' | 'off'
+export type OpeningPref = 'short' | 'full' | 'off'
+export type HeroFigure = 'remaining' | 'eaten'
+
 export type Settings = {
   /** daily goal, stored in kcal */
   goalKcal: number
-  /** daily macro targets in grams */
+  /** daily macro targets in grams; 0 hides the ghost arcs */
   targets: MacroTargets
   unit: EnergyUnit
-  /** how many times the opening sequence has played */
+  /** how many times the full opening sequence has played */
   introCount: number
   /** 'system' follows prefers-reduced-motion; 'on' forces reduced; 'off' forces full motion */
-  motion: 'system' | 'on' | 'off'
+  motion: MotionPref
+  /** which opening plays on launch after the first */
+  opening: OpeningPref
+  /** the big number on the home screen */
+  hero: HeroFigure
+  /** gold follows device tilt (opt-in on iOS) */
+  tilt: boolean
+  /** `name|kcalPerServing` keys hidden from the recents list */
+  hiddenRecents: string[]
   /** display name, optional */
   name?: string
 }
 
-export const SCHEMA_VERSION = 1 as const
+/** v1 shipped without opening/hero/tilt/hiddenRecents. v2 adds them with defaults. */
+export const SCHEMA_VERSION = 2 as const
 
 /** The on-disk / export shape. */
 export type ExportFile = {

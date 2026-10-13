@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import type {
   EnergyUnit,
   ExportFile,
+  HeroFigure,
   ImportMode,
   ImportResult,
   Ingredient,
@@ -11,6 +12,8 @@ import type {
   MacroTargets,
   Meal,
   MealComponent,
+  MotionPref,
+  OpeningPref,
   Settings,
 } from '../lib/types'
 import { SCHEMA_VERSION } from '../lib/types'
@@ -27,6 +30,10 @@ export const DEFAULT_SETTINGS: Settings = {
   unit: 'kcal',
   introCount: 0,
   motion: 'system',
+  opening: 'short',
+  hero: 'remaining',
+  tilt: false,
+  hiddenRecents: [],
 }
 
 /**
@@ -54,6 +61,8 @@ type Data = {
 
 export interface TemperanceStore extends Data {
   pulse: Pulse | null
+  /** true when the last persist write failed (quota, private mode); data is in memory only */
+  persistFailed: boolean
 
   // meals
   addQuickMeal(input: { name: string; macros: Macros; favourite?: boolean }, now?: number): Meal
@@ -83,10 +92,17 @@ export interface TemperanceStore extends Data {
   setGoalKcal(kcal: number): void
   setTargets(t: Partial<MacroTargets>): void
   setUnit(u: EnergyUnit): void
-  setMotion(m: Settings['motion']): void
+  setMotion(m: MotionPref): void
+  setOpening(o: OpeningPref): void
+  setHero(h: HeroFigure): void
+  setTilt(on: boolean): void
   setName(name: string): void
   markIntroPlayed(): void
+  /** Play the full opening again on the next launch. */
+  resetIntro(): void
+  hideRecent(key: string): void
   clearPulse(): void
+  setPersistFailed(failed: boolean): void
 
   // data
   exportData(now?: number): ExportFile
@@ -111,6 +127,34 @@ function makePulse(kind: Pulse['kind'], deltaKcal: number, entries: LogEntry[], 
   return { id: newId(), kind, deltaKcal, totalKcal: total, over: total > settings.goalKcal, at: now }
 }
 
+/** Storage that reports failures instead of throwing inside zustand. */
+function safeStorage() {
+  return {
+    getItem: (name: string) => {
+      try {
+        return localStorage.getItem(name)
+      } catch {
+        return null
+      }
+    },
+    setItem: (name: string, value: string) => {
+      try {
+        localStorage.setItem(name, value)
+        if (useStore.getState().persistFailed) useStore.getState().setPersistFailed(false)
+      } catch {
+        useStore.getState().setPersistFailed(true)
+      }
+    },
+    removeItem: (name: string) => {
+      try {
+        localStorage.removeItem(name)
+      } catch {
+        /* ignore */
+      }
+    },
+  }
+}
+
 export const useStore = create<TemperanceStore>()(
   persist(
     (set, get) => ({
@@ -119,6 +163,7 @@ export const useStore = create<TemperanceStore>()(
       ingredients: {},
       entries: [],
       pulse: null,
+      persistFailed: false,
 
       // ---------- meals ----------
       addQuickMeal({ name, macros, favourite = false }, now = Date.now()) {
@@ -364,14 +409,35 @@ export const useStore = create<TemperanceStore>()(
       setMotion(m) {
         set((s) => ({ settings: { ...s.settings, motion: m } }))
       },
+      setOpening(o) {
+        set((s) => ({ settings: { ...s.settings, opening: o } }))
+      },
+      setHero(h) {
+        set((s) => ({ settings: { ...s.settings, hero: h } }))
+      },
+      setTilt(on) {
+        set((s) => ({ settings: { ...s.settings, tilt: !!on } }))
+      },
       setName(name) {
         set((s) => ({ settings: { ...s.settings, name: cleanName(name) || undefined } }))
       },
       markIntroPlayed() {
         set((s) => ({ settings: { ...s.settings, introCount: s.settings.introCount + 1 } }))
       },
+      resetIntro() {
+        set((s) => ({ settings: { ...s.settings, introCount: 0 } }))
+      },
+      hideRecent(key) {
+        set((s) => {
+          if (s.settings.hiddenRecents.includes(key)) return {}
+          return { settings: { ...s.settings, hiddenRecents: [...s.settings.hiddenRecents, key].slice(-200) } }
+        })
+      },
       clearPulse() {
         if (get().pulse) set({ pulse: null })
+      },
+      setPersistFailed(failed) {
+        if (get().persistFailed !== failed) set({ persistFailed: failed })
       },
 
       // ---------- data ----------
@@ -433,13 +499,20 @@ export const useStore = create<TemperanceStore>()(
     {
       name: STORAGE_KEY,
       version: SCHEMA_VERSION,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(safeStorage),
       partialize: (s) => ({ settings: s.settings, meals: s.meals, ingredients: s.ingredients, entries: s.entries }),
+      // v1 -> v2: new settings fields are filled by `merge` below; nothing else changed shape.
+      migrate: (persisted) => persisted as Data,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<Data>
         return {
           ...current,
-          settings: { ...DEFAULT_SETTINGS, ...(p.settings ?? {}), targets: { ...DEFAULT_SETTINGS.targets, ...(p.settings?.targets ?? {}) } },
+          settings: {
+            ...DEFAULT_SETTINGS,
+            ...(p.settings ?? {}),
+            targets: { ...DEFAULT_SETTINGS.targets, ...(p.settings?.targets ?? {}) },
+            hiddenRecents: Array.isArray(p.settings?.hiddenRecents) ? p.settings.hiddenRecents : [],
+          },
           meals: p.meals ?? {},
           ingredients: p.ingredients ?? {},
           entries: Array.isArray(p.entries) ? p.entries : [],

@@ -35,10 +35,46 @@ export function recentMeals(meals: Record<string, Meal>, limit = 8): Meal[] {
     .slice(0, limit)
 }
 
+/** Per-serving kcal of a logged entry (what a re-log of one portion would add). */
+export function perServingKcal(e: LogEntry): number {
+  return e.servings > 0 ? Math.round(e.macros.kcal / e.servings) : Math.round(e.macros.kcal)
+}
+
+/** Key that identifies "the same thing" across logs: name plus per-serving kcal. */
+export function recentKey(e: LogEntry): string {
+  return `${e.name.trim().toLowerCase()}|${perServingKcal(e)}`
+}
+
+/**
+ * The last `limit` distinct things logged (by name + per-serving kcal), newest first,
+ * across all days. Unsaved quick logs count too. Hidden keys are skipped.
+ */
+export function recentEntries(entries: readonly LogEntry[], limit = 12, hidden: readonly string[] = []): LogEntry[] {
+  const skip = new Set(hidden)
+  const seen = new Set<string>()
+  const out: LogEntry[] = []
+  const sorted = entries.slice().sort((a, b) => b.at - a.at)
+  for (const e of sorted) {
+    const k = recentKey(e)
+    if (skip.has(k) || seen.has(k)) continue
+    seen.add(k)
+    out.push(e)
+    if (out.length >= limit) break
+  }
+  return out
+}
+
 export function favouriteMeals(meals: Record<string, Meal>): Meal[] {
   return Object.values(meals)
     .filter((m) => m.favourite)
     .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Favourites ordered by last use, then name. Feeds the folder and the LOG sheet chips. */
+export function favouritesByUse(meals: Record<string, Meal>): Meal[] {
+  return Object.values(meals)
+    .filter((m) => m.favourite)
+    .sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name))
 }
 
 /** Favourites first, then alphabetical. */
@@ -121,4 +157,18 @@ export function disciplineStreak(entries: readonly LogEntry[], goalKcal: number,
     day = dayKeyOffset(day, -1)
   }
   return streak
+}
+
+/** Average kcal over the last `n` days that have entries (0 when none). */
+export function averageKcal(days: readonly DaySummary[], n = 7): number {
+  const logged = days.slice(0, n).filter((d) => d.count > 0)
+  if (!logged.length) return 0
+  return Math.round(logged.reduce((s, d) => s + d.totals.kcal, 0) / logged.length)
+}
+
+/** How many of the last `n` days were logged and at or under the goal, and how many were logged at all. */
+export function underTheLine(days: readonly DaySummary[], goalKcal: number, n = 7): { under: number; logged: number } {
+  const window = days.slice(0, n)
+  const logged = window.filter((d) => d.count > 0)
+  return { under: logged.filter((d) => d.totals.kcal <= goalKcal).length, logged: logged.length }
 }

@@ -80,24 +80,34 @@ function settings(x: unknown): Settings {
   const t = isObj(s.targets) ? s.targets : {}
   const goal = num(s.goalKcal, 2500)
   const motion = s.motion === 'on' || s.motion === 'off' ? s.motion : 'system'
+  const opening = s.opening === 'full' || s.opening === 'off' ? s.opening : 'short'
+  const hero = s.hero === 'eaten' ? 'eaten' : 'remaining'
+  const hiddenRecents = Array.isArray(s.hiddenRecents) ? s.hiddenRecents.filter((k): k is string => typeof k === 'string').slice(-200) : []
   return {
     goalKcal: goal > 0 ? Math.round(goal) : 2500,
     targets: { protein: Math.max(0, num(t.protein, 180)), carbs: Math.max(0, num(t.carbs, 250)), fat: Math.max(0, num(t.fat, 80)) },
     unit: s.unit === 'kJ' ? 'kJ' : 'kcal',
     introCount: Math.max(0, num(s.introCount)),
     motion,
+    opening,
+    hero,
+    tilt: bool(s.tilt),
+    hiddenRecents,
     name: typeof s.name === 'string' && s.name.trim() ? s.name.trim() : undefined,
   }
 }
 
+/** Backups from any schema version we know how to read. */
+const READABLE_VERSIONS: readonly number[] = [1, 2]
+
 /**
- * Validate and sanitise an untrusted parsed JSON value into an ExportFile.
+ * Validate and sanitise an untrusted parsed JSON value into an ExportFile (current schema).
  * Returns null when it is clearly not a Temperance backup.
  */
 export function validateExportFile(raw: unknown): ExportFile | null {
   if (!isObj(raw)) return null
   if (raw.app !== 'temperance') return null
-  if (raw.version !== SCHEMA_VERSION) return null
+  if (typeof raw.version !== 'number' || !READABLE_VERSIONS.includes(raw.version)) return null
 
   const meals: Record<string, Meal> = {}
   const mealsSrc = isObj(raw.meals) ? Object.values(raw.meals) : Array.isArray(raw.meals) ? raw.meals : []
@@ -135,7 +145,7 @@ export function validateExportFile(raw: unknown): ExportFile | null {
   }
 }
 
-/** Suggested file name for a backup, e.g. temperance-backup-2026-10-13.json */
+/** Suggested file name for a backup, e.g. temperance-2026-10-13.json */
 export function backupFileName(dayKey: string): string {
-  return `temperance-backup-${dayKey}.json`
+  return `temperance-${dayKey}.json`
 }
