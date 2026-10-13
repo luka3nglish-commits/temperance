@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/*
+  TEMPERANCE design tokens. Obsidian and brushed gold. Roman inscription type.
+  The design spec (docs/design-spec.md) is the source of truth; keep these in sync with it.
+*/
+@theme {
+  --font-display: "Cinzel", "Times New Roman", serif;
+  --font-body: "Cormorant Garamond", Georgia, serif;
+
+  --color-obsidian-950: #070606;
+  --color-obsidian-900: #0d0b0b;
+  --color-obsidian-800: #141111;
+  --color-obsidian-700: #1d1818;
+  --color-obsidian-600: #292222;
+
+  --color-bone: #ece5d6;
+  --color-bone-dim: #b3aa98;
+  --color-bone-mute: #7d7567;
+
+  --color-gold-100: #f8ecc2;
+  --color-gold-200: #efd892;
+  --color-gold-300: #e3c272;
+  --color-gold-400: #d4ab57;
+  --color-gold-500: #c49a45;
+  --color-gold-600: #a37c30;
+  --color-gold-700: #7d5c1f;
+  --color-gold-800: #4f3a12;
+
+  --color-ember: #ff5a1f;
+  --color-ember-deep: #8f1e00;
+
+  --color-protein: #e3c272;
+  --color-carbs: #b3aa98;
+  --color-fat: #8a6b3a;
+}
+
+:root {
+  color-scheme: dark;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html,
+body,
+#root {
+  min-height: 100dvh;
+  background: var(--color-obsidian-950);
+  color: var(--color-bone);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 18px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Brushed metallic gold text. Use on the big number and titles. */
+.gold-text {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-gold-700) 0%,
+    var(--color-gold-300) 22%,
+    var(--color-gold-100) 38%,
+    var(--color-gold-400) 52%,
+    var(--color-gold-700) 70%,
+    var(--color-gold-300) 88%,
+    var(--color-gold-600) 100%
+  );
+  background-size: 200% 100%;
+  background-position: var(--gold-shift, 50%) 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
