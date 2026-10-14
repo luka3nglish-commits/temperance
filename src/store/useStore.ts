@@ -104,6 +104,8 @@ export interface TemperanceStore extends Data {
   addWeight(kg: number, day?: string, now?: number): WeightEntry | null
   updateWeight(id: string, patch: { kg?: number; note?: string }): void
   deleteWeight(id: string): void
+  /** Put a deleted weigh-in back exactly as it was (UNDO); replaces any entry that day. */
+  restoreWeight(entry: WeightEntry): void
   setTargetWeight(kg: number | null): void
 
   // settings
@@ -474,6 +476,16 @@ export const useStore = create<TemperanceStore>()(
       },
       deleteWeight(id) {
         set((s) => (s.weights.some((w) => w.id === id) ? { weights: s.weights.filter((w) => w.id !== id) } : {}))
+      },
+      restoreWeight(entry) {
+        const v = clampKg(entry.kg)
+        if (v === null) return
+        set((s) => {
+          const weights = s.weights.filter((w) => w.day !== entry.day && w.id !== entry.id)
+          weights.push({ ...entry, kg: v })
+          weights.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+          return { weights }
+        })
       },
       setTargetWeight(kg) {
         // null clears; an invalid number is ignored rather than clearing

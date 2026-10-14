@@ -1,4 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { IconButton } from './Button'
 import { useReducedMotion } from '../../lib/motion'
@@ -223,7 +224,9 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
   const cap = 'min(92svh, var(--vv-h))'
   const transform = reduced ? 'none' : shown ? 'translateY(0)' : 'translateY(100%)'
 
-  return (
+  // portal to <body>: <main> is a z 10 stacking context, so a sheet rendered inside it would paint
+  // under the tab bar (z 30) and the shards (z 40) and let the bar be tapped through
+  return createPortal(
     <div className="fixed inset-0 z-[var(--z-sheet)]" role="presentation">
       <div
         ref={scrimRef}
@@ -281,6 +284,7 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
         </div>
         {footer ? <div className="shrink-0 border-t border-[var(--gold-line)] bg-obsidian-900 px-5 pt-3 pb-3">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

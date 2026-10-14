@@ -149,10 +149,22 @@ try {
     if (!ok) throw new Error(`no control named ${text}`)
   }
 
+  await step('seed-yesterday', async () => {
+    // one meal logged yesterday so the REPEAT YESTERDAY chip and the history rows have something
+    return page.evaluate(() => {
+      const y = new Date()
+      y.setDate(y.getDate() - 1)
+      y.setHours(12, 30, 0, 0)
+      const e = window.__tp.store.getState().logQuick({ name: 'Oats and whey', macros: { kcal: 410, protein: 32, carbs: 48, fat: 9 } }, y.getTime())
+      return { day: e.day, kcal: e.macros.kcal }
+    })
+  })
+
   await step('open-log-sheet', async () => {
     await clickByText('Log a meal')
     await sleep(450)
     await shot(page, 'log-sheet-open')
+    return page.evaluate(() => !!document.querySelector('[data-testid=tp-repeat-yesterday]'))
   })
 
   await step('fill-quick-meal', async () => {
@@ -240,6 +252,47 @@ try {
         await page.evaluate(() => document.querySelector('main')?.scrollTo({ top: 99999 }))
         await sleep(300)
         await shot(page, 'tab-settings-bottom')
+      }
+      if (tab === 'History') {
+        // BODY: weight log plus a photo
+        const switched = await page.evaluate(() => {
+          const radios = [...document.querySelectorAll('[data-testid=tp-history-mode] [role=radio]')]
+          const body = radios.find((r) => r.textContent.trim().toLowerCase() === 'body')
+          if (!body) return false
+          body.click()
+          return true
+        })
+        if (!switched) throw new Error('BODY switch not found')
+        await sleep(600)
+        await shot(page, 'history-body-empty')
+        await page.evaluate(() => {
+          const y = new Date()
+          y.setDate(y.getDate() - 1)
+          window.__tp.store.getState().addWeight(85.4, undefined, y.getTime() - 86400000 * 0)
+        })
+        const input = await page.$('[data-testid=tp-weight-input]')
+        if (!input) throw new Error('tp-weight-input not found')
+        await input.click()
+        await input.type('84.6', { delay: 40 })
+        await page.click('[data-testid=tp-weight-log]')
+        await sleep(600)
+        await shot(page, 'history-body-weight')
+        const fileInput = await page.$('[data-testid=tp-photo-add]')
+        if (!fileInput) throw new Error('tp-photo-add not found')
+        await fileInput.uploadFile(resolve(OUT, '10-home-after-opening.png'))
+        await sleep(1800)
+        await page.evaluate(() => document.querySelector('main')?.scrollTo({ top: 99999 }))
+        await sleep(400)
+        await shot(page, 'history-body-photo')
+        const tile = await page.$('[data-testid^="tp-photo-"][data-testid$="-tile"], [data-testid=tp-photo-grid] button, [data-testid=tp-photo-grid] [role=button]')
+        if (tile) {
+          await tile.click()
+          await sleep(600)
+          await shot(page, 'history-photo-viewer')
+          await page.keyboard.press('Escape')
+          await sleep(300)
+        }
+        await page.evaluate(() => document.querySelector('main')?.scrollTo({ top: 0 }))
       }
     })
   }

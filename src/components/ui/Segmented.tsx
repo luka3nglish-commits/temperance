@@ -8,12 +8,13 @@ type Props<T extends string> = {
   className?: string
   /** 32 px inscribed switch (default) or 44 px tall for settings rows */
   size?: 'sm' | 'md'
+  testId?: string
 }
 
 /** Inscribed segmented switch: gold hairline, active = gold text with a 2 px gold underline. */
-export function Segmented<T extends string>({ value, options, onChange, label, className = '', size = 'sm' }: Props<T>) {
+export function Segmented<T extends string>({ value, options, onChange, label, className = '', size = 'sm', testId }: Props<T>) {
   return (
-    <div role="radiogroup" aria-label={label} className={`inline-flex rounded-[4px] border border-[var(--gold-line-strong)] ${className}`}>
+    <div role="radiogroup" data-testid={testId} aria-label={label} className={`inline-flex rounded-[4px] border border-[var(--gold-line-strong)] ${className}`}>
       {options.map((o, i) => {
         const active = o.value === value
         return (

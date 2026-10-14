@@ -45,6 +45,11 @@ describe('weights', () => {
     expect(useStore.getState().settings.targetWeightKg).toBeUndefined()
     s.deleteWeight(w.id)
     expect(useStore.getState().weights).toHaveLength(0)
+    const gone = { ...w, kg: 83.8, note: 'morning' }
+    s.restoreWeight(gone)
+    expect(useStore.getState().weights).toEqual([gone])
+    s.restoreWeight({ ...gone, kg: 0 })
+    expect(useStore.getState().weights).toEqual([gone])
   })
 
   it('computes the seven day trend and the distance to target', () => {

@@ -61,3 +61,7 @@ Photos: `tp-photos` (the photos section), `tp-photo-add`, `tp-photo-grid` (thumb
 ## Status
 
 Ids listed here are the contract. An id missing from a build is a gap to report, not a reason to invent a different one.
+
+## History BODY extras
+
+`tp-history` carries `data-mode="ledger" | "body"`. The weight hero and the target stone carry `data-kg`; the trend stone `data-delta` and `data-dir`; `tp-weight-chart` has `data-points`, `data-min`, `data-max`. Photos: `tp-photo-add-button` (the visible button beside the hidden input), `tp-photo-viewer-image`, `tp-photo-share`, `tp-photo-viewer-compare`, `tp-photo-compare-<id>` inside the compare view, and `data-selected` on tiles picked for compare. The store also exposes `restoreWeight(entry)` for an exact undo.
