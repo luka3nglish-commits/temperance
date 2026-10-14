@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { IconButton } from './Button'
 
@@ -18,18 +18,37 @@ type Props = {
   /** label for the close button */
   closeLabel?: string
   className?: string
+  /** id for the scrolling content column (so a form can scroll it to the top) */
+  contentId?: string
 }
 
+/** The visual viewport is shorter than this when a keyboard is up (spec section 10). */
+const KEYBOARD_UP_PX = 620
+
 let vvInstalled = false
-/** Write --vv-h on :root from visualViewport so sheets can sit above the keyboard. Installed once. */
+let keyboardUp = false
+const kbListeners = new Set<() => void>()
+
+/**
+ * Write --vv-h and --vv-top on :root from visualViewport so sheets can sit above the keyboard,
+ * and toggle `keyboard-up` on <html> when the visual viewport is under 620 px. Installed once.
+ */
 function installVisualViewport() {
   if (vvInstalled || typeof window === 'undefined') return
   vvInstalled = true
   const vv = window.visualViewport
   const write = () => {
     const h = vv ? vv.height : window.innerHeight
-    document.documentElement.style.setProperty('--vv-h', `${Math.round(h)}px`)
-    document.documentElement.classList.toggle('keyboard-up', h < 620)
+    const top = vv ? vv.offsetTop : 0
+    const root = document.documentElement
+    root.style.setProperty('--vv-h', `${Math.round(h)}px`)
+    root.style.setProperty('--vv-top', `${Math.round(top)}px`)
+    const up = h < KEYBOARD_UP_PX
+    root.classList.toggle('keyboard-up', up)
+    if (up !== keyboardUp) {
+      keyboardUp = up
+      kbListeners.forEach((l) => l())
+    }
   }
   write()
   vv?.addEventListener('resize', write)
@@ -37,17 +56,34 @@ function installVisualViewport() {
   window.addEventListener('resize', write)
 }
 
+const subscribeKb = (l: () => void) => {
+  installVisualViewport()
+  kbListeners.add(l)
+  return () => {
+    kbListeners.delete(l)
+  }
+}
+const getKb = () => keyboardUp
+const getKbServer = () => false
+
+/** True while the visual viewport is under 620 px (a keyboard is up). Chips collapse, the sheet pins to the viewport. */
+export function useKeyboardUp(): boolean {
+  return useSyncExternalStore(subscribeKb, getKb, getKbServer)
+}
+
 /**
  * Bottom sheet: obsidian-900, 1 px strong gold top edge, 16 px top corners, 36 x 3 px grab bar.
  * Rises 320 ms (--ease-sheet), dismisses 200 ms. Height binds to the visual viewport so the
- * footer (LOG) is always above the keyboard. Escape and scrim tap close it.
+ * footer (LOG) is always above the keyboard; under 620 px it pins to the visual viewport itself.
+ * Escape and scrim tap close it. Side gutters are 20 px because the shard strips run the full height.
  */
-export function Sheet({ open, onClose, onClosed, title, headerRight, children, footer, height = 'tall', closeLabel = 'Close', className = '' }: Props) {
+export function Sheet({ open, onClose, onClosed, title, headerRight, children, footer, height = 'tall', closeLabel = 'Close', className = '', contentId }: Props) {
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const closedCb = useRef(onClosed)
   closedCb.current = onClosed
+  const kbUp = useKeyboardUp()
 
   useEffect(() => {
     installVisualViewport()
@@ -87,6 +123,9 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
 
   if (!mounted) return null
 
+  const pinned = kbUp && open
+  const cap = 'min(92svh, var(--vv-h))'
+
   return (
     <div className="fixed inset-0 z-[var(--z-sheet)]" role="presentation">
       <div
@@ -98,21 +137,24 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        className={`absolute inset-x-0 bottom-0 flex flex-col rounded-t-[16px] bg-obsidian-900 shadow-[0_-1px_0_var(--gold-line-strong)] transition-transform will-change-transform keyboard-up:top-0 keyboard-up:rounded-none ${className}`}
+        className={`absolute inset-x-0 flex flex-col bg-obsidian-900 shadow-[0_-1px_0_var(--gold-line-strong)] transition-transform will-change-transform ${
+          pinned ? 'rounded-none' : 'bottom-0 rounded-t-[16px]'
+        } ${className}`}
         style={{
-          maxHeight: 'min(92svh, var(--vv-h))',
-          height: height === 'tall' ? 'min(92svh, var(--vv-h))' : undefined,
+          top: pinned ? 'var(--vv-top, 0px)' : undefined,
+          maxHeight: pinned ? 'var(--vv-h)' : cap,
+          height: pinned ? 'var(--vv-h)' : height === 'tall' ? cap : undefined,
           transform: shown ? 'translateY(0)' : 'translateY(100%)',
           transitionDuration: shown ? 'var(--t-sheet-in)' : 'var(--t-sheet-out)',
           transitionTimingFunction: 'var(--ease-sheet)',
-          paddingBottom: 'var(--safe-bottom)',
+          paddingBottom: pinned ? 0 : 'var(--safe-bottom)',
         }}
       >
-        <div className="flex justify-center pt-2.5 pb-1">
+        <div className="flex shrink-0 justify-center pt-2.5 pb-1">
           <div aria-hidden="true" className="h-[3px] w-9 rounded-[2px] bg-gold-400" />
         </div>
         {(title || headerRight) && (
-          <div className="flex h-14 shrink-0 items-center justify-between px-4">
+          <div className="flex h-14 shrink-0 items-center justify-between pl-5 pr-3">
             <h2 className="font-display inscribed text-[14px] tracking-[0.35em] text-bone">{title}</h2>
             <div className="flex items-center gap-2">
               {headerRight}
@@ -122,8 +164,10 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
             </div>
           </div>
         )}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 scrollbar-none">{children}</div>
-        {footer ? <div className="shrink-0 border-t border-[var(--gold-line)] bg-obsidian-900 px-4 pt-3 pb-3">{footer}</div> : null}
+        <div id={contentId} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 scrollbar-none">
+          {children}
+        </div>
+        {footer ? <div className="shrink-0 border-t border-[var(--gold-line)] bg-obsidian-900 px-5 pt-3 pb-3">{footer}</div> : null}
       </div>
     </div>
   )

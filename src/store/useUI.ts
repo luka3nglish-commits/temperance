@@ -44,7 +44,7 @@ export const useUI = create<UIState>()((set) => ({
   logOpen: false,
   logPrefill: null,
   openLog: (prefill) => set({ logOpen: true, logPrefill: prefill ?? null }),
-  closeLog: () => set({ logOpen: false }),
+  closeLog: () => set({ logOpen: false, logPrefill: null }),
 
   todayOpen: false,
   openToday: () => set({ todayOpen: true }),

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Temperance Open Graph image. Same language as public/icons/icon.svg: obsidian field, the column under the gold line. -->
+  <defs>
+    <linearGradient id="gold" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#5C4418"/>
+      <stop offset="0.22" stop-color="#9C7B33"/>
+      <stop offset="0.42" stop-color="#D8B45A"/>
+      <stop offset="0.5" stop-color="#FFF7DA"/>
+      <stop offset="0.56" stop-color="#F6E3A1"/>
+      <stop offset="0.7" stop-color="#D8B45A"/>
+      <stop offset="1" stop-color="#7A5E22"/>
+    </linearGradient>
+    <linearGradient id="goalline" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#F6E3A1" stop-opacity="0"/>
+      <stop offset="0.15" stop-color="#F6E3A1" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#FFF7DA"/>
+      <stop offset="0.85" stop-color="#F6E3A1" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#F6E3A1" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#D8B45A" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#D8B45A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="plinthshade" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#26262E"/>
+      <stop offset="0.25" stop-color="#121218"/>
+      <stop offset="1" stop-color="#0D0D12"/>
+    </linearGradient>
+  </defs>
+
+  <!-- the void -->
+  <rect width="1200" height="630" fill="#050507"/>
+
+  <!-- warm glow behind the column -->
+  <ellipse cx="330" cy="370" rx="260" ry="220" fill="url(#glow)"/>
+
+  <!-- plinth -->
+  <rect x="190" y="505" width="280" height="38" fill="url(#plinthshade)"/>
+
+  <!-- column body with a vertical light edge -->
+  <rect x="258" y="226" width="144" height="279" fill="#0B0B0F"/>
+  <rect x="258" y="226" width="22" height="279" fill="#121218"/>
+  <rect x="280" y="226" width="7" height="279" fill="#26262E"/>
+
+  <!-- brushed gold capital -->
+  <rect x="258" y="206" width="144" height="20" fill="url(#gold)"/>
+
+  <!-- the gold goal line across the whole frame -->
+  <rect x="0" y="168" width="1200" height="3" fill="url(#goalline)"/>
+
+  <!-- wordmark -->
+  <text x="560" y="292" font-family="Cinzel, Georgia, serif" font-weight="700" font-size="60" letter-spacing="12" fill="url(#gold)">TEMPERANCE</text>
+
+  <!-- rule -->
+  <rect x="564" y="322" width="56" height="1.5" fill="#D8B45A"/>
+
+  <!-- tagline -->
+  <text x="562" y="374" font-family="Cormorant Garamond, Georgia, serif" font-style="italic" font-weight="400" font-size="36" fill="#9A948A">A stoic calorie and macro tracker.</text>
+</svg>
