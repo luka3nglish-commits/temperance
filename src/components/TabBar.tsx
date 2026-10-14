@@ -44,7 +44,7 @@ export function TabBar() {
     <nav
       data-intro="tabbar"
       aria-label="Sections"
-      className="fixed inset-x-0 bottom-0 z-[var(--z-tabbar)] border-t border-[var(--gold-line)] bg-obsidian-900/95 backdrop-blur-[20px]"
+      className="absolute inset-x-0 bottom-0 z-[var(--z-tabbar)] border-t border-[var(--gold-line)] bg-obsidian-900/95 backdrop-blur-[20px]"
       style={{ paddingBottom: 'var(--safe-bottom)' }}
     >
       <div role="tablist" className="mx-auto flex h-14 max-w-[430px] items-end justify-center">

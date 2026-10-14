@@ -6,6 +6,8 @@
  * 3.00, so WebGL2 only). Uniforms are assigned by reference so the scene writes them each frame.
  */
 import { Color, type IUniform, MeshPhysicalMaterial, MeshStandardMaterial, Vector3 } from 'three'
+import { DEBUG } from './debugFlags'
+import { injectReflection } from './environment'
 import { COL, EMBER_EMISSIVE, GOAL_Y } from './tokens'
 
 export type ObsidianUniforms = {
@@ -117,6 +119,7 @@ float tpC = 0.0;
   tpC = above * uCrack * edge * climb;
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.02), tpC);
 }
+float tpMatte = tpC;
 `
 
 const FRAG_ROUGH = /* glsl */ `
@@ -148,7 +151,7 @@ function inject(material: MeshStandardMaterial, uniforms: ObsidianUniforms, key:
 }
 
 export function createObsidianMaterial(physical: boolean, uniforms: ObsidianUniforms): MeshStandardMaterial {
-  if (physical) {
+  if (physical && !DEBUG.std) {
     const m = new MeshPhysicalMaterial({
       color: new Color(COL.column),
       roughness: 0.16,
@@ -157,15 +160,17 @@ export function createObsidianMaterial(physical: boolean, uniforms: ObsidianUnif
       clearcoatRoughness: 0.1,
       envMapIntensity: 1.6,
     })
-    inject(m, uniforms, 'tp-obsidian-phys')
+    if (!DEBUG.nocrack) inject(m, uniforms, 'tp-obsidian-phys')
+    if (!DEBUG.noenv) injectReflection(m, { strength: 0.9, tint: 0, key: 'refl' })
     return m
   }
+  // polished obsidian: low roughness, the mirrored highlights come from injectReflection
   const m = new MeshStandardMaterial({
     color: new Color(COL.column),
-    roughness: 0.25,
+    roughness: 0.18,
     metalness: 0.1,
-    envMapIntensity: 1.2,
   })
-  inject(m, uniforms, 'tp-obsidian-std')
+  if (!DEBUG.nocrack) inject(m, uniforms, 'tp-obsidian-std')
+  if (!DEBUG.noenv) injectReflection(m, { strength: 0.9, tint: 0, key: 'refl' })
   return m
 }

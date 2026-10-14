@@ -31,7 +31,7 @@ Energy strings on screen come from `formatEnergy`: integers, thousands grouped w
 
 ## Scene
 
-`tp-monument` (MonumentLayer root, `data-mode="webgl" | "svg"`, `data-ready="true"` once `ready()` resolved), `tp-monument-canvas`, `tp-monument-svg`, `tp-column` (`data-h` = column height H to 3 dp; H is 2.000 at the goal).
+`tp-monument` (MonumentLayer root, `data-mode="webgl" | "svg"`, `data-ready="true"` once `ready()` resolved, `data-h-target` = the column height the store asks for, to 3 dp), `tp-column` (`data-h` = the rendered column height to 3 dp, updated by whichever renderer is live; H is 2.000 at the goal). `window.__tp.mon` is the live choreography state (h, crack, camera) and `window.__tp.monument` the choreography object.
 
 ## Today
 

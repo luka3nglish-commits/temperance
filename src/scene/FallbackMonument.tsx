@@ -95,6 +95,22 @@ export function FallbackMonument({ hidden = false, crossfade = true, standalone 
   const dust = useRef<(HTMLSpanElement | null)[]>([])
   const last = useRef({ h: -1, crack: -1, burstAt: -100, trauma: 0, goalX: -1, goalFade: -1, flash: -1, hStr: '' })
 
+  // test hook: while the 3D renderer is live it reports the rendered height here, so tp-column's
+  // data-h stays current after this SVG stops rendering
+  useEffect(() => {
+    if (!bus) return
+    const report = (h: number) => {
+      const hs = Math.max(0, h).toFixed(3)
+      if (hs === last.current.hStr || !column.current) return
+      last.current.hStr = hs
+      column.current.setAttribute('data-h', hs)
+    }
+    bus.reportH = report
+    return () => {
+      if (bus.reportH === report) bus.reportH = null
+    }
+  }, [bus])
+
   const render = useMemo(
     () => (mon: Mon) => {
       const L = last.current

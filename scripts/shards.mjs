@@ -83,7 +83,7 @@ function shard(a, b, slantA, slantB, depthAt, place, opts = {}) {
   const glint = [outerB, ...innerPts, outerA]
   const maxDepth = Math.max(...inner.map(([, d]) => d))
   const lines = []
-  if (maxDepth > 34) {
+  if (maxDepth > 24) {
     const n = pick(3, 4)
     for (let i = 0; i < n; i++) {
       const along = a + slantA + 8 + (run - 16) * ((i + between(0.2, 0.8)) / n)
@@ -119,24 +119,30 @@ function strip({ length, count, depthRange, deepAt, place, from = 0, to = length
   return out
 }
 
+// Depths are tuned for a 390 px phone with 16 to 20 px gutters: the stone is a thin broken rim that
+// catches light, never a frame that eats inscriptions. The top strip may go deeper because Shards.tsx
+// clips it to the top safe area plus 22 px (on an iPhone the shards fill the status bar region; on
+// Android and desktop only the first 22 px show). The side strips stop at 18 px so the EATEN and GOAL
+// inscriptions, the ring letters and the week list never sit under stone. The bottom strip lives in
+// the bottom safe area only.
 const top = strip({
   length: 390,
-  count: 5,
-  depthRange: [18, 64],
+  count: 7,
+  depthRange: [10, 44],
   deepAt: 'end',
   place: (s, d) => [s, d],
 })
 const left = strip({
   length: 844,
-  count: 9,
-  depthRange: [18, 64],
+  count: 13,
+  depthRange: [6, 18],
   deepAt: 'end',
   place: (s, d) => [d, s],
 })
 const right = strip({
   length: 844,
-  count: 11,
-  depthRange: [18, 64],
+  count: 15,
+  depthRange: [6, 18],
   deepAt: 'start',
   place: (s, d) => [64 - d, s],
 })
@@ -145,7 +151,7 @@ const bottomLeft = strip({
   count: 3,
   from: 0,
   to: 128,
-  depthRange: [11, 18],
+  depthRange: [8, 16],
   deepAt: 'start',
   place: (s, d) => [s, 64 - d],
   jagLo: 0.7,
@@ -155,7 +161,7 @@ const bottomRight = strip({
   count: 3,
   from: 262,
   to: 390,
-  depthRange: [8, 15],
+  depthRange: [6, 13],
   deepAt: 'end',
   place: (s, d) => [s, 64 - d],
   jagLo: 0.7,

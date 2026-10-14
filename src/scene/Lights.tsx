@@ -6,13 +6,12 @@
  */
 import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Environment, Lightformer } from '@react-three/drei'
 import type { DirectionalLight, PointLight, SpotLight } from 'three'
 import { useBus } from './bus'
-import type { TierSettings } from './tier'
 import { COL, T } from './tokens'
 
-export function Lights({ settings }: { settings: TierSettings }) {
+/** The environment map is built once by ColumnScene (environment.ts); no live bake here. */
+export function Lights() {
   const bus = useBus()
   const key = useRef<SpotLight>(null)
   const rim = useRef<DirectionalLight>(null)
@@ -57,11 +56,6 @@ export function Lights({ settings }: { settings: TierSettings }) {
       <directionalLight ref={rim} color={COL.rimLight} intensity={T.rim} position={[-3, 2.5, -2.5]} />
       <pointLight ref={sweep} color={COL.sweepLight} intensity={T.sweep} distance={7} decay={2} position={[3.2 * Math.sin(0.6), 3.4, 3.2 * Math.cos(0.6)]} />
       <pointLight ref={ember} color={COL.emberLight} intensity={0} distance={2.2} decay={2} position={[0, 2.05, 0.6]} />
-      <Environment resolution={settings.envRes} frames={1} environmentIntensity={T.envIntensity}>
-        <Lightformer form="rect" color={COL.envWarm} intensity={3} position={[0, 5, -2]} scale={[6, 1, 1]} />
-        <Lightformer form="rect" color={COL.envSide} intensity={1.2} position={[-4, 1, 3]} rotation-y={Math.PI / 3} scale={[1, 4, 1]} />
-        <Lightformer form="rect" color={COL.envEmber} intensity={0.6} position={[0, -1, 4]} scale={[4, 0.5, 1]} />
-      </Environment>
     </>
   )
 }

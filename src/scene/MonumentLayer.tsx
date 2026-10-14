@@ -86,12 +86,45 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
 
   useEffect(() => {
     bus.layerTop = () => root.current?.offsetTop ?? 0
+    // test and console hook: the live choreography state
+    const w = window as unknown as { __tp?: Record<string, unknown> }
+    if (w.__tp) {
+      w.__tp.mon = bus.monument.mon
+      w.__tp.monument = bus.monument
+    }
+  }, [bus])
+
+  // short phones: the stage gives (TodayScreen shrinks it to a 280 px floor), so the monument scales
+  // with it. k = available stage height / 460, applied as a transform from the top centre; the
+  // projected --goal-y / --plinth-y are multiplied by the same k (bus.layerScale).
+  const [scale, setScale] = useState(1)
+  useLayoutEffect(() => {
+    const measure = () => {
+      const frame = root.current?.parentElement
+      // no layout yet (or a test DOM): keep the natural size
+      if (!frame || frame.clientHeight === 0) return
+      const cs = getComputedStyle(document.documentElement)
+      const safeTop = parseFloat(cs.getPropertyValue('--safe-top')) || 0
+      const safeBottom = parseFloat(cs.getPropertyValue('--safe-bottom')) || 0
+      // header 40, ring row 124, stoic 64, air 19, bar 56
+      const available = frame.clientHeight - safeTop - safeBottom - 40 - 124 - 64 - 19 - 56
+      const k = Math.max(0.55, Math.min(1, available / 460))
+      const rounded = Math.round(k * 1000) / 1000
+      bus.layerScale = rounded
+      setScale((prev) => (prev === rounded ? prev : rounded))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
   }, [bus])
 
   // ---- store targets and strikes ----
   const targetsFor = useCallback(
     (eaten: number, goal: number) => {
-      bus.monument.setTargets(heightFor(eaten, goal), crackFor(eaten, goal))
+      const h = heightFor(eaten, goal)
+      bus.monument.setTargets(h, crackFor(eaten, goal))
+      // test hook: the target height on the layer root (tp-column carries the rendered height)
+      root.current?.setAttribute('data-h-target', h.toFixed(3))
     },
     [bus],
   )
@@ -266,11 +299,12 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       return
     }
     const top = bus.layerTop()
-    bus.writeStageVars(top + STAGE_PLINTH_Y - GOAL_Y * PX_PER_UNIT, top + STAGE_PLINTH_Y)
+    const k = bus.layerScale
+    bus.writeStageVars(top + (STAGE_PLINTH_Y - GOAL_Y * PX_PER_UNIT) * k, top + STAGE_PLINTH_Y * k)
   }, [bus])
   useLayoutEffect(() => {
     writeVars()
-  }, [writeVars, mode])
+  }, [writeVars, mode, scale])
   useEffect(() => {
     const onResize = () => writeVars()
     window.addEventListener('resize', onResize)
@@ -284,15 +318,20 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
   // ---- the handle ----
   useEffect(() => {
     const m = bus.monument
+    // The opening calls these from callbacks of its own gsap.context timeline. GSAP records any
+    // animation created synchronously inside such a callback into that context, and the opening's
+    // final ctx.revert() would then rewind the camera dolly and the rise to their start values.
+    // A microtask breaks the synchronous chain, so the monument's tweens stay its own.
+    const detached = (fn: () => void) => () => queueMicrotask(fn)
     const handle: MonumentHandle = {
       mode,
       ready: () => readyDeferred.current.promise,
       isReady: () => readyRef.current,
       setInstant: () => m.setInstant(),
-      playOpeningRise: (ms) => m.playOpeningRise(ms),
-      playGoalLine: (ms) => m.playGoalLine(ms),
-      sweepOnce: (ms) => m.sweepOnce(ms),
-      shake: (trauma) => m.shake(trauma),
+      playOpeningRise: (ms) => detached(() => m.playOpeningRise(ms))(),
+      playGoalLine: (ms) => detached(() => m.playGoalLine(ms))(),
+      sweepOnce: (ms) => detached(() => m.sweepOnce(ms))(),
+      shake: (trauma) => detached(() => m.shake(trauma))(),
       startIdle: () => {
         idleRef.current = true
         applyIdle()
@@ -317,7 +356,13 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
         data-ready={ready ? 'true' : 'false'}
         aria-hidden="true"
         className="pointer-events-none absolute left-0 w-full z-[var(--z-canvas)]"
-        style={{ top: 'var(--safe-top)', height: STAGE_H, visibility: visible ? 'visible' : 'hidden' }}
+        style={{
+          top: 'var(--safe-top)',
+          height: STAGE_H,
+          visibility: visible ? 'visible' : 'hidden',
+          transform: scale === 1 ? undefined : `scale(${scale})`,
+          transformOrigin: '50% 0',
+        }}
       >
         {showCanvas ? (
           <div

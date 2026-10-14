@@ -35,7 +35,9 @@ export type TierSettings = {
   tiltHz: number
 }
 
-const HIGH: TierSettings = { dprMax: 1.5, dust: 220, physical: true, envRes: 64, uDepth: 1, uFlute: 0.012, antialias: true, tickerFps: 24, tiltHz: 30 }
+// physical (clearcoat) is off on both tiers: its program compiles about twice as slowly and the
+// polish now comes from the painted reflection, which looks the same on either material
+const HIGH: TierSettings = { dprMax: 1.5, dust: 220, physical: false, envRes: 64, uDepth: 1, uFlute: 0.012, antialias: true, tickerFps: 24, tiltHz: 30 }
 const LOW: TierSettings = { dprMax: 1.0, dust: 90, physical: false, envRes: 32, uDepth: 0, uFlute: 0.012, antialias: false, tickerFps: 12, tiltHz: 15 }
 
 export function tierSettings(t: Tier): TierSettings {

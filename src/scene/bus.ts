@@ -29,6 +29,10 @@ export type SceneBus = {
   dustCount: number
   /** absolute top of the layer inside the 430 px frame, in px */
   layerTop: () => number
+  /** the layer's CSS scale on short phones (1 on a 390 x 844 phone); projected px are multiplied by it */
+  layerScale: number
+  /** test hook: the live renderer reports the rendered column height here (data-h on tp-column) */
+  reportH: ((h: number) => void) | null
   /** --goal-y and --plinth-y writer; the scene calls it at rest and on resize, the layer in svg mode */
   writeStageVars: (goalPx: number, plinthPx: number) => void
 }
@@ -44,6 +48,8 @@ export function createBus(): SceneBus {
     visible: true,
     dustCount: 220,
     layerTop: () => 0,
+    layerScale: 1,
+    reportH: null,
     writeStageVars: (goalPx, plinthPx) => {
       if (typeof document === 'undefined') return
       try {

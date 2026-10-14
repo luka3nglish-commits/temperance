@@ -95,7 +95,7 @@ export function InstallPrompt() {
       <div className="rise-in pointer-events-auto w-full max-w-[358px] rounded-[4px] border border-[var(--gold-line-strong)] bg-obsidian-800 px-4 pt-3 pb-2 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
         <p className="font-display text-[10px] tracking-[0.35em] text-bone-dim">Install</p>
         <p className="mt-1 font-body text-[15px] leading-[1.4] text-bone">{ios ? 'Share, then Add to Home Screen.' : 'Keep it on the home screen. Data stays on this device.'}</p>
-        <div className="mt-1 flex items-center justify-end gap-1">
+        <div className="mt-1 flex items-center justify-end gap-4">
           <Button variant="ghost" size="sm" onClick={later}>
             Later
           </Button>

@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
-import { PerspectiveCamera, Vector3 } from 'three'
+import { type Material, type Object3D, PerspectiveCamera, Vector3 } from 'three'
 import { isReducedMotion } from '../lib/motion'
 import { BusContext, type SceneBus } from './bus'
 import { isFrameProbePending, reportFrameTimes, tierSettings, useTier, type TierSettings } from './tier'
@@ -100,7 +100,8 @@ export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
       return ((1 - v.y) / 2) * h
     }
     const top = bus.layerTop()
-    bus.writeStageVars(top + px(GOAL_Y), top + px(0))
+    const k = bus.layerScale
+    bus.writeStageVars(top + px(GOAL_Y) * k, top + px(0) * k)
   }, [bus, size.width, size.height])
 
   useLayoutEffect(() => {
@@ -125,12 +126,42 @@ export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
     bus.sceneInvalidate = () => invalidate()
     bus.sceneHold = hold
     bus.monument.setHooks({ onCameraRest: writeStageVars })
-    const run = async () => {
+    const mark = (name: string) => {
       try {
-        await gl.compileAsync(scene, camera)
+        performance.mark(name)
       } catch {
-        /* a failed precompile only costs a later hitch; the scene still renders */
+        /* no performance API */
       }
+    }
+    // no environment map on purpose: PMREM alone costs a full shader compile on the main thread.
+    // The mirrored highlights come from environment.ts inside the materials' own programs.
+    mark('tp:gl-env-done')
+    const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
+    const run = async () => {
+      mark('tp:gl-compile-start')
+      // one material per frame: a desktop driver blocks inside compile even with parallel compile,
+      // so chunking keeps every task short and the opening timeline smooth
+      const seen = new Set<string>()
+      const chunks: Object3D[] = []
+      scene.traverse((o) => {
+        const mat = (o as { material?: Material | Material[] }).material
+        if (!mat) return
+        const list = Array.isArray(mat) ? mat : [mat]
+        const key = list.map((m) => m.uuid).join('+')
+        if (seen.has(key)) return
+        seen.add(key)
+        chunks.push(o)
+      })
+      for (const child of chunks) {
+        if (cancelled) return
+        try {
+          await gl.compileAsync(child, camera, scene)
+        } catch {
+          /* a failed precompile only costs a later hitch; the scene still renders */
+        }
+        await nextFrame()
+      }
+      mark('tp:gl-compile-done')
       if (cancelled) return
       try {
         // one frame while still `never`, so the first visible frame is already on the canvas
@@ -138,6 +169,7 @@ export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
       } catch {
         /* ignore */
       }
+      mark('tp:gl-first-frame')
       ready.current = true
       loop.current = holdUntil.current > performance.now() && !isReducedMotion() ? 'always' : 'demand'
       setFrameloop(loop.current)
@@ -170,6 +202,7 @@ export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
     const reduced = isReducedMotion()
     const mon = bus.monument.mon
     const moving = bus.monument.tick(dt, bus.idle && bus.visible, reduced, T.turn)
+    bus.reportH?.(mon.h)
 
     if (isFrameProbePending()) {
       const now = performance.now()
@@ -209,7 +242,7 @@ export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
   return (
     <BusContext.Provider value={bus}>
       <fogExp2 attach="fog" args={[COL.fog, 0.06]} />
-      <Lights settings={settings} />
+      <Lights />
       <Plinth />
       <Column settings={settings} />
       <GoalLine />

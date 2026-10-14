@@ -88,8 +88,11 @@ describe('Monument choreography', () => {
     const m = new Monument(h)
     m.mon.trauma = 1
     const theta0 = m.mon.theta
+    m.tick(0.25, false, false)
+    expect(m.mon.trauma).toBeCloseTo(1 - 0.25 * 2.4, 5)
     m.tick(0.5, false, false)
-    expect(m.mon.trauma).toBeCloseTo(1 - 0.5 * 2.4, 5)
+    // trauma never goes negative (spec section 7: max(0, trauma - dt * 2.4))
+    expect(m.mon.trauma).toBe(0)
     expect(m.mon.rotY).toBe(0)
     expect(m.mon.theta).toBe(theta0)
     m.tick(1, true, false)

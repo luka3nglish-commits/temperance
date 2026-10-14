@@ -187,63 +187,65 @@
   --z-opening: 70;
 }
 
-/* ---------- base ---------- */
-html,
-body,
-#root {
-  min-height: 100dvh;
-  background: var(--color-obsidian-950);
-  color: var(--color-bone);
-}
+/* ---------- base (layered, so Tailwind utilities on buttons and inputs win) ---------- */
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+    background: var(--color-obsidian-950);
+    color: var(--color-bone);
+  }
 
-body {
-  margin: 0;
-  font-family: var(--font-body);
-  font-size: 18px;
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  overscroll-behavior: none;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  overflow-x: hidden;
-}
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 18px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    overflow-x: hidden;
+  }
 
-/* polished centre: page vignette under the shards */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: var(--z-backdrop);
-  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
-}
+  /* polished centre: page vignette under the shards */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: var(--z-backdrop);
+    background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  color: inherit;
-}
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
 
-button {
-  cursor: pointer;
-  background: none;
-  border: 0;
-  padding: 0;
-}
+  button {
+    cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
 
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 
-:focus-visible {
-  outline: 1px solid var(--gold-focus);
-  outline-offset: 2px;
+  :focus-visible {
+    outline: 1px solid var(--gold-focus);
+    outline-offset: 2px;
+  }
 }
 
 /* ---------- type utilities ---------- */
@@ -306,6 +308,10 @@ input[type="number"]::-webkit-outer-spin-button {
   background: var(--ember-grad);
   background-size: 220% 100%;
   background-position: calc(50% + var(--tilt-x) * 60%) 0;
+  /* the shorthand above resets the clip; restore it or the number paints as a block */
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 /* low tier or no blend support: plain gradient */
 .no-grain .gold-num .gold-face,

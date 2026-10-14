@@ -34,11 +34,17 @@ const ASPECT: Record<StripId, string> = {
  * strip's 8 to 18 px shards sit in the bottom safe area under the bar's colour, never over the tab
  * labels. The frame already spans the safe areas (viewport-fit=cover), so no further offset.
  */
+/*
+ * Element sizes clip the strips so the stone never covers an inscription: the top strip shows the top
+ * safe area plus 22 px (deeper shards only appear where a status bar leaves the space empty), the
+ * bottom strip only the bottom safe area, and the side strips run between the header band and the
+ * tab bar. With `slice` the viewBox stays 1:1, so a smaller element simply crops.
+ */
 const PLACE: Record<StripId, string> = {
-  top: 'left-0 right-0 top-0 h-16',
-  bottom: 'left-0 right-0 bottom-0 h-16',
-  left: 'left-0 top-0 bottom-0 w-16',
-  right: 'right-0 top-0 bottom-0 w-16',
+  top: 'left-0 right-0 top-0 h-[calc(var(--safe-top)+22px)]',
+  bottom: 'left-0 right-0 bottom-0 h-[calc(var(--safe-bottom)+6px)]',
+  left: 'left-0 top-[calc(var(--safe-top)+40px)] bottom-[calc(var(--safe-bottom)+56px)] w-16',
+  right: 'right-0 top-[calc(var(--safe-top)+40px)] bottom-[calc(var(--safe-bottom)+56px)] w-16',
 }
 
 /** glint gradient endpoints for a tilt value: the bright seam crosses the strip as the light moves */
@@ -109,9 +115,9 @@ function Strip({ id, polys }: { id: StripId; polys: ShardPoly[] }) {
               x2={`${100 - x1}%`}
               y2={`${100 - y1}%`}
             >
-              <stop offset="0%" stopColor="#1A1A20" />
-              <stop offset="55%" stopColor="#0A0A0D" />
-              <stop offset="100%" stopColor="#26262E" />
+              <stop offset="0%" stopColor="#15151B" />
+              <stop offset="55%" stopColor="#08080B" />
+              <stop offset="100%" stopColor="#1E1E25" />
             </linearGradient>
           )
         })}
