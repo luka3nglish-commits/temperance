@@ -10,17 +10,19 @@ type Props = {
   /** how to print the value, default: 1, 1.5, 2 */
   format?(v: number): string
   className?: string
+  testId?: string
 }
 
 const defaultFormat = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, ''))
 
 /** 56 px stepper with 44 px minus and plus targets. Used for PORTION. */
-export function Stepper({ value, onChange, min = 0.5, max = 4, step = 0.5, label = 'Portion', format = defaultFormat, className = '' }: Props) {
+export function Stepper({ value, onChange, min = 0.5, max = 4, step = 0.5, label = 'Portion', format = defaultFormat, className = '', testId }: Props) {
   const dec = () => onChange(Math.max(min, Math.round((value - step) * 100) / 100))
   const inc = () => onChange(Math.min(max, Math.round((value + step) * 100) / 100))
   return (
     <div
       role="group"
+      data-testid={testId}
       aria-label={label}
       className={`flex h-14 items-center justify-between rounded-[4px] border border-obsidian-600 bg-obsidian-800 ${className}`}
     >

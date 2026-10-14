@@ -58,18 +58,20 @@ type SmallInputProps = {
   width?: number
   label: string
   testId?: string
+  /** the phone keypad: whole numbers (default) or a decimal point too (kg to one decimal) */
+  inputMode?: 'numeric' | 'decimal'
 }
 
 /** A 44 px numeric field for a settings row: obsidian-800, right aligned Cormorant 19 px, unit inside. */
-export function SmallInput({ id, value, onChange, onCommit, suffix, prefix, width = 112, label, testId }: SmallInputProps) {
+export function SmallInput({ id, value, onChange, onCommit, suffix, prefix, width = 112, label, testId, inputMode = 'numeric' }: SmallInputProps) {
   return (
     <span className="relative inline-block" style={{ width }}>
       <input
         id={id}
         data-testid={testId}
         type="text"
-        inputMode="numeric"
-        pattern="[0-9]*"
+        inputMode={inputMode}
+        pattern={inputMode === 'decimal' ? '[0-9]*[.,]?[0-9]*' : '[0-9]*'}
         autoComplete="off"
         aria-label={label}
         value={value}

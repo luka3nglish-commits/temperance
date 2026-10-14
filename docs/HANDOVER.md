@@ -34,8 +34,15 @@ A Temperance icon appears on your home screen. Use that from now on.
 2. DAILY GOAL: type your calories for the day.
 3. MACRO TARGETS: type your protein, carbs and fat in grams. Leave them at 0 if you only want calories.
 4. UNITS: pick KCAL or KJ. The app shows whichever you choose.
+5. TARGET WEIGHT: optional. The weight you are working toward, in kilograms.
 
 That is it. Go back to the home screen and the big number shows how much you have left today.
+
+## Macro goals on the home screen
+
+With MACRO TARGETS set, the three rows beside the ring show your goals. The PROTEIN row reads 142 g on the left and of 180 g on the right: 142 grams eaten so far out of a 180 gram goal. Carbs and fat work the same way.
+
+Tap a row and for a few seconds the ring shows how close you are to that goal, with the percent on the right. Tap it again to go back. A macro with its target at 0 shows its share of today's calories as a percent instead.
 
 ## Log a meal
 
@@ -67,6 +74,10 @@ Tap the star on any meal in LIBRARY to make it a favourite. Favourites sit at th
 
 Under the LOG button you will see RECENT. It lists the last 12 things you logged, even ones you did not save. Tap one to log it again. Hold it to edit the numbers first.
 
+## Repeat yesterday
+
+Eating the same as yesterday? If you logged anything yesterday, the first chip on the LOG sheet reads REPEAT YESTERDAY, with yesterday's total next to it. Tap it and every meal from yesterday is logged again today in one go. The message at the bottom shows how much was added. Tap UNDO on it and they all come off again.
+
 ## Past the line
 
 Your goal is the gold line. While you are under it the big number is gold and shows what you have left. When you go past it the stone breaks through the line, the number turns ember and reads OVER THE LINE with how far over you are. Nothing stops you logging. Tomorrow it resets at midnight.
@@ -74,6 +85,28 @@ Your goal is the gold line. While you are under it the big number is gold and sh
 ## History
 
 HISTORY shows the last 30 days as small columns against the gold line. A column over the line has an ember tip. Tap any day to see what you logged.
+
+## Track your weight
+
+1. Open HISTORY and switch to BODY.
+2. Type your weight in kilograms and save it.
+
+BODY shows your latest weight, the trend, how far you are from your target weight and a chart of your weigh-ins. One weigh-in a day: weigh again the same day and the new number replaces the first. Every weigh-in is listed in BODY, and you can delete one if it was a mistake.
+
+Your weight moves up and down by about a kilo from day to day with water and food. Watch the trend, not one morning. The trend compares your average over the last 7 days with the 7 days before.
+
+To set or change your target weight, open Settings and type it in TARGET WEIGHT, in kilograms. Clear the box to remove it.
+
+Weigh-ins are in the backup file along with everything else.
+
+## Progress photos
+
+1. Open HISTORY, switch to BODY and go to the photos.
+2. Tap the add button. Take a photo or pick one you already have.
+3. Tap a photo to see it full size. You can add a short note to it or delete it. Delete asks twice.
+4. Tap compare to see two photos side by side.
+
+Photos stay on this phone. They are not in the backup file, so exporting and importing does not carry them to a new phone, and clearing the browser or deleting the app removes them. Settings shows how many you have and how much space they take. The app keeps a smaller copy of each photo to save space, so keep the originals in your phone's own photo library if they matter to you.
 
 ## Back up once a week
 
@@ -84,13 +117,13 @@ Your data lives on your phone only. If you lose the phone or clear the browser, 
 3. On iPhone, the share sheet opens. Tap Save to Files, pick a folder, tap Save. You can also send it to yourself in Messages or Mail.
 4. On Android, the file is saved to Downloads, or the share sheet opens and you can send it anywhere.
 
-The file is called temperance followed by the date, for example `temperance-2026-10-14.json`.
+The file is called temperance followed by the date, for example `temperance-2026-10-14.json`. It holds your settings, your library, every day you logged and your weigh-ins. Progress photos are not in it.
 
 To bring it back on a new phone: open Settings, tap IMPORT JSON, pick the file, then choose MERGE to add it to what is there or REPLACE to start from the file.
 
 ## Your data stays on the phone
 
-There is no account, no login and no server. Nothing you log leaves your phone. The only copy anywhere else is the backup you export yourself.
+There is no account, no login and no server. Nothing you log leaves your phone. The only copy anywhere else is the backup you export yourself. Progress photos never leave the phone at all, not even in the backup.
 
 ## Small things worth knowing
 

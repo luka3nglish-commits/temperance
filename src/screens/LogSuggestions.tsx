@@ -42,6 +42,7 @@ export function LogSuggestions({ query, entries, unit, onPick, max = 5 }: Props)
           key={e.id}
           type="button"
           role="option"
+          data-testid={`tp-suggest-${e.id}`}
           aria-selected="false"
           onClick={() => onPick(e)}
           className="flex h-10 shrink-0 items-center gap-2 rounded-[4px] border border-[var(--gold-line-strong)] bg-obsidian-800 px-3 transition-colors duration-150 hover:bg-[var(--gold-line)] active:scale-[0.97] cursor-pointer"

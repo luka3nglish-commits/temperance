@@ -34,14 +34,39 @@ const OPENING_OPTIONS = [
 const MACRO_KEYS = ['protein', 'carbs', 'fat'] as const
 const MACRO_LETTER: Record<keyof MacroTargets, string> = { protein: 'P', carbs: 'C', fat: 'F' }
 
+/** The store keeps weights above 0 and under 500 kg; anything else it would drop. */
+const MAX_KG = 500
+
+/** The TARGET WEIGHT field for a stored target: kg to one decimal (`82.5`, `80.0`), empty when there is none. */
+export function weightDraftFor(kg: number | undefined): string {
+  return typeof kg === 'number' && Number.isFinite(kg) && kg > 0 ? kg.toFixed(1) : ''
+}
+
+export type TargetWeightCommit = { kind: 'clear' } | { kind: 'set'; kg: number } | { kind: 'keep' }
+
 /**
- * SETTINGS. A quiet column of 56 px rows ruled with --gold-line, in the order of spec section 13,
- * then the data rows (export, import, erase) and the footer. Entrance stagger on mount only.
+ * What a committed TARGET WEIGHT draft means: empty clears the target, a weight the store accepts
+ * sets it (to one decimal), anything else (0, 800, letters) keeps the stored target as it was.
+ */
+export function parseTargetWeight(draft: string): TargetWeightCommit {
+  if (draft.trim() === '') return { kind: 'clear' }
+  const n = parseNumber(draft)
+  if (n === null) return { kind: 'keep' }
+  const kg = Math.round(n * 10) / 10
+  if (!(kg > 0) || kg >= MAX_KG) return { kind: 'keep' }
+  return { kind: 'set', kg }
+}
+
+/**
+ * SETTINGS. A quiet column of 56 px rows ruled with --gold-line, in the order of spec section 13
+ * (TARGET WEIGHT sits under MACRO TARGETS), then the data rows (export, import, erase) and the
+ * footer. Entrance stagger on mount only.
  */
 export function SettingsScreen() {
   const settings = useStore((s) => s.settings)
   const setGoalKcal = useStore((s) => s.setGoalKcal)
   const setTargets = useStore((s) => s.setTargets)
+  const setTargetWeight = useStore((s) => s.setTargetWeight)
   const setUnit = useStore((s) => s.setUnit)
   const setHero = useStore((s) => s.setHero)
   const setTilt = useStore((s) => s.setTilt)
@@ -77,6 +102,20 @@ export function SettingsScreen() {
     const n = parseNumber(targetDraft[k])
     if (n !== null) setTargets({ [k]: Math.round(n) })
     else setTargetDraft((d) => ({ ...d, [k]: String(targets[k]) }))
+  }
+
+  // TARGET WEIGHT: kg to one decimal; an empty field clears it
+  const targetWeightKg = settings.targetWeightKg
+  const [weightDraft, setWeightDraft] = useState(() => weightDraftFor(targetWeightKg))
+  useEffect(() => {
+    setWeightDraft(weightDraftFor(targetWeightKg))
+  }, [targetWeightKg])
+  const commitWeight = () => {
+    const next = parseTargetWeight(weightDraft)
+    if (next.kind === 'clear') setTargetWeight(null)
+    else if (next.kind === 'set') setTargetWeight(next.kg)
+    // re-seed from the store: the effect above does not run when the stored value did not change
+    setWeightDraft(weightDraftFor(useStore.getState().settings.targetWeightKg))
   }
 
   const onTilt = (on: boolean) => {
@@ -133,6 +172,20 @@ export function SettingsScreen() {
               />
             ))}
           </div>
+        </SettingsRow>
+
+        <SettingsRow label="Target weight" htmlFor="set-target-weight">
+          <SmallInput
+            id="set-target-weight"
+            testId="tp-settings-target-weight"
+            label="Target weight in kilograms"
+            value={weightDraft}
+            onChange={setWeightDraft}
+            onCommit={commitWeight}
+            suffix="kg"
+            width={112}
+            inputMode="decimal"
+          />
         </SettingsRow>
 
         <SettingsRow label="Units">

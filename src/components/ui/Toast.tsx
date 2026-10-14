@@ -45,6 +45,7 @@ export function Toaster() {
       {current ? (
         <div
           key={current.id}
+          data-testid="tp-toast"
           className={`pointer-events-auto flex max-w-[358px] items-center gap-4 rounded-[4px] border bg-obsidian-800 px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)] rise-in ${
             current.tone === 'warn' ? 'border-[rgba(255,90,31,0.45)]' : 'border-[var(--gold-line-strong)]'
           }`}
@@ -53,6 +54,7 @@ export function Toaster() {
           {current.action ? (
             <button
               type="button"
+              data-testid={current.action.icon === 'undo' ? 'tp-toast-undo' : 'tp-toast-action'}
               className="font-display inline-flex h-9 shrink-0 items-center gap-1.5 text-[10px] tracking-[0.3em] text-gold-300 cursor-pointer"
               onClick={() => {
                 current.action?.onClick()

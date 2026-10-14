@@ -4,11 +4,23 @@ A stoic calorie and macro tracker for one person, built as a phone-first install
 
 Live: https://luka3nglish-commits.github.io/temperance/
 
+## Features
+
+- TODAY: the column against the gold line, the remaining (or eaten) figure, the macro ring and the day's stoic line. Every log is a strike; past the line the stone breaks.
+- LOG: QUICK (calories alone are enough) or BUILD from saved ingredients, favourites as one-tap chips, the last 12 logs one tap from logging again, UNDO on every log.
+- LIBRARY: meals and ingredients with a favourites folder. Editing a meal never changes a past day.
+- HISTORY: the last 30 days as a colonnade, the 7 day average, days under the line, the streak, week and month lists.
+- Settings: daily goal, macro targets, kcal or kJ, motion and opening options, JSON export and import.
+- Weight tracker in HISTORY, BODY: one weigh-in a day, the latest, the 7 day trend, the distance to a target weight set in Settings (TARGET WEIGHT) and a chart. Weigh-ins are in the JSON backup.
+- Progress photos in HISTORY, BODY: add, view, note, compare side by side, delete. They stay on the phone (IndexedDB) and are never in the JSON backup.
+- REPEAT YESTERDAY: the first chip on the LOG sheet logs every entry from yesterday again today in one tap, with UNDO.
+- Macro goals on TODAY: with a target set, each readout beside the ring reads `of 180 g` next to the grams eaten; a tap still shows progress on the ring.
+
 ## Stack
 
 - Vite 8, React 19, TypeScript (strict)
 - Tailwind 4, tokens declared with `@theme` in `src/index.css`
-- zustand 5 with `persist` (localStorage key `temperance.v1`, schema version 2 with a `migrate`)
+- zustand 5 with `persist` (localStorage key `temperance.v1`, schema version 3 with a `migrate`)
 - React Three Fiber 9, drei 10, three 0.186 for the column scene, with a CSS fallback when WebGL is missing
 - gsap for choreography, lucide-react for icons
 - vite-plugin-pwa (Workbox) for the manifest and service worker
@@ -29,7 +41,9 @@ Live: https://luka3nglish-commits.github.io/temperance/
 
 ## Where data lives
 
-Everything is on the device. The store persists to `localStorage` under the key `temperance.v1` as JSON: settings, meal and ingredient library, log entries and the intro counter. There is no account and no server.
+Everything is on the device. The store persists to `localStorage` under the key `temperance.v1` as JSON: settings (with the intro counter and the optional target weight), meal and ingredient library, log entries and weigh-ins. There is no account and no server.
+
+Progress photos are too big for localStorage. `src/lib/photos.ts` keeps them in IndexedDB (database `temperance-photos`), downscaled to 1600 px on the long edge plus a 360 px thumbnail. They never leave the device and are not part of the JSON backup; the Settings footer shows their count and size.
 
 Rules the store enforces:
 
@@ -46,7 +60,7 @@ Both live in Settings.
 
 - EXPORT JSON calls `exportData()` and writes `temperance-YYYY-MM-DD.json`. On phones that support the Web Share API with files it opens the share sheet, otherwise it downloads the file.
 - IMPORT JSON takes a file input, validates it with `validateExportFile` (`src/lib/exportFile.ts`), then asks MERGE or REPLACE with a two-step confirm. A bad file reads `That file is not a Temperance backup.`
-- The export file shape is `ExportFile` in `src/lib/types.ts`: `app: "temperance"`, `version`, `exportedAt`, and the data.
+- The export file shape is `ExportFile` in `src/lib/types.ts`: `app: "temperance"`, `version` (3), `exportedAt`, and the data: settings, meals, ingredients, entries and weights. Progress photos are never in it.
 
 ## Deployment
 

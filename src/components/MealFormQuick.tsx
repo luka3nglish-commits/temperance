@@ -42,6 +42,7 @@ export function MealFormQuick({ draft, onChange, unit, meals, suggestFrom, onSug
     >
       <div>
         <NameInput
+          data-testid="tp-log-name"
           label="Name"
           placeholder="Meal"
           value={draft.name}
@@ -54,6 +55,7 @@ export function MealFormQuick({ draft, onChange, unit, meals, suggestFrom, onSug
       <div className="grid grid-cols-3 gap-3">
         <DigitInput
           ref={caloriesRef}
+          data-testid="tp-log-kcal"
           className="col-span-2"
           label="Calories"
           suffix={unitLabel(unit)}
@@ -66,14 +68,14 @@ export function MealFormQuick({ draft, onChange, unit, meals, suggestFrom, onSug
           <div className="mb-1.5 flex items-baseline justify-between">
             <span className="font-display text-[10px] tracking-[0.35em] text-bone-dim">Portion</span>
           </div>
-          <Stepper value={draft.servings} onChange={(v) => set('servings', v)} min={0.5} max={4} step={0.5} label="Portion" />
+          <Stepper testId="tp-log-portion" value={draft.servings} onChange={(v) => set('servings', v)} min={0.5} max={4} step={0.5} label="Portion" />
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <DigitInput label="Protein" suffix="g" placeholder="0" value={draft.protein} onChange={(v) => set('protein', v)} />
-        <DigitInput label="Carbs" suffix="g" placeholder="0" value={draft.carbs} onChange={(v) => set('carbs', v)} />
-        <DigitInput label="Fat" suffix="g" placeholder="0" value={draft.fat} onChange={(v) => set('fat', v)} />
+        <DigitInput data-testid="tp-log-protein" label="Protein" suffix="g" placeholder="0" value={draft.protein} onChange={(v) => set('protein', v)} />
+        <DigitInput data-testid="tp-log-carbs" label="Carbs" suffix="g" placeholder="0" value={draft.carbs} onChange={(v) => set('carbs', v)} />
+        <DigitInput data-testid="tp-log-fat" label="Fat" suffix="g" placeholder="0" value={draft.fat} onChange={(v) => set('fat', v)} />
       </div>
 
       <MealFormHint hint={hint.text} differs={hint.differs} saveToLibrary={save} onSaveToLibrary={(on) => set('saveOverride', on)} />

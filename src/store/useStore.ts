@@ -92,6 +92,8 @@ export interface TemperanceStore extends Data {
   ): LogEntry
   updateEntry(id: string, patch: { name?: string; servings?: number; macros?: Macros }, now?: number): void
   deleteEntry(id: string, now?: number): void
+  /** Remove several entries in one write with one pulse (UNDO of a repeated day). */
+  deleteEntries(ids: readonly string[], now?: number): void
   /** Put a deleted entry back exactly as it was (UNDO). No-op if an entry with that id exists. */
   restoreEntry(entry: LogEntry, now?: number): void
   /** Copy every entry from `fromDay` into `toDay` (default today). Returns the copies (for UNDO). */
@@ -396,6 +398,19 @@ export const useStore = create<TemperanceStore>()(
         })
       },
 
+      deleteEntries(ids, now = Date.now()) {
+        const drop = new Set(ids)
+        set((s) => {
+          const gone = s.entries.filter((e) => drop.has(e.id))
+          if (!gone.length) return {}
+          const entries = s.entries.filter((e) => !drop.has(e.id))
+          const today = localDayKey(new Date(now))
+          const todayKcal = gone.filter((e) => e.day === today).reduce((sum, e) => sum + e.macros.kcal, 0)
+          const pulse = todayKcal !== 0 ? makePulse('remove', -todayKcal, entries, s.settings, now) : s.pulse
+          return { entries, pulse }
+        })
+      },
+
       restoreEntry(entry, now = Date.now()) {
         set((s) => {
           if (s.entries.some((e) => e.id === entry.id)) return {}
@@ -414,7 +429,15 @@ export const useStore = create<TemperanceStore>()(
         set((s) => {
           const entries = [...s.entries, ...copies]
           const added = sumMacros(copies.map((c) => c.macros)).kcal
-          return { entries, pulse: makePulse('log', added, entries, s.settings, now) }
+          // the library meals behind the copies count as used again
+          const meals = { ...s.meals }
+          for (const c of copies) {
+            if (c.mealId && meals[c.mealId]) {
+              const m = meals[c.mealId]
+              meals[c.mealId] = { ...m, lastUsedAt: now, useCount: m.useCount + 1 }
+            }
+          }
+          return { entries, meals, pulse: makePulse('log', added, entries, s.settings, now) }
         })
         return copies
       },
@@ -453,6 +476,8 @@ export const useStore = create<TemperanceStore>()(
         set((s) => (s.weights.some((w) => w.id === id) ? { weights: s.weights.filter((w) => w.id !== id) } : {}))
       },
       setTargetWeight(kg) {
+        // null clears; an invalid number is ignored rather than clearing
+        if (kg !== null && clampKg(kg) === null) return
         set((s) => {
           const v = kg === null ? null : clampKg(kg)
           const settings = { ...s.settings }

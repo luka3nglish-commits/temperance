@@ -4,6 +4,8 @@ import { useStore } from '../store/useStore'
 import { useUI, type LogPrefill } from '../store/useUI'
 import { favouritesByUse, recentEntries, recentKey } from '../store/selectors'
 import { roundMacros } from '../lib/macros'
+import { yesterdayKey } from '../lib/day'
+import { useToday } from '../lib/useToday'
 import { Button, Segmented, Sheet, useToast } from '../components/ui'
 import { useKeyboardUp } from '../components/ui/Sheet'
 import {
@@ -26,6 +28,7 @@ import { MealFormQuick } from '../components/MealFormQuick'
 import { MealFormBuild } from '../components/MealFormBuild'
 import { LogFavourites } from './LogFavourites'
 import { LogRecents } from './LogRecents'
+import { RepeatYesterdayChip, daySummary, repeatToastText } from './LogRepeat'
 
 type Mode = 'quick' | 'build'
 const MODES: readonly { value: Mode; label: string }[] = [
@@ -50,8 +53,9 @@ function liveMealFor(entry: LogEntry, meals: Record<string, Meal>): Meal | undef
 
 /**
  * THE LOG SHEET. Opens from the keystone (or a prefill from TODAY and LIBRARY), QUICK or BUILD,
- * favourites chips and the LOG button in a sticky footer, RECENT underneath. Every write is a
- * synchronous store call; the sheet closes and the strike plays from the store pulse.
+ * the chip row (REPEAT YESTERDAY, then favourites) and the LOG button in a sticky footer, RECENT
+ * underneath. Every write is a synchronous store call; the sheet closes and the strike plays from
+ * the store pulse.
  */
 export function LogSheet() {
   const open = useUI((s) => s.logOpen)
@@ -70,6 +74,7 @@ export function LogSheet() {
   const hideRecent = useStore((s) => s.hideRecent)
   const toast = useToast((s) => s.show)
   const kbUp = useKeyboardUp()
+  const today = useToday()
 
   const unit = settings.unit
   const [mode, setMode] = useState<Mode>('quick')
@@ -82,6 +87,9 @@ export function LogSheet() {
   const recents = useMemo(() => recentEntries(entries, RECENT_LIMIT, settings.hiddenRecents), [entries, settings.hiddenRecents])
   const suggestFrom = useMemo(() => recentEntries(entries, 40, settings.hiddenRecents), [entries, settings.hiddenRecents])
   const favourites = useMemo(() => favouritesByUse(meals).slice(0, 8), [meals])
+  // REPEAT YESTERDAY shows while yesterday holds at least one entry
+  const yesterday = yesterdayKey(today)
+  const repeat = useMemo(() => daySummary(entries, yesterday), [entries, yesterday])
 
   // The newest visible log as of the last open (the store hydrates synchronously, so the first
   // render already sees it). A row logged since, here or from LIBRARY and TODAY, rises in on the
@@ -139,25 +147,28 @@ export function LogSheet() {
   }, [])
 
   // ---------- after any write ----------
+  /** The write already happened and counts; when it could not be persisted the toast says so instead. True when it did. */
+  const warnIfSessionOnly = useCallback((): boolean => {
+    if (!useStore.getState().persistFailed) return false
+    toast({
+      text: 'Saved for this session only. Export now.',
+      tone: 'warn',
+      duration: 8000,
+      action: { label: 'Export', onClick: () => setTab('settings') },
+    })
+    return true
+  }, [setTab, toast])
+
   const afterLog = useCallback(
     (entry: LogEntry) => {
       closeLog()
-      // the write already happened and the entry counts; the toast only says where it lives
-      if (useStore.getState().persistFailed) {
-        toast({
-          text: 'Saved for this session only. Export now.',
-          tone: 'warn',
-          duration: 8000,
-          action: { label: 'Export', onClick: () => setTab('settings') },
-        })
-        return
-      }
+      if (warnIfSessionOnly()) return
       toast({
         text: `Logged · ${energyLine(entry.macros.kcal, unit)}`,
         action: { label: 'Undo', icon: 'undo', onClick: () => deleteEntry(entry.id) },
       })
     },
-    [closeLog, deleteEntry, setTab, toast, unit],
+    [closeLog, deleteEntry, toast, unit, warnIfSessionOnly],
   )
 
   // ---------- submit ----------
@@ -233,18 +244,41 @@ export function LogSheet() {
 
   const onHide = useCallback((e: LogEntry) => hideRecent(recentKey(e)), [hideRecent])
 
+  // REPEAT YESTERDAY: every entry from yesterday copied onto today in one store write, one toast, one UNDO
+  const onRepeat = useCallback(() => {
+    // the sheet is already on its way out: a second tap during the close never doubles the day
+    if (!useUI.getState().logOpen) return
+    const copies = useStore.getState().repeatDay(yesterdayKey(today))
+    if (!copies.length) return
+    closeLog()
+    if (warnIfSessionOnly()) return
+    const kcal = copies.reduce((sum, c) => sum + c.macros.kcal, 0)
+    toast({
+      text: repeatToastText(kcal, unit),
+      action: { label: 'Undo', icon: 'undo', onClick: () => copies.forEach((c) => deleteEntry(c.id)) },
+    })
+  }, [closeLog, deleteEntry, today, toast, unit, warnIfSessionOnly])
+
   return (
     <Sheet
       open={open}
       onClose={closeLog}
       onClosed={reset}
       title="Log"
+      testId="tp-log-sheet"
       contentId={CONTENT_ID}
       headerRight={<Segmented<Mode> value={mode} options={MODES} onChange={(v) => setMode(v)} label="Mode" />}
       footer={
         <div>
-          {!kbUp ? <LogFavourites meals={favourites} unit={unit} onPick={onFavourite} /> : null}
-          <Button variant="gold" full type="submit" form={FORM_ID} disabled={!canLog} aria-disabled={!canLog}>
+          {!kbUp ? (
+            <LogFavourites
+              meals={favourites}
+              unit={unit}
+              onPick={onFavourite}
+              lead={repeat.count > 0 ? <RepeatYesterdayChip kcal={repeat.kcal} count={repeat.count} unit={unit} onRepeat={onRepeat} /> : null}
+            />
+          ) : null}
+          <Button variant="gold" full type="submit" form={FORM_ID} disabled={!canLog} aria-disabled={!canLog} data-testid="tp-log-submit">
             Log
           </Button>
         </div>

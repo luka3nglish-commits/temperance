@@ -21,6 +21,8 @@ type Props = {
   className?: string
   /** id for the scrolling content column (so a form can scroll it to the top) */
   contentId?: string
+  /** data-testid for the dialog panel */
+  testId?: string
 }
 
 /** The visual viewport is shorter than this when a keyboard is up (spec section 10). */
@@ -87,7 +89,7 @@ const canAnimate = (el: Element | null): el is HTMLElement => !!el && typeof (el
  * the visual viewport itself. Escape, the scrim, the close button and a drag down on the grab bar
  * close it. On desktop it hugs the 430 px slab. Side gutters are 20 px because the shard strips run the full height.
  */
-export function Sheet({ open, onClose, onClosed, title, headerRight, children, footer, height = 'tall', closeLabel = 'Close', className = '', contentId }: Props) {
+export function Sheet({ open, onClose, onClosed, title, headerRight, children, footer, height = 'tall', closeLabel = 'Close', className = '', contentId, testId }: Props) {
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -232,6 +234,7 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
       <div
         ref={panelRef}
         role="dialog"
+        data-testid={testId}
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}

@@ -5,6 +5,7 @@
  * Split by calorie contribution (macroEnergySplit) so the ring matches the big number.
  * A zero macro draws no arc but keeps its gap. Empty day: three equal 114 deg arcs in the track colour.
  * Ghost target arcs at radius 44 when targets are set. Angles tween 520 ms --ease-stone in rAF.
+ * Readouts show each macro's goal (`of 180 g`) when its target is set, else its energy share.
  * Tapping a readout row flips the ring into single-macro progress mode for 6 s.
  */
 import { useEffect, useState } from 'react'
@@ -184,6 +185,17 @@ export function TodayRing({ totals, targets, focus, size = 112 }: RingProps) {
   )
 }
 
+/**
+ * The right-aligned column of a readout row. In progress mode: grams against the target as a
+ * percent (`79%`). With a target set: the goal itself (`of 180 g`). Without one: the macro's
+ * share of today's energy (`31%`, `0%` on an empty day).
+ */
+export function readoutAside({ active, target, ratio, share, empty }: { active: boolean; target: number; ratio: number; share: number; empty: boolean }): string {
+  if (active) return `${ratio}%`
+  if (target > 0) return `of ${target} g`
+  return `${empty ? 0 : share}%`
+}
+
 type RowProps = {
   totals: Macros
   targets: MacroTargets
@@ -233,6 +245,7 @@ export function TodayRingRow({ totals, targets, onOpen }: RowProps) {
       <div data-intro="ring-readouts" className="absolute right-6 top-[14px] left-40">
         {MACRO_KEYS.map((k) => {
           const active = focus === k
+          const target = Math.round(targets[k])
           const share = Math.round(split[k] * 100)
           const ratio = Math.round(progress[k] * 100)
           return (
@@ -242,19 +255,23 @@ export function TodayRingRow({ totals, targets, onOpen }: RowProps) {
               onClick={() => toggle(k)}
               data-testid={`tp-readout-${k}`}
               data-grams={grams(k)}
+              data-target={target}
               aria-pressed={active}
-              aria-label={`${MACRO_LABEL[k]} ${grams(k)} grams${targets[k] > 0 ? `, ${ratio} percent of target` : ''}`}
+              aria-label={`${MACRO_LABEL[k]} ${grams(k)} grams${target > 0 ? ` of ${target}, ${ratio} percent of target` : ''}`}
               className="relative flex h-8 w-full cursor-pointer items-center gap-2.5 text-left before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-['']"
             >
               <span aria-hidden="true" className="h-0.5 w-2.5 shrink-0" style={{ background: MACRO_COLOUR[k] }} />
               <span className={`font-display inscribed w-[62px] shrink-0 text-[10px] leading-none tracking-[0.3em] ${active ? 'text-gold-300' : 'text-bone-dim'}`}>
                 {MACRO_LABEL[k]}
               </span>
-              <span className="num font-body text-[18px] font-medium leading-none text-bone">
+              <span className="num font-body shrink-0 whitespace-nowrap text-[18px] font-medium leading-none text-bone">
                 {grams(k)} <span className="text-[15px] text-bone-dim">g</span>
               </span>
-              <span className={`num font-body ml-auto text-[15px] leading-none ${active ? 'text-gold-300' : 'text-bone-dim'}`}>
-                {active ? ratio : empty ? 0 : share}%
+              <span
+                data-aside={active ? 'progress' : target > 0 ? 'target' : 'share'}
+                className={`num font-body ml-auto shrink-0 whitespace-nowrap text-[15px] leading-none ${active ? 'text-gold-300' : 'text-bone-dim'}`}
+              >
+                {readoutAside({ active, target, ratio, share, empty })}
               </span>
             </button>
           )

@@ -48,7 +48,7 @@ export function LogRecents({ entries, unit, onRelog, onEditFirst, onHide, limit 
         Recent
       </SectionHeading>
       {entries.length ? (
-        <ul className="flex flex-col">
+        <ul data-testid="tp-recents" className="flex flex-col">
           {entries.map((e) => {
             const key = recentKey(e)
             return (
@@ -68,7 +68,9 @@ export function LogRecents({ entries, unit, onRelog, onEditFirst, onHide, limit 
           })}
         </ul>
       ) : (
-        <EmptyLine className="pt-3">Nothing logged yet.</EmptyLine>
+        <div data-testid="tp-recent-empty">
+          <EmptyLine className="pt-3">Nothing logged yet.</EmptyLine>
+        </div>
       )}
     </section>
   )
@@ -200,6 +202,7 @@ function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, on
       <button
         ref={faceRef}
         type="button"
+        data-testid={`tp-recent-row-${entry.id}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endPress}
