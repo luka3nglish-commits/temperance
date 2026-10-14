@@ -1,0 +1,7 @@
+node_modules
+dist
+.tmp
+dev-dist
+.vite
+*.log
+.DS_Store
