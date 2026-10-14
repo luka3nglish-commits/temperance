@@ -91,6 +91,8 @@ export function SafeCanvas({ children, settings, onFallback, onRemount, onCreate
         className={className}
         style={{ touchAction: 'pan-y', position: 'absolute', inset: 0 }}
         dpr={[1, settings.dprMax]}
+        // offsetWidth/Height ignore the layer's short-phone CSS scale; getBoundingClientRect would not
+        resize={{ offsetSize: true }}
         gl={{
           antialias: settings.antialias,
           alpha: true,

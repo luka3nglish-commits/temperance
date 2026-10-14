@@ -48,7 +48,8 @@ try {
       monument: document.querySelector('[data-testid=tp-monument]')?.getAttribute('data-ready') ?? null,
       mode: document.querySelector('[data-testid=tp-monument]')?.getAttribute('data-mode') ?? null,
       tier: document.documentElement.dataset.tier ?? null,
-      h: document.querySelector('[data-testid=tp-monument]')?.getAttribute('data-h') ?? null,
+      h: document.querySelector('[data-testid=tp-monument]')?.getAttribute('data-h-target') ?? null,
+      rotY: window.__tp?.mon?.rotY ?? null,
       parallelCompile: (() => {
         try {
           const g = document.createElement('canvas').getContext('webgl2')
@@ -67,6 +68,10 @@ try {
     await page.reload({ waitUntil: 'domcontentloaded' })
     await new Promise((r) => setTimeout(r, 3000))
     second = await read()
+    // live idle: the column turns at 0.035 rad/s, so rotY must move over a second
+    await new Promise((r) => setTimeout(r, 1200))
+    second.rotYLater = await page.evaluate(() => window.__tp?.mon?.rotY ?? null)
+    second.idleTurning = second.rotYLater !== null && second.rotY !== null && second.rotYLater > second.rotY
   }
   console.log(JSON.stringify({ mode: { headed: args.includes('--headed'), nowebgl: NOWEBGL, reduced: args.includes('--reduced') }, first, second, errors }, null, 1))
 } finally {

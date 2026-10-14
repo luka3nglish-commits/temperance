@@ -254,11 +254,7 @@ export function HistoryWeight({ today }: { today: string }) {
       action: {
         label: 'Undo',
         icon: 'undo',
-        onClick: () => {
-          const s = useStore.getState()
-          const back = s.addWeight(w.kg, w.day, w.at)
-          if (back && w.note) s.updateWeight(back.id, { note: w.note })
-        },
+        onClick: () => useStore.getState().restoreWeight(w),
       },
     })
   }

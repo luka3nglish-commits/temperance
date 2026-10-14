@@ -255,7 +255,7 @@ export function LogSheet() {
     const kcal = copies.reduce((sum, c) => sum + c.macros.kcal, 0)
     toast({
       text: repeatToastText(kcal, unit),
-      action: { label: 'Undo', icon: 'undo', onClick: () => copies.forEach((c) => deleteEntry(c.id)) },
+      action: { label: 'Undo', icon: 'undo', onClick: () => useStore.getState().deleteEntries(copies.map((c) => c.id)) },
     })
   }, [closeLog, deleteEntry, today, toast, unit, warnIfSessionOnly])
 

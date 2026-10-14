@@ -124,7 +124,8 @@ export function HistoryPhotos({ today }: { today: string }) {
     }
     await reload()
     if (alive.current) setBusy(false)
-    if (error) toast({ text: error, tone: 'warn' })
+    if (error && added) toast({ text: `${addedText(added)} · one could not be read`, tone: 'warn' })
+    else if (error) toast({ text: error, tone: 'warn' })
     else if (added) toast({ text: addedText(added) })
   }
 

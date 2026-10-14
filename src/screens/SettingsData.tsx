@@ -4,6 +4,7 @@ import { Button, IconButton, useToast } from '../components/ui'
 import type { ExportFile, ImportMode, ImportResult } from '../lib/types'
 import { localDayKey } from '../lib/day'
 import { backupFileName, validateExportFile } from '../lib/exportFile'
+import { clearPhotos } from '../lib/photos'
 import { useStore } from '../store/useStore'
 import { SettingsNote, SettingsRow } from './SettingsRow'
 
@@ -171,6 +172,7 @@ export function SettingsData() {
     setArmed(false)
     setPending(null)
     resetAll()
+    void clearPhotos().catch(() => {})
     toast({ text: 'Erased.' })
   }
 

@@ -431,15 +431,20 @@ export const useStore = create<TemperanceStore>()(
         set((s) => {
           const entries = [...s.entries, ...copies]
           const added = sumMacros(copies.map((c) => c.macros)).kcal
-          // the library meals behind the copies count as used again
+          // the library meals (and the ingredients inside built ones) count as used again
           const meals = { ...s.meals }
+          const ingredients = { ...s.ingredients }
           for (const c of copies) {
             if (c.mealId && meals[c.mealId]) {
               const m = meals[c.mealId]
               meals[c.mealId] = { ...m, lastUsedAt: now, useCount: m.useCount + 1 }
             }
+            for (const comp of c.components ?? []) {
+              const ing = ingredients[comp.ingredientId]
+              if (ing) ingredients[comp.ingredientId] = { ...ing, lastUsedAt: now, useCount: ing.useCount + 1 }
+            }
           }
-          return { entries, meals, pulse: makePulse('log', added, entries, s.settings, now) }
+          return { entries, meals, ingredients, pulse: makePulse('log', added, entries, s.settings, now) }
         })
         return copies
       },

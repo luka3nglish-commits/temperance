@@ -55,7 +55,14 @@ function openDb(): Promise<IDBDatabase> {
     }
     req.onsuccess = () => {
       const db = req.result
-      db.onversionchange = () => db.close()
+      // a closed connection must not stay cached, or every later transaction throws until reload
+      db.onversionchange = () => {
+        db.close()
+        dbPromise = null
+      }
+      db.onclose = () => {
+        dbPromise = null
+      }
       resolve(db)
     }
     req.onerror = () => reject(req.error ?? new Error('IndexedDB failed to open'))
@@ -77,7 +84,8 @@ function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequ
         const req = run(store)
         if (req) req.onsuccess = () => (result = req.result)
         t.oncomplete = () => resolve(result as T)
-        t.onerror = () => reject(t.error ?? new Error('IndexedDB transaction failed'))
+        // a failed request bubbles its error to the transaction before the abort; keep the real one
+        t.onerror = (ev) => reject((ev.target as IDBRequest | null)?.error ?? t.error ?? new Error('IndexedDB transaction failed'))
         t.onabort = () => reject(t.error ?? new Error('IndexedDB transaction aborted'))
       }),
   )
@@ -188,6 +196,14 @@ export async function deletePhoto(id: string): Promise<void> {
   if (!photosSupported()) return
   await tx('readwrite', (store) => {
     store.delete(id)
+  })
+}
+
+/** Remove every photo (ERASE ALL). */
+export async function clearPhotos(): Promise<void> {
+  if (!photosSupported()) return
+  await tx('readwrite', (store) => {
+    store.clear()
   })
 }
 

@@ -104,8 +104,21 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       // no layout yet (or a test DOM): keep the natural size
       if (!frame || frame.clientHeight === 0) return
       const cs = getComputedStyle(document.documentElement)
-      const safeTop = parseFloat(cs.getPropertyValue('--safe-top')) || 0
-      const safeBottom = parseFloat(cs.getPropertyValue('--safe-bottom')) || 0
+      const readSafe = (name: '--safe-top' | '--safe-bottom') => {
+        const v = parseFloat(cs.getPropertyValue(name))
+        if (Number.isFinite(v)) return v
+        // a browser that hands back the raw env() token: measure it through a probe element
+        const probe = document.createElement('div')
+        probe.style.cssText =
+          'position:fixed;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)'
+        document.body.appendChild(probe)
+        const pcs = getComputedStyle(probe)
+        const out = parseFloat(name === '--safe-top' ? pcs.paddingTop : pcs.paddingBottom) || 0
+        probe.remove()
+        return out
+      }
+      const safeTop = readSafe('--safe-top')
+      const safeBottom = readSafe('--safe-bottom')
       // header 40, ring row 124, stoic 64, air 19, bar 56
       const available = frame.clientHeight - safeTop - safeBottom - 40 - 124 - 64 - 19 - 56
       const k = Math.max(0.55, Math.min(1, available / 460))
@@ -244,6 +257,13 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
     if (mode === 'webgl' && readyRef.current && !joined && introDone) joinNow(true)
   }, [introDone, mode, joined, joinNow])
 
+  // once the opening is over the column is always in live idle, whichever path ended it
+  useEffect(() => {
+    if (!introDone) return
+    idleRef.current = true
+    applyIdle()
+  }, [introDone, applyIdle])
+
   // nothing placed the column (no opening ran, or it never reached the scene): place it now
   useEffect(() => {
     const place = () => {
@@ -316,7 +336,9 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
   }, [writeVars])
 
   // ---- the handle ----
-  useEffect(() => {
+  // a layout effect: Opening's own layout effect runs setInstant / startIdle on a quiet relaunch in
+  // the same commit, and this layer mounts earlier in tree order, so the real handle must already be set
+  useLayoutEffect(() => {
     const m = bus.monument
     // The opening calls these from callbacks of its own gsap.context timeline. GSAP records any
     // animation created synchronously inside such a callback into that context, and the opening's
