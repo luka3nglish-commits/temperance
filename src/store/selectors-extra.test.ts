@@ -5,6 +5,7 @@ import {
   disciplineStreak,
   favouritesByUse,
   goalProgress,
+  historyDays,
   libraryIngredients,
   libraryMeals,
   loggedDays,
@@ -12,110 +13,116 @@ import {
   matchesQuery,
   perServingKcal,
   recentKey,
-  remainingKcal,
   searchIngredients,
   searchMeals,
-  underTheLine,
 } from './selectors'
 
-const M = (kcal: number, protein = 0, carbs = 0, fat = 0) => ({ kcal, protein, carbs, fat })
-
-const meal = (id: string, name: string, extra: Partial<Meal> = {}): Meal => ({
+const meal = (id: string, name: string, favourite = false, lastUsedAt?: number): Meal => ({
   id,
   name,
   kind: 'quick',
-  macros: M(100),
-  favourite: false,
+  macros: { kcal: 100, protein: 0, carbs: 0, fat: 0 },
+  favourite,
   createdAt: 0,
   updatedAt: 0,
+  lastUsedAt,
   useCount: 0,
-  ...extra,
 })
 
-const ing = (id: string, name: string, favourite = false): Ingredient => ({
+const ingredient = (id: string, name: string, favourite = false): Ingredient => ({
   id,
   name,
   per: { amount: 100, unit: 'g' },
-  macros: M(100),
+  macros: { kcal: 100, protein: 0, carbs: 0, fat: 0 },
   favourite,
   createdAt: 0,
   updatedAt: 0,
   useCount: 0,
 })
 
-const entry = (id: string, day: string, kcal: number, at = 0, extra: Partial<LogEntry> = {}): LogEntry => ({
+const entry = (id: string, day: string, kcal: number, at: number, servings = 1, name = 'X'): LogEntry => ({
   id,
   day,
   at,
-  name: id,
-  servings: 1,
-  macros: M(kcal),
-  ...extra,
+  name,
+  servings,
+  macros: { kcal, protein: 0, carbs: 0, fat: 0 },
 })
 
 const record = <T extends { id: string }>(list: T[]): Record<string, T> => Object.fromEntries(list.map((x) => [x.id, x]))
 
 describe('favouritesByUse', () => {
-  it('orders favourites by last use, newest first, then by name', () => {
+  it('orders by last use, then name, and excludes non-favourites', () => {
     const meals = record([
-      meal('a', 'Zeta', { favourite: true, lastUsedAt: 100 }),
-      meal('b', 'Alpha', { favourite: true, lastUsedAt: 300 }),
-      meal('c', 'Mid', { favourite: true, lastUsedAt: 100 }),
-      meal('d', 'Never', { favourite: true }),
-      meal('e', 'Not fav', { favourite: false, lastUsedAt: 999 }),
+      meal('a', 'Zeta', true, 100),
+      meal('b', 'Alpha', true, 300),
+      meal('c', 'Beta', true),
+      meal('d', 'Aardvark', false, 999),
+      meal('e', 'Gamma', true, 100),
     ])
-    expect(favouritesByUse(meals).map((m) => m.name)).toEqual(['Alpha', 'Mid', 'Zeta', 'Never'])
+    expect(favouritesByUse(meals).map((m) => m.id)).toEqual(['b', 'e', 'a', 'c'])
   })
 
-  it('returns an empty list when nothing is a favourite', () => {
-    expect(favouritesByUse(record([meal('a', 'A'), meal('b', 'B')]))).toEqual([])
+  it('is empty with no favourites', () => {
+    expect(favouritesByUse(record([meal('a', 'A')]))).toEqual([])
     expect(favouritesByUse({})).toEqual([])
   })
 })
 
-describe('library ordering', () => {
-  it('libraryMeals puts favourites first then sorts alphabetically within each group', () => {
-    const meals = record([meal('a', 'Toast'), meal('b', 'Oats', { favourite: true }), meal('c', 'Beans'), meal('d', 'Whey', { favourite: true })])
-    expect(libraryMeals(meals).map((m) => m.name)).toEqual(['Oats', 'Whey', 'Beans', 'Toast'])
+describe('libraryMeals and libraryIngredients', () => {
+  it('puts favourites first, then alphabetical within each group', () => {
+    const meals = record([meal('a', 'Oats'), meal('b', 'Kebab', true), meal('c', 'Apple'), meal('d', 'Zucchini', true)])
+    expect(libraryMeals(meals).map((m) => m.name)).toEqual(['Kebab', 'Zucchini', 'Apple', 'Oats'])
   })
 
-  it('libraryIngredients does the same for ingredients', () => {
-    const ings = record([ing('a', 'Rice'), ing('b', 'Chicken', true), ing('c', 'Avocado'), ing('d', 'Egg', true)])
-    expect(libraryIngredients(ings).map((g) => g.name)).toEqual(['Chicken', 'Egg', 'Avocado', 'Rice'])
+  it('ignores last use entirely', () => {
+    const meals = record([meal('a', 'B', false, 999), meal('b', 'A', false, 1)])
+    expect(libraryMeals(meals).map((m) => m.name)).toEqual(['A', 'B'])
+  })
+
+  it('sorts ingredients the same way', () => {
+    const ings = record([ingredient('a', 'Rice'), ingredient('b', 'Whey', true), ingredient('c', 'Butter'), ingredient('d', 'Avocado', true)])
+    expect(libraryIngredients(ings).map((g) => g.name)).toEqual(['Avocado', 'Whey', 'Butter', 'Rice'])
     expect(libraryIngredients({})).toEqual([])
   })
 })
 
-describe('matchesQuery and search', () => {
-  it('an empty or whitespace query matches everything', () => {
-    expect(matchesQuery('Chicken and rice', '')).toBe(true)
-    expect(matchesQuery('Chicken and rice', '   ')).toBe(true)
-    expect(matchesQuery('', '')).toBe(true)
+describe('matchesQuery', () => {
+  it('matches everything on an empty or whitespace query', () => {
+    expect(matchesQuery('Chicken rice', '')).toBe(true)
+    expect(matchesQuery('Chicken rice', '   ')).toBe(true)
   })
 
-  it('is case-insensitive and substring friendly', () => {
-    expect(matchesQuery('Chicken and rice', 'CHICK')).toBe(true)
-    expect(matchesQuery('Chicken and rice', 'and r')).toBe(true)
-    expect(matchesQuery('Chicken and rice', 'beef')).toBe(false)
+  it('is case insensitive', () => {
+    expect(matchesQuery('Chicken rice', 'CHICK')).toBe(true)
+    expect(matchesQuery('CHICKEN RICE', 'rice')).toBe(true)
   })
 
-  it('a multi-word query matches when every word appears, in any order', () => {
-    expect(matchesQuery('Chicken and rice', 'rice chicken')).toBe(true)
-    expect(matchesQuery('Chicken and rice', '  rice   chicken ')).toBe(true)
-    expect(matchesQuery('Chicken and rice', 'rice beef')).toBe(false)
+  it('matches multi-word queries in any order', () => {
+    expect(matchesQuery('Rice with chicken', 'chicken rice')).toBe(true)
+    expect(matchesQuery('Rice with chicken', 'rice chicken')).toBe(true)
+    expect(matchesQuery('Rice with chicken', 'rice beef')).toBe(false)
   })
 
-  it('searchMeals keeps library ordering and filters by name', () => {
-    const meals = record([meal('a', 'Chicken rice'), meal('b', 'Chicken wrap', { favourite: true }), meal('c', 'Beef rice')])
-    expect(searchMeals(meals, 'chicken').map((m) => m.name)).toEqual(['Chicken wrap', 'Chicken rice'])
-    expect(searchMeals(meals, 'rice').map((m) => m.name)).toEqual(['Beef rice', 'Chicken rice'])
-    expect(searchMeals(meals, 'zzz')).toEqual([])
-    expect(searchMeals(meals, '')).toHaveLength(3)
+  it('matches substrings inside words', () => {
+    expect(matchesQuery('Overnight oats', 'night')).toBe(true)
+    expect(matchesQuery('Overnight oats', 'beef')).toBe(false)
+  })
+})
+
+describe('searchMeals and searchIngredients', () => {
+  const meals = record([meal('a', 'Chicken rice'), meal('b', 'Rice pudding', true), meal('c', 'Oats'), meal('d', 'Fried rice')])
+
+  it('filters while keeping library order', () => {
+    expect(searchMeals(meals, 'rice').map((m) => m.name)).toEqual(['Rice pudding', 'Chicken rice', 'Fried rice'])
+    expect(searchMeals(meals, 'chicken rice').map((m) => m.name)).toEqual(['Chicken rice'])
+    expect(searchMeals(meals, 'xyz')).toEqual([])
+    expect(searchMeals(meals, '')).toHaveLength(4)
   })
 
-  it('searchIngredients filters the same way', () => {
-    const ings = record([ing('a', 'Brown rice'), ing('b', 'White rice', true), ing('c', 'Oats')])
-    expect(searchIngredients(ings, 'rice').map((g) => g.name)).toEqual(['White rice', 'Brown rice'])
+  it('searches ingredients', () => {
+    const ings = record([ingredient('a', 'Whey'), ingredient('b', 'Wheat flour'), ingredient('c', 'Rice')])
+    expect(searchIngredients(ings, 'whe').map((g) => g.name)).toEqual(['Wheat flour', 'Whey'])
   })
 })
 
@@ -123,85 +130,95 @@ describe('loggedDays', () => {
   it('lists only days with entries, newest first, with totals and counts', () => {
     const entries = [
       entry('a', '2026-10-11', 500, 1),
-      entry('b', '2026-10-13', 300, 5),
-      entry('c', '2026-10-11', 700, 2),
-      entry('d', '2026-09-30', 100, 0),
+      entry('b', '2026-10-13', 300, 2),
+      entry('c', '2026-10-11', 200, 3),
+      entry('d', '2026-09-30', 100, 4),
     ]
     const days = loggedDays(entries)
     expect(days.map((d) => d.day)).toEqual(['2026-10-13', '2026-10-11', '2026-09-30'])
-    expect(days[1].totals.kcal).toBe(1200)
+    expect(days[1].totals.kcal).toBe(700)
     expect(days[1].count).toBe(2)
     expect(days[0].count).toBe(1)
+  })
+
+  it('is empty with no entries', () => {
     expect(loggedDays([])).toEqual([])
   })
 })
 
 describe('disciplineStreak', () => {
-  it('starts from yesterday when today is empty', () => {
-    const entries = [entry('a', '2026-10-12', 1500), entry('b', '2026-10-11', 1800), entry('c', '2026-10-10', 1900)]
+  it('counts from yesterday when today is still empty', () => {
+    const entries = [entry('a', '2026-10-12', 1500, 1), entry('b', '2026-10-11', 1800, 2), entry('c', '2026-10-10', 1900, 3)]
     expect(disciplineStreak(entries, 2000, '2026-10-13')).toBe(3)
   })
 
-  it('breaks on a gap day and on an over-goal day', () => {
-    const gap = [entry('a', '2026-10-12', 1500), entry('b', '2026-10-10', 1500)]
-    expect(disciplineStreak(gap, 2000, '2026-10-13')).toBe(1)
-    const over = [entry('a', '2026-10-13', 1500), entry('b', '2026-10-12', 2500), entry('c', '2026-10-11', 1500)]
+  it('breaks on an over day and on a gap', () => {
+    const over = [entry('a', '2026-10-12', 1500, 1), entry('b', '2026-10-11', 2500, 2), entry('c', '2026-10-10', 1900, 3)]
     expect(disciplineStreak(over, 2000, '2026-10-13')).toBe(1)
+    const gap = [entry('a', '2026-10-12', 1500, 1), entry('c', '2026-10-10', 1900, 3)]
+    expect(disciplineStreak(gap, 2000, '2026-10-13')).toBe(1)
+  })
+
+  it('is zero when neither today nor yesterday is logged', () => {
+    expect(disciplineStreak([entry('a', '2026-10-10', 100, 1)], 2000, '2026-10-13')).toBe(0)
     expect(disciplineStreak([], 2000, '2026-10-13')).toBe(0)
   })
 
-  it('exactly at the goal still counts', () => {
-    expect(disciplineStreak([entry('a', '2026-10-13', 2000)], 2000, '2026-10-13')).toBe(1)
+  it('counts a day exactly on the goal as under the line', () => {
+    expect(disciplineStreak([entry('a', '2026-10-13', 2000, 1)], 2000, '2026-10-13')).toBe(1)
   })
 })
 
-describe('progress', () => {
-  it('goalProgress is 0 for a zero or negative goal and uncapped otherwise', () => {
-    expect(goalProgress(M(500), 0)).toBe(0)
-    expect(goalProgress(M(500), -100)).toBe(0)
-    expect(goalProgress(M(500), 1000)).toBe(0.5)
-    expect(goalProgress(M(1200), 1000)).toBeCloseTo(1.2)
-    expect(remainingKcal(M(1200), 1000)).toBe(-200)
+describe('goalProgress and macroProgress', () => {
+  const totals = { kcal: 1250, protein: 90, carbs: 0, fat: 40 }
+
+  it('is a fraction of the goal, uncapped', () => {
+    expect(goalProgress(totals, 2500)).toBe(0.5)
+    expect(goalProgress({ ...totals, kcal: 3000 }, 2500)).toBe(1.2)
   })
 
-  it('macroProgress returns 0 for a zero target and ratios otherwise', () => {
-    expect(macroProgress(M(0, 90, 50, 20), { protein: 0, carbs: 0, fat: 0 })).toEqual({ protein: 0, carbs: 0, fat: 0 })
-    const p = macroProgress(M(0, 90, 125, 100), { protein: 180, carbs: 250, fat: 80 })
-    expect(p.protein).toBe(0.5)
-    expect(p.carbs).toBe(0.5)
-    expect(p.fat).toBe(1.25)
-    expect(macroProgress(M(0, 90, 0, 0), { protein: 0, carbs: 250, fat: 80 })).toEqual({ protein: 0, carbs: 0, fat: 0 })
-  })
-})
-
-describe('recents helpers', () => {
-  it('perServingKcal divides by servings and rounds', () => {
-    expect(perServingKcal(entry('a', '2026-10-13', 1000, 0, { servings: 3 }))).toBe(333)
-    expect(perServingKcal(entry('b', '2026-10-13', 850, 0, { servings: 1 }))).toBe(850)
-    expect(perServingKcal(entry('c', '2026-10-13', 412.6, 0, { servings: 0 }))).toBe(413)
+  it('is zero with a zero or negative goal', () => {
+    expect(goalProgress(totals, 0)).toBe(0)
+    expect(goalProgress(totals, -10)).toBe(0)
   })
 
-  it('recentKey lowercases and trims the name and appends per-serving kcal', () => {
-    expect(recentKey(entry('a', '2026-10-13', 800, 0, { name: '  Chicken Rice ', servings: 2 }))).toBe('chicken rice|400')
-    expect(recentKey(entry('a', '2026-10-13', 400, 0, { name: 'chicken rice' }))).toBe('chicken rice|400')
+  it('macroProgress handles zero targets per macro', () => {
+    expect(macroProgress(totals, { protein: 180, carbs: 0, fat: 80 })).toEqual({ protein: 0.5, carbs: 0, fat: 0.5 })
+    expect(macroProgress(totals, { protein: 0, carbs: 0, fat: 0 })).toEqual({ protein: 0, carbs: 0, fat: 0 })
+  })
+
+  it('macroProgress is uncapped', () => {
+    expect(macroProgress({ kcal: 0, protein: 200, carbs: 0, fat: 0 }, { protein: 100, carbs: 1, fat: 1 }).protein).toBe(2)
   })
 })
 
-describe('averageKcal and underTheLine with no data', () => {
-  it('returns 0 and zero counts when nothing is logged', () => {
-    expect(averageKcal([], 7)).toBe(0)
-    const empty = [{ day: '2026-10-13', totals: M(0), count: 0 }]
-    expect(averageKcal(empty, 7)).toBe(0)
-    expect(underTheLine(empty, 2000, 7)).toEqual({ under: 0, logged: 0 })
-    expect(underTheLine([], 2000, 7)).toEqual({ under: 0, logged: 0 })
+describe('perServingKcal and recentKey', () => {
+  it('divides by servings and rounds', () => {
+    expect(perServingKcal(entry('a', '2026-10-13', 1200, 1, 3))).toBe(400)
+    expect(perServingKcal(entry('a', '2026-10-13', 1000, 1, 3))).toBe(333)
+    expect(perServingKcal(entry('a', '2026-10-13', 612.4, 1, 1))).toBe(612)
   })
 
-  it('averageKcal only looks at the first n days', () => {
-    const days = [
-      { day: '2026-10-13', totals: M(1000), count: 1 },
-      { day: '2026-10-12', totals: M(3000), count: 1 },
-      { day: '2026-10-11', totals: M(9000), count: 1 },
-    ]
-    expect(averageKcal(days, 2)).toBe(2000)
+  it('falls back to the raw kcal when servings is zero', () => {
+    expect(perServingKcal(entry('a', '2026-10-13', 250.6, 1, 0))).toBe(251)
+  })
+
+  it('builds the key from the trimmed lowercase name and per-serving kcal', () => {
+    expect(recentKey(entry('a', '2026-10-13', 800, 1, 2, '  Kebab '))).toBe('kebab|400')
+    expect(recentKey(entry('a', '2026-10-13', 800, 1, 2, 'KEBAB'))).toBe(recentKey(entry('b', '2026-10-12', 400, 2, 1, 'kebab')))
+  })
+})
+
+describe('averageKcal', () => {
+  it('is zero with no days or no logged days', () => {
+    expect(averageKcal([])).toBe(0)
+    expect(averageKcal(historyDays([], '2026-10-13', 7))).toBe(0)
+  })
+
+  it('averages only the window asked for', () => {
+    const entries = [entry('a', '2026-10-13', 1000, 1), entry('b', '2026-10-12', 2000, 2), entry('c', '2026-10-01', 9000, 3)]
+    const days = historyDays(entries, '2026-10-13', 30)
+    expect(averageKcal(days, 7)).toBe(1500)
+    expect(averageKcal(days, 30)).toBe(4000)
   })
 })

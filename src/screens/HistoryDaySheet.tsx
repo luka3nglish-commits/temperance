@@ -44,7 +44,7 @@ export function HistoryDaySheet({ day, open, onClose, today, unit, goalKcal }: P
   const title = label === 'Today' || label === 'Yesterday' ? label : dayStampLong(day)
 
   return (
-    <Sheet open={open} onClose={onClose} title={title} height="auto" headerRight={list.length ? <EnergyFigure kcal={totals.kcal} unit={unit} size={15} /> : null}>
+    <Sheet open={open} onClose={onClose} title={title} height="auto" contentId="tp-history-day-sheet" headerRight={list.length ? <EnergyFigure kcal={totals.kcal} unit={unit} size={15} /> : null}>
       {list.length ? (
         <>
           <div className="flex items-center justify-between gap-4 border-b border-[var(--gold-line-strong)] pb-3">
@@ -112,12 +112,20 @@ function SwipeRow({ entry, unit, onDelete }: { entry: LogEntry; unit: EnergyUnit
     }
     setDx(0)
   }
+  /** a cancelled pointer (scroll took over, call came in) never deletes: it slides back */
+  const onCancel = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const s = start.current
+    if (!s || s.id !== e.pointerId) return
+    start.current = null
+    setDragging(false)
+    setDx(0)
+  }
 
   const armed = dx <= -COMMIT
   const m = entry.macros
 
   return (
-    <li className="relative overflow-hidden border-b border-[var(--gold-line)]">
+    <li data-testid={`tp-history-entry-${entry.id}`} className="relative overflow-hidden border-b border-[var(--gold-line)]">
       <div
         aria-hidden="true"
         className="absolute inset-y-0 right-0 flex items-center justify-end pr-5 transition-opacity duration-150"
@@ -135,12 +143,12 @@ function SwipeRow({ entry, unit, onDelete }: { entry: LogEntry; unit: EnergyUnit
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
-        onPointerCancel={onUp}
+        onPointerCancel={onCancel}
       >
-        <span className="num w-[60px] shrink-0 font-body text-[13px] text-bone-dim">{formatTime(entry.at)}</span>
+        <span className="num w-[60px] shrink-0 font-body text-[14px] text-bone-dim">{formatTime(entry.at)}</span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-body text-[18px] font-medium leading-[1.3] text-bone">{entry.name}</span>
-          <span className="num font-body text-[13px] text-bone-dim">
+          <span className="num font-body text-[14px] text-bone-dim">
             P {Math.round(m.protein)} · C {Math.round(m.carbs)} · F {Math.round(m.fat)}
             {entry.servings !== 1 ? ` · x ${entry.servings}` : ''}
           </span>

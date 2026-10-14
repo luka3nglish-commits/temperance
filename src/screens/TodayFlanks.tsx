@@ -27,12 +27,16 @@ export function TodayFlanks({ eaten, goal, unit, compact, onEaten }: Props) {
       <div data-intro="flanks" className="absolute inset-x-4 flex items-center justify-center gap-5" style={{ top: 134 }}>
         <button type="button" onClick={onEaten} aria-label="Today's entries" className="flex h-11 cursor-pointer items-baseline gap-2 rounded-[4px] px-1">
           <span className={labelCls}>Eaten</span>
-          <span className={valueCls}>{eatenText}</span>
+          <span className={valueCls} data-testid="tp-eaten-value" data-kcal={eaten}>
+            {eatenText}
+          </span>
         </button>
         <span aria-hidden="true" className="h-3 w-px bg-[var(--gold-line-strong)]" />
         <div className="flex h-11 items-baseline gap-2 px-1">
           <span className={labelCls}>Goal</span>
-          <span className={valueCls}>{goalText}</span>
+          <span className={valueCls} data-testid="tp-goal-value" data-kcal={goal}>
+            {goalText}
+          </span>
         </div>
       </div>
     )
@@ -47,13 +51,15 @@ export function TodayFlanks({ eaten, goal, unit, compact, onEaten }: Props) {
         className="pointer-events-auto absolute left-0 top-0 flex h-[52px] w-[104px] cursor-pointer flex-col items-start justify-center gap-1.5 rounded-[4px] text-left"
       >
         <span className={labelCls}>Eaten</span>
-        <span className={valueCls}>{eatenText}</span>
+        <span className={valueCls} data-testid="tp-eaten-value" data-kcal={eaten}>
+          {eatenText}
+        </span>
       </button>
       <div className="absolute right-0 top-0 flex h-[52px] w-[104px] flex-col items-end justify-center gap-1.5 text-right">
         <span className={labelCls} style={{ marginRight: '-0.35em' }}>
           Goal
         </span>
-        <span className={valueCls} style={{ marginRight: '-0.02em' }}>
+        <span className={valueCls} data-testid="tp-goal-value" data-kcal={goal} style={{ marginRight: '-0.02em' }}>
           {goalText}
         </span>
       </div>
@@ -66,6 +72,7 @@ export function TodayGoalLabel({ goal, unit }: { goal: number; unit: EnergyUnit 
   return (
     <div
       data-intro="goal-label"
+      data-testid="tp-goal-label"
       aria-hidden="true"
       className="font-display inscribed pointer-events-none absolute text-[9px] leading-none tracking-[0.3em] text-gold-400"
       style={{ top: 'calc(var(--goal-y) - 15px)', right: 'calc(16px - 0.3em)' }}

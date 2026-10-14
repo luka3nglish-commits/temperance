@@ -18,7 +18,7 @@ type Props = {
  */
 export function LibraryIngredients({ ingredients, total, unit, searching, onOpen, onToggleFavourite }: Props) {
   return (
-    <section aria-labelledby="lib-ing-heading">
+    <section data-testid="tp-ingredients" aria-labelledby="lib-ing-heading">
       <SectionHeading right={total > 0 ? <span aria-label={`${total} ingredients`}>{roman(total)}</span> : null}>
         <span id="lib-ing-heading">Ingredients</span>
       </SectionHeading>
@@ -33,9 +33,9 @@ export function LibraryIngredients({ ingredients, total, unit, searching, onOpen
               name={g.name}
               subline={ingredientSubline(g, unit)}
               favourite={g.favourite}
-              trailing="star"
               onOpen={onOpen}
               onToggleFavourite={onToggleFavourite}
+              testIds={{ row: `tp-ingredient-row-${g.id}` }}
             />
           ))}
         </ul>

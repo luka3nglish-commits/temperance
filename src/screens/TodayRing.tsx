@@ -96,7 +96,8 @@ export function TodayRing({ totals, targets, focus, size = 112 }: RingProps) {
   const flat = spans.flatMap((s) => [s.start, s.end])
   const tw = useTweened(flat, 520, easeStone, reduced)
 
-  const hasTargets = targets.protein > 0 && targets.carbs > 0 && targets.fat > 0
+  // ghost arcs once any target is set; a zero target draws no ghost arc but keeps its gap (same rule as the macros)
+  const hasTargets = targets.protein > 0 || targets.carbs > 0 || targets.fat > 0
   const ghost = hasTargets
     ? layoutArcs(
         (() => {
@@ -106,6 +107,9 @@ export function TodayRing({ totals, targets, focus, size = 112 }: RingProps) {
       )
     : null
 
+  // test hooks: the drawn arc lengths to 1 dp; the empty-day placeholder arcs are track colour, not macros, so they read 0.0
+  const deg = (i: number) => (empty && !focus ? '0.0' : Math.max(0, tw[i * 2 + 1] - tw[i * 2]).toFixed(1))
+
   return (
     <svg
       width={size}
@@ -113,6 +117,11 @@ export function TodayRing({ totals, targets, focus, size = 112 }: RingProps) {
       viewBox="0 0 120 120"
       aria-hidden="true"
       focusable="false"
+      data-testid="tp-ring"
+      data-protein-deg={deg(0)}
+      data-carbs-deg={deg(1)}
+      data-fat-deg={deg(2)}
+      data-focus={focus ?? undefined}
       className="block overflow-visible"
       style={{ overflow: 'visible' }}
     >
@@ -211,7 +220,7 @@ export function TodayRingRow({ totals, targets, onOpen }: RowProps) {
       >
         <TodayRing totals={totals} targets={targets} focus={focus} />
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-display gold-text num text-[20px] font-bold leading-none">
+          <span data-testid="tp-ring-centre" data-grams={empty && !focus ? 0 : centreValue} className="font-display gold-text num text-[20px] font-bold leading-none">
             {empty && !focus ? 0 : centreValue}
             <span className="normal-case"> g</span>
           </span>
@@ -231,6 +240,8 @@ export function TodayRingRow({ totals, targets, onOpen }: RowProps) {
               key={k}
               type="button"
               onClick={() => toggle(k)}
+              data-testid={`tp-readout-${k}`}
+              data-grams={grams(k)}
               aria-pressed={active}
               aria-label={`${MACRO_LABEL[k]} ${grams(k)} grams${targets[k] > 0 ? `, ${ratio} percent of target` : ''}`}
               className="relative flex h-8 w-full cursor-pointer items-center gap-2.5 text-left before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-['']"

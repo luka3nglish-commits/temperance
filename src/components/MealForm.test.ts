@@ -16,6 +16,7 @@ import {
   rowFromComponent,
   rowFromIngredient,
   saveToLibraryFor,
+  suffixPadding,
 } from './MealForm'
 
 const THIN = ' '
@@ -39,6 +40,17 @@ describe('copy helpers', () => {
   })
   it('prints P C F with middle dots and whole grams', () => {
     expect(macroLine({ protein: 31.6, carbs: 48, fat: 12.2 })).toBe('P 32 · C 48 · F 12')
+  })
+})
+
+describe('digit field padding', () => {
+  it('leaves 36 px for a unit of one or two letters and 56 px for kcal and serve, so thirds fit at 360 px', () => {
+    expect(suffixPadding('g')).toBe(36)
+    expect(suffixPadding('ml')).toBe(36)
+    expect(suffixPadding('kJ')).toBe(36)
+    expect(suffixPadding('kcal')).toBe(56)
+    expect(suffixPadding('serve')).toBe(56)
+    expect(suffixPadding(undefined)).toBe(16)
   })
 })
 

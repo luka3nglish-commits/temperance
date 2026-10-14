@@ -43,19 +43,22 @@ type Props = {
  * Cinzel 20 px value over a Cinzel 9 px tracking 0.3em label, bone over bone-dim, split by neutral hairlines.
  */
 export function HistoryStones({ avgKcal, under, streak, unit }: Props) {
-  const stones: { label: string; value: string; sub?: string; aria: string }[] = [
+  const stones: { id: string; label: string; value: string; sub?: string; aria: string }[] = [
     {
+      id: 'tp-stat-avg',
       label: '7 day avg',
       value: avgKcal > 0 ? formatEnergy(avgKcal, unit) : '0',
       sub: avgKcal > 0 ? unitLabel(unit) : undefined,
       aria: `Seven day average ${formatEnergy(avgKcal, unit)} ${unitLabel(unit)}`,
     },
     {
+      id: 'tp-stat-under',
       label: 'Under the line',
       value: `${under.under} of ${under.logged}`,
       aria: `Under the line ${under.under} of ${under.logged} days`,
     },
     {
+      id: 'tp-stat-streak',
       label: 'Streak',
       value: toRoman(streak),
       aria: `Streak ${streak} ${streak === 1 ? 'day' : 'days'}`,
@@ -66,12 +69,14 @@ export function HistoryStones({ avgKcal, under, streak, unit }: Props) {
       {stones.map((s, i) => (
         <div
           key={s.label}
+          data-testid={s.id}
+          data-value={s.value}
           className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 px-1 py-3 text-center ${i > 0 ? 'border-l border-[var(--bone-08)]' : ''}`}
           aria-label={s.aria}
         >
           <dd className="font-display inscribed num flex items-baseline gap-1 text-[20px] leading-[1.1] tracking-[0.02em] text-bone">
             <span>{s.value}</span>
-            {s.sub ? <span className="font-body text-[12px] lowercase tracking-normal text-bone-dim">{s.sub}</span> : null}
+            {s.sub ? <span className="text-[9px] normal-case tracking-[0.1em] text-bone-dim">{s.sub}</span> : null}
           </dd>
           <dt className="font-display text-[9px] tracking-[0.3em] text-bone-dim">{s.label}</dt>
         </div>

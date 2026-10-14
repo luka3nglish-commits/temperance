@@ -217,6 +217,23 @@ export class Monument {
     this.inv()
   }
 
+  /**
+   * A non-pulse change while the column is on screen (a new goal, a day rollover, an import):
+   * the column eases to its new height over `ms` with the stone easing, no dust, no shake.
+   */
+  settleSmooth(ms: number): void {
+    const m = this.mon
+    if (this.hooks.reduced() || ms <= 0 || !this.placed) {
+      this.settleSilently()
+      return
+    }
+    this.strikeTl?.kill()
+    this.strikeTl = gsap.timeline().to(m, { h: this.hTarget, duration: ms / 1000, ease: EASE.stone, onUpdate: this.inv })
+    this.hooks.holdAlways(ms + 100)
+    if (this.crackTarget !== m.crack) this.tweenCrack(this.crackTarget, ms)
+    this.inv()
+  }
+
   /** Silent update (layer hidden, or a non-pulse store change such as a new goal). */
   settleSilently(): void {
     this.strikeTl?.kill()
@@ -304,7 +321,7 @@ export class Monument {
       tl.call(
         () => {
           m.trauma = 1
-          this.burst(Math.min(h1, GOAL_Y) <= GOAL_Y ? h1 : h1, crossed)
+          this.burst(h1, crossed)
           this.pulseCapital()
           shakeStage()
           vibrate(18)
@@ -432,7 +449,7 @@ export class Monument {
    * Per-frame integration. `dt` seconds, clamped by the caller. Returns true while something is
    * still in motion (trauma or a crack pulse) so a demand loop can keep asking for frames.
    */
-  tick(dt: number, idleOn: boolean, reduced: boolean): boolean {
+  tick(dt: number, idleOn: boolean, reduced: boolean, turnRate = 0.035): boolean {
     const m = this.mon
     let moving = false
     if (m.trauma > 0) {
@@ -444,8 +461,11 @@ export class Monument {
       return moving
     }
     if (idleOn) {
-      m.rotY += 0.035 * dt
+      m.rotY += turnRate * dt
       if (m.rotY > Math.PI * 2) m.rotY -= Math.PI * 2
+      // the sweep light orbits once per 14 s; sweepOnce adds its 2.1 rad on top
+      m.theta += ((Math.PI * 2) / (MS.lightSweep / 1000)) * dt
+      if (m.theta > Math.PI * 4) m.theta -= Math.PI * 2
     }
     if (m.crack > 0) {
       m.crackTime += dt

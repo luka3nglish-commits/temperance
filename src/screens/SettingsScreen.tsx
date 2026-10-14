@@ -36,7 +36,7 @@ const MACRO_LETTER: Record<keyof MacroTargets, string> = { protein: 'P', carbs: 
 
 /**
  * SETTINGS. A quiet column of 56 px rows ruled with --gold-line, in the order of spec section 13,
- * then the data rows (export, import, erase) and the footer.
+ * then the data rows (export, import, erase) and the footer. Entrance stagger on mount only.
  */
 export function SettingsScreen() {
   const settings = useStore((s) => s.settings)
@@ -98,60 +98,77 @@ export function SettingsScreen() {
   }
 
   return (
-    <section aria-label="Settings" className="px-5 pb-6">
+    <section data-testid="tp-settings" aria-label="Settings" className="px-5 pb-6">
       <header className="rise-in sticky top-0 z-10 -mx-5 flex h-14 items-center justify-center bg-obsidian-950/95 px-5 backdrop-blur-[20px]" style={{ marginTop: 'var(--safe-top)' }}>
         <h1 className="font-display inscribed text-[14px] tracking-[0.35em] text-bone">Settings</h1>
       </header>
 
       <div className="rise-in rise-in-1">
         <SettingsRow label="Daily goal" htmlFor="set-goal">
-          <SmallInput id="set-goal" label={`Daily goal in ${unitLabel(unit)}`} value={goalDraft} onChange={setGoalDraft} onCommit={commitGoal} suffix={unitLabel(unit)} width={132} />
+          <SmallInput
+            id="set-goal"
+            testId="tp-settings-goal"
+            label={`Daily goal in ${unitLabel(unit)}`}
+            value={goalDraft}
+            onChange={setGoalDraft}
+            onCommit={commitGoal}
+            suffix={unitLabel(unit)}
+            width={132}
+          />
         </SettingsRow>
 
         <SettingsRow label="Macro targets">
           <div role="group" aria-label="Macro targets in grams" className="flex items-center gap-1.5">
             {MACRO_KEYS.map((k) => (
-              <span key={k} className="flex items-center gap-1">
-                <span aria-hidden="true" className="font-display text-[9px] tracking-[0.2em] text-bone-dim">
-                  {MACRO_LETTER[k]}
-                </span>
-                <SmallInput
-                  id={`set-target-${k}`}
-                  label={`${k} target in grams`}
-                  value={targetDraft[k]}
-                  onChange={(v) => setTargetDraft((d) => ({ ...d, [k]: v }))}
-                  onCommit={() => commitTarget(k)}
-                  width={58}
-                />
-              </span>
+              <SmallInput
+                key={k}
+                id={`set-target-${k}`}
+                testId={`tp-settings-target-${k}`}
+                label={`${k} target in grams`}
+                value={targetDraft[k]}
+                onChange={(v) => setTargetDraft((d) => ({ ...d, [k]: v }))}
+                onCommit={() => commitTarget(k)}
+                prefix={MACRO_LETTER[k]}
+                width={68}
+              />
             ))}
           </div>
         </SettingsRow>
 
         <SettingsRow label="Units">
-          <Segmented size="md" label="Energy unit" value={unit} options={UNIT_OPTIONS} onChange={setUnit} />
+          <span data-testid="tp-settings-unit" className="contents">
+            <Segmented size="md" label="Energy unit" value={unit} options={UNIT_OPTIONS} onChange={setUnit} />
+          </span>
         </SettingsRow>
 
         <SettingsRow label="Hero figure">
-          <Segmented size="md" label="Hero figure" value={settings.hero} options={HERO_OPTIONS} onChange={setHero} />
+          <span data-testid="tp-settings-hero" className="contents">
+            <Segmented size="md" label="Hero figure" value={settings.hero} options={HERO_OPTIONS} onChange={setHero} />
+          </span>
         </SettingsRow>
       </div>
 
       <div className="rise-in rise-in-2">
         <SettingsRow label="Gold follows tilt">
-          <Toggle label="Gold follows tilt" hideLabel checked={settings.tilt} onChange={onTilt} />
+          <span data-testid="tp-settings-tilt" className="contents">
+            <Toggle label="Gold follows tilt" hideLabel checked={settings.tilt} onChange={onTilt} />
+          </span>
         </SettingsRow>
 
         <SettingsRow label="Motion">
-          <Segmented size="md" label="Motion" value={settings.motion} options={MOTION_OPTIONS} onChange={setMotion} />
+          <span data-testid="tp-settings-motion" className="contents">
+            <Segmented size="md" label="Motion" value={settings.motion} options={MOTION_OPTIONS} onChange={setMotion} />
+          </span>
         </SettingsRow>
 
         <SettingsRow label="Opening">
-          <Segmented size="md" label="Opening" value={settings.opening} options={OPENING_OPTIONS} onChange={setOpening} />
+          <span data-testid="tp-settings-opening" className="contents">
+            <Segmented size="md" label="Opening" value={settings.opening} options={OPENING_OPTIONS} onChange={setOpening} />
+          </span>
         </SettingsRow>
 
         <SettingsRow label="Replay opening">
-          <Button variant="hairline" size="sm" onClick={replayOpening}>
+          <Button variant="hairline" size="sm" data-testid="tp-settings-replay" onClick={replayOpening}>
             Replay
           </Button>
         </SettingsRow>

@@ -1,7 +1,7 @@
 import gsap from 'gsap'
 import { CustomEase } from 'gsap/CustomEase'
 import { getMonumentHandle } from '../scene/handle'
-import { queryArcs, type Targets } from './targets'
+import { queryArcs, targetList, type Targets } from './targets'
 
 /**
  * The opening timelines (docs/design-spec.md section 5). Pure builders: they take the DOM targets
@@ -9,7 +9,8 @@ import { queryArcs, type Targets } from './targets'
  * the seconds GSAP wants, and every position below is written in the spec's milliseconds.
  *
  * The monument is driven through getMonumentHandle() at call time, never a cached handle, because
- * the scene may swap webgl for svg after a context loss.
+ * the scene may swap webgl for svg after a context loss. Every tween is created inside the
+ * opening's gsap.context (the async S1 join included) so one revert returns the DOM to pure CSS.
  */
 
 gsap.registerPlugin(CustomEase)
@@ -28,6 +29,10 @@ export const SHORT_MS = 700
 export const FADE_MS = 240
 export const FONTS_CAP_MS = 300
 
+/** S4: the rise is called at 420 so the column lands at 1000 inside a 680 ms dolly (spec S4). */
+export const RISE_AT_MS = 420
+export const RISE_MS = 680
+
 export type Overlay = {
   wordmark: HTMLElement | null
   letters: HTMLElement[]
@@ -37,12 +42,16 @@ export type BuildInput = {
   targets: Targets
   overlay: Overlay
   stage: HTMLElement | null
+  /** the opening's context; tweens added after the build (the fonts gate) go through it */
+  ctx: gsap.Context
   /** resolves when the fonts are ready (raced against the 300 ms cap inside the builder) */
   fontsReady: Promise<unknown>
   /** false once the opening was reverted or finished; async joins check it before touching the DOM */
   isLive(): boolean
   /** the shard glint gradients follow this (SVG attributes cannot read --tilt-x) */
   onTilt(x: number): void
+  /** hand the light back to the tilt loop (called when the shard sweep ends; idempotent) */
+  releaseTilt(): void
   onComplete(): void
 }
 
@@ -106,21 +115,28 @@ const revealShards = (tl: gsap.core.Timeline, el: HTMLElement | undefined, at: n
 
 /**
  * The ring. When the three arcs expose `data-arc` paths they draw by stroke length, staggered;
- * otherwise the ring is revealed from its centre with a circle clip.
+ * otherwise the ring is revealed from its centre with a circle clip. The track and the centre
+ * value fade in with the first arc so nothing pops.
  */
 const drawRing = (tl: gsap.core.Timeline, ring: HTMLElement | undefined, at: number, each: number, stagger: number) => {
   if (!ring) return
   const arcs = queryArcs(ring)
-  tl.set(ring, { opacity: 1, clearProps: 'opacity' }, ms(at))
+  tl.to(ring, { opacity: 1, duration: ms(200), ease: 'none', clearProps: 'opacity' }, ms(at))
   if (arcs.length) {
+    let drew = 0
     arcs.forEach((arc, i) => {
-      let len = 0
-      try {
-        len = arc.getTotalLength()
-      } catch {
-        len = 0
+      // the ring's arcs carry pathLength="1": dash units are then path lengths, not user units
+      const pl = parseFloat(arc.getAttribute('pathLength') ?? '')
+      let len = Number.isFinite(pl) && pl > 0 ? pl : 0
+      if (!len) {
+        try {
+          len = arc.getTotalLength()
+        } catch {
+          len = 0
+        }
       }
       if (!len) return
+      drew += 1
       tl.fromTo(
         arc,
         { strokeDasharray: len, strokeDashoffset: len },
@@ -128,7 +144,7 @@ const drawRing = (tl: gsap.core.Timeline, ring: HTMLElement | undefined, at: num
         ms(at + i * stagger),
       )
     })
-    return
+    if (drew) return
   }
   tl.fromTo(
     ring,
@@ -152,7 +168,8 @@ const land = (stage: HTMLElement | null, trauma: number) => {
 
 /**
  * The wordmark FLIP: measure the overlay wordmark and the header slot, translate and scale the
- * overlay copy into the slot, then swap (overlay hidden, header shown) in the same frame.
+ * overlay copy into the slot while its tracking closes from 0.5em to the header's 0.34em, then
+ * swap (overlay hidden, header shown) in the same frame.
  */
 const flipWordmark = (tl: gsap.core.Timeline, overlay: HTMLElement | null, header: HTMLElement | undefined, at: number, dur: number) => {
   if (!overlay) return
@@ -168,7 +185,11 @@ const flipWordmark = (tl: gsap.core.Timeline, overlay: HTMLElement | null, heade
       scale = Math.max(0.2, Math.min(1, to.height / from.height))
     }
   }
-  tl.to(overlay, { x, y, scale, transformOrigin: '50% 50%', duration: ms(dur), ease: EASE.stone }, ms(at))
+  tl.to(
+    overlay,
+    { x, y, scale, letterSpacing: '0.34em', paddingLeft: '0.34em', transformOrigin: '50% 50%', duration: ms(dur), ease: EASE.stone },
+    ms(at),
+  )
   tl.set(overlay, { opacity: 0 }, ms(at + dur))
   if (header) tl.set(header, { opacity: 1, clearProps: 'opacity' }, ms(at + dur))
 }
@@ -178,40 +199,22 @@ const flipWordmark = (tl: gsap.core.Timeline, overlay: HTMLElement | null, heade
  * added to the running timeline at the moment the gate opens; the FLIP follows its last letter.
  */
 export function buildFull(input: BuildInput): gsap.core.Timeline {
-  const { targets, overlay, stage, isLive, onTilt } = input
+  const { targets, overlay, stage, ctx, isLive, onTilt } = input
   const tl = gsap.timeline({ paused: true, onComplete: input.onComplete })
 
-  // S2 the shards: fade 120 to 420, glint sweep 120 to 720
+  // S2 the shards: fade 120 to 420, glint sweep 120 to 720, then the tilt loop takes the light back
   revealShards(tl, targets.shards, 120, 300, 600, onTilt)
+  tl.call(() => input.releaseTilt(), [], ms(720))
 
   // S3 the line: the gold goal slab draws 300 to 1020; its label follows the slab's landing
   tl.call(() => getMonumentHandle().playGoalLine(720), [], ms(300))
   fadeIn(tl, targets['goal-label'], 1020, 200)
 
-  // S4 the rise: the column lands at 1000 with the dust, the shake and one fast light pass
-  tl.call(
-    () => {
-      const h = getMonumentHandle()
-      const t0 = performance.now()
-      const go = (elapsed: number) => getMonumentHandle().playOpeningRise(Math.max(300, 680 - elapsed))
-      if (h.isReady()) {
-        go(0)
-        return
-      }
-      // join windows: ready by 600 rises from where the SVG monument is; later, the SVG plays
-      // the rise itself and the canvas joins at the first idle frame (the scene's job)
-      let fired = false
-      const fire = () => {
-        if (fired || !isLive()) return
-        fired = true
-        go(Math.min(180, performance.now() - t0))
-      }
-      void h.ready().then(fire)
-      window.setTimeout(fire, 180)
-    },
-    [],
-    ms(420),
-  )
+  // S4 the rise. One call at 420 whatever the shader state: the scene routes it (3D when ready,
+  // the SVG monument otherwise, handing over to the canvas when shaders resolve before 600 ms, or
+  // crossfading at the first idle frame after 1900 when they resolve later). The column lands at
+  // 1000 with the dust; the shake and one fast light pass are cued from here.
+  tl.call(() => getMonumentHandle().playOpeningRise(RISE_MS), [], ms(RISE_AT_MS))
   tl.call(() => getMonumentHandle().sweepOnce(400), [], ms(960))
   tl.call(() => land(stage, 0.75), [], ms(1000))
 
@@ -239,21 +242,23 @@ export function buildFull(input: BuildInput): gsap.core.Timeline {
   const cap = new Promise<void>((r) => window.setTimeout(r, FONTS_CAP_MS))
   void Promise.race([input.fontsReady.catch(() => undefined), cap]).then(() => {
     if (!isLive() || tl.progress() >= 1) return
-    const now = Math.min(tl.time(), ms(FONTS_CAP_MS))
-    const letters = gsap.timeline()
-    if (overlay.letters.length) {
-      letters.to(overlay.letters, {
-        clipPath: 'inset(0% 0 0 0)',
-        duration: ms(180),
-        ease: EASE.cut,
-        stagger: ms(40),
-      })
-    }
-    // the FLIP starts at 680 or after the last letter, whichever is later
-    const lastLetter = (overlay.letters.length ? (overlay.letters.length - 1) * 40 + 180 : 0) / 1000
-    const flipAt = Math.max(ms(680) - now, lastLetter)
-    flipWordmark(letters, overlay.wordmark, targets.wordmark, flipAt * 1000, 420)
-    tl.add(letters, now)
+    ctx.add(() => {
+      const now = Math.min(tl.time(), ms(FONTS_CAP_MS))
+      const letters = gsap.timeline()
+      if (overlay.letters.length) {
+        letters.to(overlay.letters, {
+          clipPath: 'inset(0% 0 0 0)',
+          duration: ms(180),
+          ease: EASE.cut,
+          stagger: ms(40),
+        })
+      }
+      // the FLIP starts at 680 or after the last letter, whichever is later
+      const lastLetter = (overlay.letters.length ? (overlay.letters.length - 1) * 40 + 180 : 0) / 1000
+      const flipAt = Math.max(ms(680) - now, lastLetter)
+      flipWordmark(letters, overlay.wordmark, targets.wordmark, flipAt * 1000, 420)
+      tl.add(letters, now)
+    })
   })
 
   return tl
@@ -274,6 +279,7 @@ export function buildShort(input: BuildInput): gsap.core.Timeline {
     0,
   )
   revealShards(tl, targets.shards, 0, 200, 500, onTilt)
+  tl.call(() => input.releaseTilt(), [], ms(500))
   fadeIn(tl, targets.wordmark, 0, 200)
   fadeIn(tl, targets.date, 0, 200)
   tl.call(() => getMonumentHandle().sweepOnce(400), [], ms(100))
@@ -294,14 +300,17 @@ export function buildShort(input: BuildInput): gsap.core.Timeline {
   return tl
 }
 
-/** OFF and reduced motion: one 240 ms crossfade into the final frame. No rise, no dust, no sweep. */
+/**
+ * OFF and reduced motion: one 240 ms crossfade into the final frame. No rise, no dust, no sweep.
+ * Every target was hidden with opacity (hiddenVars 'fade'), so opacity is all that moves.
+ */
 export function buildFade(input: BuildInput): gsap.core.Timeline {
   const { targets } = input
   const tl = gsap.timeline({ paused: true, onComplete: input.onComplete })
   tl.call(() => getMonumentHandle().setInstant(), [], 0)
-  const els = Object.values(targets).filter((el): el is HTMLElement => !!el)
+  const els = targetList(targets)
   if (els.length) {
-    tl.to(els, { opacity: 1, clipPath: 'inset(0% 0 0 0)', duration: ms(FADE_MS), ease: 'power1.out', clearProps: 'opacity,clipPath' }, 0)
+    tl.to(els, { opacity: 1, duration: ms(FADE_MS), ease: 'power1.out', clearProps: 'opacity' }, 0)
   }
   tl.call(() => {}, [], ms(FADE_MS))
   return tl

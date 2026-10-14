@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Pencil, SquarePlus, Star, X } from 'lucide-react'
+import { ChevronRight, Pencil, SquarePlus, Star, X } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import type { Ingredient, Macros, Meal } from '../lib/types'
 import { ingredientMacrosFor, scaleMacros } from '../lib/macros'
@@ -16,12 +16,14 @@ type Props = {
   /** fires after the close transition finished */
   onClosed?(): void
   onEdit(target: DetailTarget): void
+  /** reopen an assembled meal in the LOG sheet's BUILD mode (fires after this sheet has left) */
+  onBuild(mealId: string): void
 }
 
 const DELETE_ARM_MS = 3500
 
 /** The MEAL DETAIL / INGREDIENT sheet: name, numbers, portion or amount, four hairline actions. */
-export function LibraryDetailSheet({ target, onClose, onClosed, onEdit }: Props) {
+export function LibraryDetailSheet({ target, onClose, onClosed, onEdit, onBuild }: Props) {
   // keep the last target so the sheet can animate out after it is cleared
   const [held, setHeld] = useState<DetailTarget | null>(target)
   useEffect(() => {
@@ -53,7 +55,7 @@ export function LibraryDetailSheet({ target, onClose, onClosed, onEdit }: Props)
       height="auto"
     >
       {current?.kind === 'meal' && meal ? (
-        <MealDetail key={meal.id} meal={meal} onClose={onClose} onEdit={() => onEdit(current)} />
+        <MealDetail key={meal.id} meal={meal} onClose={onClose} onEdit={() => onEdit(current)} onBuild={() => onBuild(meal.id)} />
       ) : current?.kind === 'ingredient' && ingredient ? (
         <IngredientDetail key={ingredient.id} ingredient={ingredient} onClose={onClose} onEdit={() => onEdit(current)} />
       ) : null}
@@ -111,15 +113,18 @@ type ActionProps = {
   armed?: boolean
   note?: ReactNode
   pressed?: boolean
+  testId?: string
 }
 
 /** One of the four 56 px hairline actions. */
-function Action({ icon, label, onClick, tone = 'default', armed, note, pressed }: ActionProps) {
+function Action({ icon, label, onClick, tone = 'default', armed, note, pressed, testId }: ActionProps) {
   const ember = tone === 'ember'
   return (
     <li data-delete={ember ? '' : undefined} className={`border-t transition-colors duration-150 ${armed ? 'border-ember' : 'border-[var(--gold-line)]'}`}>
       <button
         type="button"
+        data-testid={testId}
+        data-armed={armed ? '' : undefined}
         onClick={onClick}
         aria-pressed={pressed}
         className={`flex h-14 w-full items-center gap-4 text-left transition-colors duration-150 hover:bg-[var(--gold-line)] active:bg-[var(--gold-line)] cursor-pointer ${
@@ -129,7 +134,10 @@ function Action({ icon, label, onClick, tone = 'default', armed, note, pressed }
         <span aria-hidden="true" className="flex w-6 shrink-0 justify-center">
           {icon}
         </span>
-        <span className={`font-display inscribed flex-1 ${armed ? 'text-[10px] tracking-[0.4em] text-ember' : 'text-[14px] tracking-[0.3em]'}`}>
+        <span
+          data-testid={armed ? 'tp-meal-delete-confirm' : undefined}
+          className={`font-display inscribed flex-1 ${armed ? 'text-[10px] tracking-[0.4em] text-ember' : 'text-[14px] tracking-[0.3em]'}`}
+        >
           {armed ? 'Delete?' : label}
         </span>
       </button>
@@ -171,7 +179,7 @@ function Title({ name, favourite }: { name: string; favourite: boolean }) {
 
 /* ---------------- meal ---------------- */
 
-function MealDetail({ meal, onClose, onEdit }: { meal: Meal; onClose(): void; onEdit(): void }) {
+function MealDetail({ meal, onClose, onEdit, onBuild }: { meal: Meal; onClose(): void; onEdit(): void; onBuild(): void }) {
   const unit = useStore((s) => s.settings.unit)
   const ingredients = useStore((s) => s.ingredients)
   const [portion, setPortion] = useState(1)
@@ -197,10 +205,14 @@ function MealDetail({ meal, onClose, onEdit }: { meal: Meal; onClose(): void; on
   const components = meal.kind === 'built' ? meal.components ?? [] : []
 
   return (
-    <div onClickCapture={(e) => {
-      // any other tap in the sheet disarms a pending delete
-      if (del.armed && !(e.target as HTMLElement).closest('[data-delete]')) del.disarm()
-    }}>
+    <div
+      data-testid="tp-meal-detail"
+      data-kind={meal.kind}
+      onClickCapture={(e) => {
+        // any other tap in the sheet disarms a pending delete
+        if (del.armed && !(e.target as HTMLElement).closest('[data-delete]')) del.disarm()
+      }}
+    >
       <Title name={meal.name} favourite={meal.favourite} />
       <Numbers macros={scaled} />
 
@@ -218,7 +230,18 @@ function MealDetail({ meal, onClose, onEdit }: { meal: Meal; onClose(): void; on
 
       {components.length ? (
         <div className="mt-5">
-          <div className="font-display border-b border-[var(--gold-line-strong)] pb-2 text-[10px] tracking-[0.4em] text-bone-dim">Built from</div>
+          <div className="flex items-end justify-between border-b border-[var(--gold-line-strong)]">
+            <span className="font-display pb-2 text-[10px] tracking-[0.4em] text-bone-dim">Built from</span>
+            <button
+              type="button"
+              data-testid="tp-meal-detail-build"
+              onClick={onBuild}
+              className="font-display -mr-2 inline-flex h-11 min-w-11 items-center justify-center gap-1.5 px-2 text-[10px] tracking-[0.3em] text-gold-400 hover:text-gold-300 cursor-pointer"
+            >
+              Build
+              <ChevronRight size={12} strokeWidth={1.5} aria-hidden="true" />
+            </button>
+          </div>
           <ul>
             {components.map((c, i) => {
               const gone = !ingredients[c.ingredientId]
@@ -238,14 +261,16 @@ function MealDetail({ meal, onClose, onEdit }: { meal: Meal; onClose(): void; on
       ) : null}
 
       <ul className="mt-6 border-b border-[var(--gold-line)]">
-        <Action icon={<SquarePlus size={20} strokeWidth={1.5} />} label="Log" onClick={log} />
+        <Action testId="tp-meal-detail-log" icon={<SquarePlus size={20} strokeWidth={1.5} />} label="Log" onClick={log} />
         <Action
+          testId="tp-meal-detail-edit"
           icon={<Pencil size={18} strokeWidth={1.5} />}
           label="Edit"
           onClick={onEdit}
           note="Edits change future logs only. Past days keep their numbers."
         />
         <Action
+          testId="tp-meal-detail-fav"
           icon={<Star size={18} strokeWidth={1.5} className={meal.favourite ? 'fill-current' : ''} />}
           label="Favourite"
           pressed={meal.favourite}
@@ -254,7 +279,7 @@ function MealDetail({ meal, onClose, onEdit }: { meal: Meal; onClose(): void; on
             useStore.getState().toggleFavouriteMeal(meal.id)
           }}
         />
-        <Action icon={<X size={18} strokeWidth={1.5} />} label="Delete" tone="ember" armed={del.armed} onClick={del.tap} />
+        <Action testId="tp-meal-detail-delete" icon={<X size={18} strokeWidth={1.5} />} label="Delete" tone="ember" armed={del.armed} onClick={del.tap} />
       </ul>
     </div>
   )
@@ -287,9 +312,12 @@ function IngredientDetail({ ingredient, onClose, onEdit }: { ingredient: Ingredi
   })
 
   return (
-    <div onClickCapture={(e) => {
-      if (del.armed && !(e.target as HTMLElement).closest('[data-delete]')) del.disarm()
-    }}>
+    <div
+      data-testid="tp-ingredient-detail"
+      onClickCapture={(e) => {
+        if (del.armed && !(e.target as HTMLElement).closest('[data-delete]')) del.disarm()
+      }}
+    >
       <Title name={ingredient.name} favourite={ingredient.favourite} />
       <Numbers macros={scaled} />
 
@@ -315,14 +343,16 @@ function IngredientDetail({ ingredient, onClose, onEdit }: { ingredient: Ingredi
       </div>
 
       <ul className="mt-6 border-b border-[var(--gold-line)]">
-        <Action icon={<SquarePlus size={20} strokeWidth={1.5} />} label="Log" onClick={log} />
+        <Action testId="tp-ingredient-detail-log" icon={<SquarePlus size={20} strokeWidth={1.5} />} label="Log" onClick={log} />
         <Action
+          testId="tp-ingredient-detail-edit"
           icon={<Pencil size={18} strokeWidth={1.5} />}
           label="Edit"
           onClick={onEdit}
           note="Edits change future logs only. Past days and saved meals keep their numbers."
         />
         <Action
+          testId="tp-ingredient-detail-fav"
           icon={<Star size={18} strokeWidth={1.5} className={ingredient.favourite ? 'fill-current' : ''} />}
           label="Favourite"
           pressed={ingredient.favourite}
@@ -331,7 +361,7 @@ function IngredientDetail({ ingredient, onClose, onEdit }: { ingredient: Ingredi
             useStore.getState().toggleFavouriteIngredient(ingredient.id)
           }}
         />
-        <Action icon={<X size={18} strokeWidth={1.5} />} label="Delete" tone="ember" armed={del.armed} onClick={del.tap} />
+        <Action testId="tp-ingredient-detail-delete" icon={<X size={18} strokeWidth={1.5} />} label="Delete" tone="ember" armed={del.armed} onClick={del.tap} />
       </ul>
     </div>
   )

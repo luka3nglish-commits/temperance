@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { SquarePlus } from 'lucide-react'
 import type { EnergyUnit, LogEntry } from '../lib/types'
 import { recentKey } from '../store/selectors'
-import { useReducedMotion } from '../lib/motion'
+import { useReducedMotion, vibrate } from '../lib/motion'
 import { EmptyLine, SectionHeading } from '../components/ui'
-import { energyLine, macroLine, perServingMacros } from '../components/MealForm'
+import { energyLine, macroLine } from '../components/MealForm'
 
 type Props = {
   entries: readonly LogEntry[]
@@ -16,29 +16,31 @@ type Props = {
   /** swipe left or HIDE: drop it from recents */
   onHide(entry: LogEntry): void
   limit?: number
+  /**
+   * The row that arrived since the sheet was last open (its `recentKey`). Read once at mount: it
+   * rises in from the top once the sheet has settled. Hiding a row later never makes the next one rise.
+   */
+  risingKey?: string | null
 }
 
 const LONG_PRESS_MS = 450
 const SWIPE_HIDE_PX = 72
 const MOVE_CANCEL_PX = 8
 const STONE_EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'
+/** the sheet takes --t-sheet-in to rise; the new row lands after it */
+const RISE_DELAY_MS = 320
+const RISE_MS = 240
 
 /**
  * RECENT: the last 12 distinct things logged. 52 px rows with a 3 x 30 px gold bar, the name
- * over its P C F line, kcal in Cinzel gold and a square-plus ghost. A newly logged row rises in
- * from the top over 240 ms with its gold rule drawing left to right.
+ * over its P C F line, kcal in Cinzel gold and a square-plus ghost. Every number on a row is the
+ * snapshot as it was logged (portions included), because a tap re-logs exactly that.
  */
-export function LogRecents({ entries, unit, onRelog, onEditFirst, onHide, limit = 12 }: Props) {
+export function LogRecents({ entries, unit, onRelog, onEditFirst, onHide, limit = 12, risingKey = null }: Props) {
   const reduced = useReducedMotion()
   const [menuFor, setMenuFor] = useState<string | null>(null)
-  // a genuinely new top row rises in; derived during render so it never paints a still frame first
-  const first = entries.length ? recentKey(entries[0]) : null
-  const [prevFirst, setPrevFirst] = useState(first)
-  const [risingKey, setRisingKey] = useState<string | null>(null)
-  if (first !== prevFirst) {
-    setPrevFirst(first)
-    setRisingKey(first)
-  }
+  // captured at mount; the sheet mounts this fresh on every open
+  const [rising] = useState(() => risingKey)
 
   return (
     <section className="mt-6" aria-label="Recent">
@@ -54,7 +56,7 @@ export function LogRecents({ entries, unit, onRelog, onEditFirst, onHide, limit 
                 key={key}
                 entry={e}
                 unit={unit}
-                rising={risingKey === key && !reduced}
+                rising={rising === key && !reduced}
                 reduced={reduced}
                 menuOpen={menuFor === key}
                 onMenu={(open) => setMenuFor(open ? key : null)}
@@ -88,7 +90,7 @@ function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, on
   const rowRef = useRef<HTMLLIElement>(null)
   const faceRef = useRef<HTMLButtonElement>(null)
   const ruleRef = useRef<HTMLSpanElement>(null)
-  const per = perServingMacros(entry)
+  const revealRef = useRef<HTMLDivElement>(null)
   const servings = entry.servings
 
   // gesture state (refs: no re-render while a finger is down)
@@ -101,15 +103,15 @@ function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, on
     const li = rowRef.current
     const rule = ruleRef.current
     if (!li || typeof li.animate !== 'function') return
-    const a = li.animate([{ transform: 'translateY(-14px)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 240, easing: STONE_EASE })
-    const b = rule?.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 240, easing: STONE_EASE })
+    const timing = { duration: RISE_MS, delay: RISE_DELAY_MS, easing: STONE_EASE, fill: 'backwards' as const }
+    const a = li.animate([{ transform: 'translateY(-14px)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }], timing)
+    const b = rule?.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], timing)
     return () => {
       a.cancel()
       b?.cancel()
     }
   }, [rising])
 
-  const revealRef = useRef<HTMLDivElement>(null)
   const setShift = (dx: number, animate = false) => {
     const el = faceRef.current
     if (!el) return
@@ -137,12 +139,15 @@ function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, on
 
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return
+    // a fresh gesture never inherits a swallowed click from the last one
+    suppressClick.current = false
     if (press.current) window.clearTimeout(press.current.timer)
     const timer = window.setTimeout(() => {
       const p = press.current
       if (!p || p.swiping) return
       p.long = true
       suppressClick.current = true
+      vibrate(12)
       onEditFirst()
     }, LONG_PRESS_MS)
     press.current = { x: e.clientX, y: e.clientY, id: e.pointerId, timer, long: false, swiping: false, dx: 0 }
@@ -234,7 +239,7 @@ function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, on
             {entry.name}
             {servings !== 1 ? <span className="num text-bone-dim"> {'×'} {servings}</span> : null}
           </span>
-          <span className="num block truncate font-body text-[13px] leading-[1.2] text-bone-dim">{macroLine(per)}</span>
+          <span className="num block truncate font-body text-[13px] leading-[1.2] text-bone-dim">{macroLine(entry.macros)}</span>
         </span>
         <span className="num font-display inscribed shrink-0 text-[15px] tracking-[0.02em] text-gold-400">{energyLine(entry.macros.kcal, unit)}</span>
         <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center text-bone-dim">

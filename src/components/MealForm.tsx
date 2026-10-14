@@ -257,17 +257,24 @@ type DigitInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'on
 
 const DIGIT_EASE = 'cubic-bezier(0.7, 0, 0.2, 1)'
 
+/** Right padding that leaves room for the unit: 36 px for `g` and `ml`, 56 px for `kcal`, `kJ` and `serve`. */
+export function suffixPadding(suffix: ReactNode): number {
+  if (suffix === undefined || suffix === null || suffix === '') return 16
+  return typeof suffix === 'string' && suffix.length <= 2 ? 36 : 56
+}
+
 /**
  * Decimal input on the phone keypad. The native text is transparent; a mirror draws the same
- * glyphs on top and the newest digit wipes in from the top of its cell (120 ms, --ease-cut) with
- * a short vibration. The caret and the placeholder stay native. Reduced motion: digits just appear.
+ * glyphs on top and the newest digit lands from the top of its cell (120 ms clip wipe, --ease-cut)
+ * with a short vibration. The caret and the placeholder stay native. Reduced motion: digits just appear.
  */
 export const DigitInput = forwardRef<HTMLInputElement, DigitInputProps>(function DigitInput(
-  { value, onChange, suffix, label, labelRight, compact, className = '', ...rest },
+  { value, onChange, suffix, label, labelRight, compact, className = '', style, ...rest },
   ref,
 ) {
   const lastRef = useRef<HTMLSpanElement>(null)
   const prevLen = useRef(value.length)
+  const padRight = suffixPadding(suffix)
 
   useEffect(() => {
     // exactly one new character: a typed digit, not a prefill
@@ -277,11 +284,13 @@ export const DigitInput = forwardRef<HTMLInputElement, DigitInputProps>(function
     vibrate(8)
     const el = lastRef.current
     if (!el || isReducedMotion() || typeof el.animate !== 'function') return
-    const anim = el.animate([{ clipPath: 'inset(100% 0 0 0)', opacity: 0.6 }, { clipPath: 'inset(0 0 0 0)', opacity: 1 }], {
-      duration: 120,
-      easing: DIGIT_EASE,
-      fill: 'none',
-    })
+    const anim = el.animate(
+      [
+        { clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-3px)', opacity: 0.6 },
+        { clipPath: 'inset(0 0 0 0)', transform: 'translateY(0)', opacity: 1 },
+      ],
+      { duration: 120, easing: DIGIT_EASE, fill: 'none' },
+    )
     return () => anim.cancel()
   }, [value])
 
@@ -289,9 +298,8 @@ export const DigitInput = forwardRef<HTMLInputElement, DigitInputProps>(function
   const mirror = (
     <span
       aria-hidden="true"
-      className={`num pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden whitespace-pre pl-4 font-body text-[20px] font-medium text-bone ${
-        suffix ? 'right-14' : 'right-4'
-      }`}
+      className="num pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden whitespace-pre pl-4 font-body text-[20px] font-medium text-bone"
+      style={{ right: padRight }}
     >
       {chars.map((ch, i) => (
         <span key={i} ref={i === chars.length - 1 ? lastRef : undefined} className="inline-block">
@@ -310,7 +318,8 @@ export const DigitInput = forwardRef<HTMLInputElement, DigitInputProps>(function
     enterKeyHint: 'go' as const,
     value,
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value.replace(/[^0-9.,]/g, '')),
-    style: { color: 'transparent', caretColor: '#e7e1d2', ...(compact ? { height: 48 } : {}) },
+    // inline padding beats the primitive's pr-14 so a short unit does not eat the thirds at 360 px
+    style: { color: 'transparent', caretColor: '#e7e1d2', paddingRight: padRight, ...(compact ? { height: 48 } : {}), ...style },
     suffix,
     ...rest,
   }

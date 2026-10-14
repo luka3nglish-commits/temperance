@@ -70,9 +70,9 @@ export function HistoryScreen() {
   const closeSheet = useCallback(() => setPickedDay(null), [])
 
   return (
-    <section aria-label="History" className="pb-6">
+    <section data-testid="tp-history" aria-label="History" className="pb-6">
       <header
-        className="rise-in sticky top-0 z-10 flex h-14 items-center justify-between bg-obsidian-950/95 px-2 backdrop-blur-[20px]"
+        className="rise-in sticky top-0 z-10 flex h-14 items-center justify-between bg-obsidian-950/95 px-5 backdrop-blur-[20px]"
         style={{ marginTop: 'var(--safe-top)' }}
       >
         <IconButton label="Earlier month" onClick={back} disabled={!canBack} className="disabled:opacity-30 disabled:pointer-events-none">
@@ -87,7 +87,7 @@ export function HistoryScreen() {
       </header>
 
       <div className="rise-in rise-in-1">
-        <HistoryColonnade days={colonnadeDays} goalKcal={goalKcal} today={today} onPick={setPickedDay} />
+        <HistoryColonnade days={colonnadeDays} goalKcal={goalKcal} today={today} unit={unit} onPick={setPickedDay} />
       </div>
 
       <div className="rise-in rise-in-2 px-5 pt-5">

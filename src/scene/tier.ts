@@ -52,10 +52,21 @@ export function getTier(): Tier {
   return tier
 }
 
+/** Mirror the tier on <html>: the `no-grain` class (CSS reads it) and `data-tier` (tests read it). */
+function applyTierToDocument(t: Tier): void {
+  if (typeof document === 'undefined') return
+  try {
+    document.documentElement.classList.toggle('no-grain', t !== 'high')
+    document.documentElement.dataset.tier = t
+  } catch {
+    /* no DOM */
+  }
+}
+
 export function setTier(t: Tier): void {
+  applyTierToDocument(t)
   if (t === tier) return
   tier = t
-  if (typeof document !== 'undefined') document.documentElement.classList.toggle('no-grain', t !== 'high')
   listeners.forEach((l) => l())
 }
 

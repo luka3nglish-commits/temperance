@@ -83,6 +83,23 @@ export function LogSheet() {
   const suggestFrom = useMemo(() => recentEntries(entries, 40, settings.hiddenRecents), [entries, settings.hiddenRecents])
   const favourites = useMemo(() => favouritesByUse(meals).slice(0, 8), [meals])
 
+  // The newest visible log as of the last open (the store hydrates synchronously, so the first
+  // render already sees it). A row logged since, here or from LIBRARY and TODAY, rises in on the
+  // next open; the test is time, not identity, so hiding or deleting the top row never rises the
+  // one beneath it. Set in an effect so it batches with the Sheet's own mount and RECENT, which
+  // reads `risingKey` once at mount, sees it on its first render.
+  const top = recents[0]
+  const topRef = useRef(top)
+  topRef.current = top
+  const seenAt = useRef(top?.at ?? 0)
+  const [risingKey, setRisingKey] = useState<string | null>(null)
+  useEffect(() => {
+    if (!open) return
+    const t = topRef.current
+    setRisingKey(t && t.at > seenAt.current ? recentKey(t) : null)
+    seenAt.current = Math.max(seenAt.current, t?.at ?? 0)
+  }, [open])
+
   // ---------- prefill ----------
   const applyPrefill = useCallback(
     (p: LogPrefill) => {
@@ -117,6 +134,7 @@ export function LogSheet() {
     setRows([])
     setBuildName('')
     setBuildSave(null)
+    setRisingKey(null)
     if (useUI.getState().logPrefill) useUI.setState({ logPrefill: null })
   }, [])
 
@@ -124,24 +142,20 @@ export function LogSheet() {
   const afterLog = useCallback(
     (entry: LogEntry) => {
       closeLog()
-      toast({
-        text: `Logged · ${energyLine(entry.macros.kcal, unit)}`,
-        action: { label: 'Undo', icon: 'undo', onClick: () => deleteEntry(entry.id) },
-      })
+      // the write already happened and the entry counts; the toast only says where it lives
       if (useStore.getState().persistFailed) {
         toast({
           text: 'Saved for this session only. Export now.',
           tone: 'warn',
           duration: 8000,
-          action: {
-            label: 'Export',
-            onClick: () => {
-              closeLog()
-              setTab('settings')
-            },
-          },
+          action: { label: 'Export', onClick: () => setTab('settings') },
         })
+        return
       }
+      toast({
+        text: `Logged · ${energyLine(entry.macros.kcal, unit)}`,
+        action: { label: 'Undo', icon: 'undo', onClick: () => deleteEntry(entry.id) },
+      })
     },
     [closeLog, deleteEntry, setTab, toast, unit],
   )
@@ -263,7 +277,7 @@ export function LogSheet() {
           onSubmit={submit}
         />
       )}
-      <LogRecents entries={recents} unit={unit} onRelog={onRelog} onEditFirst={onEditFirst} onHide={onHide} limit={RECENT_LIMIT} />
+      <LogRecents entries={recents} unit={unit} onRelog={onRelog} onEditFirst={onEditFirst} onHide={onHide} limit={RECENT_LIMIT} risingKey={risingKey} />
     </Sheet>
   )
 }

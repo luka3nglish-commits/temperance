@@ -55,7 +55,7 @@ export function LibraryEditor({ target, onClose, onClosed }: Props) {
       title={title}
       height="tall"
       footer={
-        <Button type="submit" form={formId} variant="gold" full disabled={!valid}>
+        <Button type="submit" form={formId} variant="gold" full disabled={!valid} data-testid={current?.kind === 'ingredient' ? 'tp-ingredient-edit-save' : 'tp-meal-edit-save'}>
           Save
         </Button>
       }
@@ -85,12 +85,12 @@ function MacroHint({ kcalTyped, macros }: { kcalTyped: number | null; macros: Pi
   )
 }
 
-function MacroFields({ p, c, f, onP, onC, onF }: { p: string; c: string; f: string; onP(v: string): void; onC(v: string): void; onF(v: string): void }) {
+function MacroFields({ p, c, f, onP, onC, onF, testPrefix }: { p: string; c: string; f: string; onP(v: string): void; onC(v: string): void; onF(v: string): void; testPrefix: string }) {
   return (
     <div className="grid grid-cols-3 gap-3">
-      <Field label="Protein" {...decimalInputProps} value={p} onChange={(e) => onP(e.target.value)} suffix="g" placeholder="0" />
-      <Field label="Carbs" {...decimalInputProps} value={c} onChange={(e) => onC(e.target.value)} suffix="g" placeholder="0" />
-      <Field label="Fat" {...decimalInputProps} value={f} onChange={(e) => onF(e.target.value)} suffix="g" placeholder="0" />
+      <Field label="Protein" data-testid={`${testPrefix}-protein`} {...decimalInputProps} value={p} onChange={(e) => onP(e.target.value)} suffix="g" placeholder="0" />
+      <Field label="Carbs" data-testid={`${testPrefix}-carbs`} {...decimalInputProps} value={c} onChange={(e) => onC(e.target.value)} suffix="g" placeholder="0" />
+      <Field label="Fat" data-testid={`${testPrefix}-fat`} {...decimalInputProps} value={f} onChange={(e) => onF(e.target.value)} suffix="g" placeholder="0" />
     </div>
   )
 }
@@ -162,6 +162,8 @@ function MealForm({ id, formId, onDone, onValidity }: FormProps) {
   return (
     <form
       id={formId}
+      data-testid="tp-meal-editor"
+      data-kind={kind}
       className="flex flex-col gap-3 pb-2"
       onSubmit={(e) => {
         e.preventDefault()
@@ -175,7 +177,7 @@ function MealForm({ id, formId, onDone, onValidity }: FormProps) {
         </div>
       ) : null}
 
-      <Field label="Name" type="text" autoComplete="off" autoCapitalize="sentences" placeholder="Meal" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+      <Field label="Name" data-testid="tp-meal-edit-name" type="text" autoComplete="off" autoCapitalize="sentences" placeholder="Meal" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
 
       {built ? (
         <>
@@ -251,8 +253,8 @@ function MealForm({ id, formId, onDone, onValidity }: FormProps) {
         </>
       ) : (
         <>
-          <Field label="Calories" {...decimalInputProps} value={kcalText} onChange={(e) => setKcalText(e.target.value)} suffix={unitLabel(unit)} placeholder="0" enterKeyHint="done" />
-          <MacroFields p={p} c={c} f={f} onP={setP} onC={setC} onF={setF} />
+          <Field label="Calories" data-testid="tp-meal-edit-kcal" {...decimalInputProps} value={kcalText} onChange={(e) => setKcalText(e.target.value)} suffix={unitLabel(unit)} placeholder="0" enterKeyHint="done" />
+          <MacroFields p={p} c={c} f={f} onP={setP} onC={setC} onF={setF} testPrefix="tp-meal-edit" />
           <MacroHint kcalTyped={typedKcal === null ? null : fromInputEnergy(typedKcal, unit)} macros={quickMacros} />
         </>
       )}
@@ -304,18 +306,20 @@ function IngredientForm({ id, formId, onDone, onValidity }: FormProps) {
   return (
     <form
       id={formId}
+      data-testid="tp-ingredient-editor"
       className="flex flex-col gap-3 pb-2"
       onSubmit={(e) => {
         e.preventDefault()
         save()
       }}
     >
-      <Field label="Name" type="text" autoComplete="off" autoCapitalize="sentences" placeholder="Ingredient" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+      <Field label="Name" data-testid="tp-ingredient-edit-name" type="text" autoComplete="off" autoCapitalize="sentences" placeholder="Ingredient" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
 
-      <div className="grid grid-cols-3 items-end gap-3">
+      {/* the unit switch sizes to its three words so SERVE never clips at 360 px */}
+      <div className="grid grid-cols-[1fr_auto] items-end gap-3">
         <Field
           label="Per"
-          className="col-span-2"
+          data-testid="tp-ingredient-edit-per"
           {...decimalInputProps}
           value={perText}
           onChange={(e) => setPerText(e.target.value)}
@@ -323,12 +327,12 @@ function IngredientForm({ id, formId, onDone, onValidity }: FormProps) {
           placeholder={perUnit === 'serve' ? '1' : '100'}
         />
         <div className="flex h-14 items-center">
-          <Segmented label="Basis unit" size="md" value={perUnit} onChange={onUnit} options={UNITS} className="w-full [&>button]:flex-1 [&>button]:px-0" />
+          <Segmented label="Basis unit" size="md" value={perUnit} onChange={onUnit} options={UNITS} />
         </div>
       </div>
 
-      <Field label={`Calories ${basisLabel(per)}`} {...decimalInputProps} value={kcalText} onChange={(e) => setKcalText(e.target.value)} suffix={unitLabel(unit)} placeholder="0" enterKeyHint="done" />
-      <MacroFields p={p} c={c} f={f} onP={setP} onC={setC} onF={setF} />
+      <Field label={`Calories ${basisLabel(per)}`} data-testid="tp-ingredient-edit-kcal" {...decimalInputProps} value={kcalText} onChange={(e) => setKcalText(e.target.value)} suffix={unitLabel(unit)} placeholder="0" enterKeyHint="done" />
+      <MacroFields p={p} c={c} f={f} onP={setP} onC={setC} onF={setF} testPrefix="tp-ingredient-edit" />
       <MacroHint kcalTyped={typedKcal === null ? null : fromInputEnergy(typedKcal, unit)} macros={macros} />
 
       <div className="flex min-h-9 items-center justify-between">

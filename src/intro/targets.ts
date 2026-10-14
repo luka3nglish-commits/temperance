@@ -50,15 +50,37 @@ export function queryTargets(root: ParentNode = document): Targets {
   return out
 }
 
-/** The stage container that runs the landing shake (falls back to the main column). */
+/**
+ * The stage container that runs the landing shake: the today agent's `[data-stage]` (the same
+ * element src/scene/strike.ts shakes), falling back to the main column.
+ */
 export function queryStage(root: ParentNode = document): HTMLElement | null {
-  return root.querySelector<HTMLElement>('[data-intro="stage"]') ?? root.querySelector<HTMLElement>('#main')
+  return (
+    root.querySelector<HTMLElement>('[data-stage]') ??
+    root.querySelector<HTMLElement>('[data-intro="stage"]') ??
+    root.querySelector<HTMLElement>('#main')
+  )
+}
+
+/**
+ * The hidden state every target starts in, as gsap vars, so the hide can be a `gsap.set` inside the
+ * opening's context (a context revert then returns each element to pure CSS, never to "hidden").
+ * `fade` hides everything with opacity (the crossfade variants); `cut` clips the number instead.
+ */
+export function hiddenVars(name: TargetName, mode: 'cut' | 'fade'): gsap.TweenVars {
+  if (mode === 'cut' && CLIP_TARGETS.includes(name)) return { clipPath: 'inset(100% 0 0 0)' }
+  return { opacity: 0 }
 }
 
 /** The three macro arcs, when the ring exposes them (`data-arc` on each path). */
 export function queryArcs(ring: HTMLElement | undefined): SVGPathElement[] {
   if (!ring) return []
   return Array.from(ring.querySelectorAll<SVGPathElement>('path[data-arc]'))
+}
+
+/** The targets in a stable order (for the fade variants, which tween them as one group). */
+export function targetList(targets: Targets): HTMLElement[] {
+  return TARGET_NAMES.map((n) => targets[n]).filter((el): el is HTMLElement => !!el)
 }
 
 /** Remove every inline style the opening may have left so the final frame is pure CSS. */

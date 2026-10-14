@@ -34,10 +34,11 @@ export function TodayScreen() {
   const remaining = remainingKcal(totals, settings.goalKcal)
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden" style={{ paddingTop: 'var(--safe-top)' }}>
+    <div data-testid="tp-today" className="relative flex h-full w-full flex-col overflow-hidden" style={{ paddingTop: 'var(--safe-top)' }}>
       <TodayHeader today={today} />
 
-      <div data-stage className="relative w-full" style={{ flex: '0 1 460px', minHeight: 280 }}>
+      {/* data-stage: the scene toggles .shake here; data-intro="stage": the opening's landing shake (targets.ts queryStage) */}
+      <div data-stage data-intro="stage" className="relative w-full" style={{ flex: '0 1 460px', minHeight: 280 }}>
         <TodayNumber
           remaining={remaining}
           eaten={totals.kcal}

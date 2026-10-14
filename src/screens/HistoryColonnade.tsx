@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { DaySummary } from '../store/selectors'
+import type { EnergyUnit } from '../lib/types'
 import { formatDayLabel, parseDayKey } from '../lib/day'
-import { formatInt } from '../lib/units'
+import { formatEnergy, unitLabel } from '../lib/units'
 import { useTier } from '../scene/tier'
 
 /** Strip geometry (px). The strip is 180 tall: 162 of column, 18 of day numbers. */
@@ -23,6 +24,7 @@ type Props = {
   days: readonly DaySummary[]
   goalKcal: number
   today: string
+  unit: EnergyUnit
   onPick(day: string): void
 }
 
@@ -31,7 +33,7 @@ type Props = {
  * scroll-snapped by week, with the goal as a fixed gold hairline at 60 percent of the strip. Height is
  * eaten over goal against that line; past it the top is ember. Untracked days are 4 px stubs.
  */
-export function HistoryColonnade({ days, goalKcal, today, onPick }: Props) {
+export function HistoryColonnade({ days, goalKcal, today, unit, onPick }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
   const tier = useTier()
   const [entered, setEntered] = useState(false)
@@ -93,7 +95,7 @@ export function HistoryColonnade({ days, goalKcal, today, onPick }: Props) {
           </defs>
         </svg>
         {weeks.map((week, wi) => (
-          <div key={week[0]?.day ?? wi} className="flex shrink-0" style={{ scrollSnapAlign: 'start' }}>
+          <div key={week[0]?.day ?? wi} role="presentation" className="flex shrink-0" style={{ scrollSnapAlign: 'start' }}>
             {week.map((d) => {
               // position from the right, for the stagger
               const fromRight = days.findIndex((x) => x.day === d.day)
@@ -104,6 +106,7 @@ export function HistoryColonnade({ days, goalKcal, today, onPick }: Props) {
                   goalKcal={goalKcal}
                   isToday={d.day === today}
                   today={today}
+                  unit={unit}
                   glow={tier === 'high'}
                   entered={entered}
                   delay={Math.max(0, Math.min(14, fromRight)) * 22}
@@ -125,6 +128,7 @@ type ColProps = {
   goalKcal: number
   isToday: boolean
   today: string
+  unit: EnergyUnit
   glow: boolean
   entered: boolean
   delay: number
@@ -133,7 +137,7 @@ type ColProps = {
   onPick(day: string): void
 }
 
-function DayColumn({ d, goalKcal, isToday, today, glow, entered, delay, index, count, onPick }: ColProps) {
+function DayColumn({ d, goalKcal, isToday, today, unit, glow, entered, delay, index, count, onPick }: ColProps) {
   const tracked = d.count > 0
   const ratio = goalKcal > 0 ? d.totals.kcal / goalKcal : 0
   const h = tracked ? Math.min(COL_H, Math.max(STUB_H, Math.round(ratio * GOAL_H))) : STUB_H
@@ -144,64 +148,63 @@ function DayColumn({ d, goalKcal, isToday, today, glow, entered, delay, index, c
   const tipTop = stoneTop - tipH
   const date = parseDayKey(d.day).getDate()
   const label = formatDayLabel(d.day, today)
-  const aria = tracked ? `${label}, ${formatInt(Math.round(d.totals.kcal))} kcal${over ? ', over the line' : ''}` : `${label}, untracked`
+  const aria = tracked ? `${label}, ${formatEnergy(d.totals.kcal, unit)} ${unitLabel(unit)}${over ? ', over the line' : ''}` : `${label}, untracked`
 
   return (
-    <button
-      type="button"
-      role="listitem"
-      aria-label={aria}
-      aria-posinset={index}
-      aria-setsize={count}
-      onClick={() => onPick(d.day)}
-      className="group relative flex shrink-0 cursor-pointer flex-col items-start outline-none"
-      style={{ width: PITCH, height: STRIP_H }}
-    >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-1 left-[-3px] rounded-[2px] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
-        style={{ width: COL_W + 6, background: 'var(--gold-line)' }}
-      />
-      <svg
-        width={COL_W}
-        height={COL_H}
-        viewBox={`0 0 ${COL_W} ${COL_H}`}
-        aria-hidden="true"
-        className="relative block overflow-visible"
-        style={{
-          transformOrigin: '50% 100%',
-          transform: entered ? 'scaleY(1)' : 'scaleY(0)',
-          transition: `transform 500ms var(--ease-stone) ${delay}ms`,
-        }}
+    <div role="listitem" aria-posinset={index} aria-setsize={count} className="shrink-0" style={{ width: PITCH, height: STRIP_H }}>
+      <button
+        type="button"
+        aria-label={aria}
+        data-day={d.day}
+        onClick={() => onPick(d.day)}
+        className="group relative flex h-full w-full cursor-pointer flex-col items-start outline-none"
       >
-        {over ? (
-          <g style={glow ? { filter: 'drop-shadow(0 0 2px var(--ember-glow))' } : undefined}>
-            <rect x="0" y={tipTop} width={COL_W} height={tipH} fill="url(#hcol-ember)" />
-            <rect x="0" y={tipTop} width={COL_W} height="1" fill="#FFB088" opacity="0.8" />
-          </g>
-        ) : null}
-        {/* the stone */}
-        <rect x="0" y={stoneTop} width={COL_W} height={stoneH} fill={tracked ? 'url(#hcol-stone)' : '#1A1A21'} />
-        {tracked ? (
-          <>
-            {/* capital edge */}
-            {!over ? <rect x="0" y={stoneTop} width={COL_W} height="1" fill="#26262E" /> : null}
-            {/* two flutes */}
-            <line x1="7.5" y1={stoneTop + 2} x2="7.5" y2={COL_H} stroke="#E7E1D2" strokeOpacity="0.25" strokeWidth="1" />
-            <line x1="15.5" y1={stoneTop + 2} x2="15.5" y2={COL_H} stroke="#E7E1D2" strokeOpacity="0.08" strokeWidth="1" />
-          </>
-        ) : null}
-        {isToday ? <rect x="0" y={COL_H - 2} width={COL_W} height="2" fill="#D8B45A" /> : null}
-      </svg>
-      <span
-        aria-hidden="true"
-        className={`font-display num flex items-center justify-center text-[9px] tracking-[0.1em] ${
-          isToday ? 'text-gold-400' : tracked ? 'text-bone-dim' : 'text-bone-mute'
-        }`}
-        style={{ width: COL_W, height: LABEL_H }}
-      >
-        {date}
-      </span>
-    </button>
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-1 left-[-3px] rounded-[2px] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+          style={{ width: COL_W + 6, background: 'var(--gold-line)' }}
+        />
+        <svg
+          width={COL_W}
+          height={COL_H}
+          viewBox={`0 0 ${COL_W} ${COL_H}`}
+          aria-hidden="true"
+          className="relative block overflow-visible"
+          style={{
+            transformOrigin: '50% 100%',
+            transform: entered ? 'scaleY(1)' : 'scaleY(0)',
+            transition: `transform 500ms var(--ease-stone) ${delay}ms`,
+          }}
+        >
+          {over ? (
+            <g style={glow ? { filter: 'drop-shadow(0 0 2px var(--ember-glow))' } : undefined}>
+              <rect x="0" y={tipTop} width={COL_W} height={tipH} fill="url(#hcol-ember)" />
+              <rect x="0" y={tipTop} width={COL_W} height="1" fill="#FFB088" opacity="0.8" />
+            </g>
+          ) : null}
+          {/* the stone */}
+          <rect x="0" y={stoneTop} width={COL_W} height={stoneH} fill={tracked ? 'url(#hcol-stone)' : '#1A1A21'} />
+          {tracked ? (
+            <>
+              {/* capital edge */}
+              {!over ? <rect x="0" y={stoneTop} width={COL_W} height="1" fill="#26262E" /> : null}
+              {/* two flutes */}
+              <line x1="7.5" y1={stoneTop + 2} x2="7.5" y2={COL_H} stroke="#E7E1D2" strokeOpacity="0.25" strokeWidth="1" />
+              <line x1="15.5" y1={stoneTop + 2} x2="15.5" y2={COL_H} stroke="#E7E1D2" strokeOpacity="0.08" strokeWidth="1" />
+            </>
+          ) : null}
+          {isToday ? <rect x="0" y={COL_H - 2} width={COL_W} height="2" fill="#D8B45A" /> : null}
+        </svg>
+        <span
+          aria-hidden="true"
+          className={`font-display num flex items-center justify-center text-[9px] tracking-[0.1em] ${
+            isToday ? 'text-gold-400' : tracked ? 'text-bone-dim' : 'text-bone-mute'
+          }`}
+          style={{ width: COL_W, height: LABEL_H }}
+        >
+          {date}
+        </span>
+      </button>
+    </div>
   )
 }

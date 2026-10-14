@@ -14,7 +14,7 @@ type Props = {
 export function MealFormHint({ hint, differs, saveToLibrary, onSaveToLibrary, className = '' }: Props) {
   return (
     <div className={`flex min-h-9 items-center justify-between gap-3 ${className}`}>
-      <p className="num min-w-0 truncate font-body text-[14px] leading-[1.4] text-bone-dim" aria-live="polite">
+      <p className="num min-w-0 truncate font-body text-[14px] leading-[1.4] text-bone-dim">
         {hint}
         {hint && differs ? <span className="text-bone-dim"> {'·'} differs from calories</span> : null}
       </p>

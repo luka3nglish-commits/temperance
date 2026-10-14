@@ -80,12 +80,21 @@ export function TodayNumber({ remaining, eaten, goal, unit, hero, short, onSwap 
       />
       <p
         data-intro="label"
+        data-testid="tp-hero-label"
         className={`font-display inscribed absolute inset-x-0 text-center text-[11px] leading-[18px] tracking-[0.4em] ${over ? 'text-ember-text' : 'text-bone-dim'}`}
         style={{ top: labelTop, marginRight: '-0.4em' }}
       >
         {label}
       </p>
-      <div ref={wrapRef} data-intro="number" className="absolute inset-x-0 flex justify-center" style={{ top: numberTop }}>
+      <div
+        ref={wrapRef}
+        data-intro="number"
+        data-testid="tp-hero-number"
+        data-value={display}
+        data-over={over ? 'true' : 'false'}
+        className="absolute inset-x-0 flex justify-center"
+        style={{ top: numberTop }}
+      >
         <button
           type="button"
           onClick={onSwap}
@@ -97,6 +106,7 @@ export function TodayNumber({ remaining, eaten, goal, unit, hero, short, onSwap 
       </div>
       <p
         data-intro="subline"
+        data-testid="tp-subline"
         className="num font-body absolute inset-x-0 text-center text-[17px] italic leading-[22px] text-bone-dim"
         style={{ top: sublineTop }}
       >

@@ -2,8 +2,8 @@ import { memo, useCallback, useEffect, useRef, useState, type PointerEvent as Re
 import { Check, SquarePlus, Star } from 'lucide-react'
 import { vibrate } from '../lib/motion'
 
-/** What the 44 px trailing target does. */
-export type RowTrailing = 'log' | 'star'
+/** Test hooks for one row; each is optional and rendered only when given (never derived, so a meal shown twice is never ambiguous). */
+export type RowTestIds = { row?: string; fav?: string; log?: string }
 
 type Props = {
   id: string
@@ -11,13 +11,13 @@ type Props = {
   /** `612 kcal · P 32 C 48 F 12` or `per 100 g · 165 kcal · ...` */
   subline: string
   favourite: boolean
-  trailing: RowTrailing
   onOpen(id: string): void
   onToggleFavourite(id: string): void
-  /** required when trailing is 'log' */
+  /** when given, a 44 px square-plus at the trailing edge logs one portion at once */
   onLog?(id: string): void
   /** label for the log target, e.g. "Log one portion" */
   logLabel?: string
+  testIds?: RowTestIds
 }
 
 const LONG_PRESS_MS = 450
@@ -80,12 +80,15 @@ function useLongPress(onLongPress: () => void) {
   return { onPointerDown, onPointerMove, onPointerUp: clear, onPointerCancel: clear, onPointerLeave: clear, onClickCapture, onContextMenu }
 }
 
+const TARGET = 'flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-[4px] transition-[color,transform] duration-150 active:scale-[0.9] cursor-pointer'
+
 /**
- * One 60 px library row ruled with --gold-line. The body is a button that opens the detail sheet;
- * a sibling 44 px button at the trailing edge logs one portion (square-plus) or toggles the
- * favourite mark (star). Long press anywhere on the row toggles the favourite.
+ * One 60 px library row ruled with --gold-line. The body is a button that opens the detail sheet.
+ * At the trailing edge sit the 44 px targets: the star (outline bone-dim off, filled gold-400 on)
+ * on every row, and the square-plus that logs one portion when `onLog` is given (meal rows).
+ * Long press anywhere on the row toggles the favourite.
  */
-export const LibraryRow = memo(function LibraryRow({ id, name, subline, favourite, trailing, onOpen, onToggleFavourite, onLog, logLabel = 'Log one portion' }: Props) {
+export const LibraryRow = memo(function LibraryRow({ id, name, subline, favourite, onOpen, onToggleFavourite, onLog, logLabel = 'Log one portion', testIds }: Props) {
   const [flash, setFlash] = useState(false)
   const flashTimer = useRef(0)
   useEffect(() => () => window.clearTimeout(flashTimer.current), [])
@@ -105,6 +108,7 @@ export const LibraryRow = memo(function LibraryRow({ id, name, subline, favourit
 
   return (
     <li
+      data-testid={testIds?.row}
       className="flex items-stretch border-b border-[var(--gold-line)] select-none [-webkit-touch-callout:none]"
       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 60px' }}
       {...press}
@@ -114,42 +118,33 @@ export const LibraryRow = memo(function LibraryRow({ id, name, subline, favourit
         onClick={() => onOpen(id)}
         className="flex min-h-[60px] min-w-0 flex-1 flex-col justify-center py-1.5 pr-2 text-left transition-colors duration-150 hover:bg-[var(--gold-line)] active:bg-[var(--gold-line)] cursor-pointer"
       >
-        <span className="flex min-w-0 items-center gap-2">
-          {favourite && trailing !== 'star' ? (
-            <Star aria-hidden="true" size={11} strokeWidth={1.5} className="shrink-0 fill-current text-gold-400" />
-          ) : null}
-          <span className="truncate font-body text-[19px] font-medium leading-[1.3] text-bone">{name}</span>
-          {favourite && trailing !== 'star' ? <span className="sr-only">, favourite</span> : null}
-        </span>
+        <span className="truncate font-body text-[19px] font-medium leading-[1.3] text-bone">{name}</span>
         <span className="num truncate font-body text-[13px] leading-[1.3] text-bone-dim">{subline}</span>
       </button>
 
-      {trailing === 'log' ? (
+      <button
+        type="button"
+        data-testid={testIds?.fav}
+        aria-pressed={favourite}
+        aria-label={`Favourite ${name}`}
+        onClick={toggle}
+        className={`${TARGET} ${favourite ? 'text-gold-400' : 'text-bone-dim hover:text-bone'}`}
+      >
+        <Star size={20} strokeWidth={1.5} className={`transition-transform duration-150 ${favourite ? 'fill-current' : ''}`} />
+      </button>
+
+      {onLog ? (
         <button
           type="button"
+          data-testid={testIds?.log}
           aria-label={`${logLabel} of ${name}`}
           title={logLabel}
           onClick={log}
-          className={`flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-[4px] transition-[color,transform] duration-150 active:scale-[0.9] cursor-pointer ${
-            flash ? 'text-gold-300' : 'text-bone-dim hover:text-gold-400'
-          }`}
+          className={`${TARGET} ${flash ? 'text-gold-300' : 'text-bone-dim hover:text-gold-400'}`}
         >
           {flash ? <Check size={22} strokeWidth={1.5} /> : <SquarePlus size={22} strokeWidth={1.5} />}
         </button>
-      ) : (
-        <button
-          type="button"
-          role="switch"
-          aria-checked={favourite}
-          aria-label={`Favourite ${name}`}
-          onClick={toggle}
-          className={`flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-[4px] transition-[color,transform] duration-150 active:scale-[0.9] cursor-pointer ${
-            favourite ? 'text-gold-400' : 'text-bone-dim hover:text-bone'
-          }`}
-        >
-          <Star size={20} strokeWidth={1.5} className={favourite ? 'fill-current' : ''} />
-        </button>
-      )}
+      ) : null}
     </li>
   )
 })

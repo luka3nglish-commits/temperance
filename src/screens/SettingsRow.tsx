@@ -12,12 +12,16 @@ type Props = {
   className?: string
 }
 
-/** A 56 px settings row ruled with --gold-line: label at the left, value or control at the right. */
+/**
+ * A 56 px settings row ruled with --gold-line: label at the left, value or control at the right.
+ * A control too wide for a narrow phone (three segments, three inputs) drops under the label
+ * instead of overflowing; the row grows and the control stays right aligned.
+ */
 export function SettingsRow({ label, children, below, htmlFor, className = '' }: Props) {
-  const labelClass = 'font-display shrink-0 text-[10px] tracking-[0.35em] text-bone-dim'
+  const labelClass = 'font-display shrink-0 whitespace-nowrap text-[10px] tracking-[0.35em] text-bone-dim'
   return (
     <div className={`border-b border-[var(--gold-line)] ${className}`}>
-      <div className="flex min-h-14 items-center justify-between gap-4 py-1.5">
+      <div className="flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1.5">
         {htmlFor ? (
           <label htmlFor={htmlFor} className={labelClass}>
             {label}
@@ -25,7 +29,7 @@ export function SettingsRow({ label, children, below, htmlFor, className = '' }:
         ) : (
           <span className={labelClass}>{label}</span>
         )}
-        <div className="flex min-w-0 items-center justify-end gap-2">{children}</div>
+        <div className="ml-auto flex min-w-0 items-center justify-end gap-2">{children}</div>
       </div>
       {below ? <div className="pb-3">{below}</div> : null}
     </div>
@@ -47,17 +51,22 @@ type SmallInputProps = {
   value: string
   onChange(value: string): void
   onCommit(): void
+  /** unit drawn inside at the right (kcal, kJ) */
   suffix?: string
+  /** a one-letter Cinzel mark drawn inside at the left (P, C, F) */
+  prefix?: string
   width?: number
   label: string
+  testId?: string
 }
 
 /** A 44 px numeric field for a settings row: obsidian-800, right aligned Cormorant 19 px, unit inside. */
-export function SmallInput({ id, value, onChange, onCommit, suffix, width = 112, label }: SmallInputProps) {
+export function SmallInput({ id, value, onChange, onCommit, suffix, prefix, width = 112, label, testId }: SmallInputProps) {
   return (
     <span className="relative inline-block" style={{ width }}>
       <input
         id={id}
+        data-testid={testId}
         type="text"
         inputMode="numeric"
         pattern="[0-9]*"
@@ -70,10 +79,15 @@ export function SmallInput({ id, value, onChange, onCommit, suffix, width = 112,
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
         }}
         onFocus={(e) => e.target.select()}
-        className={`num h-11 w-full rounded-[4px] border border-obsidian-600 bg-obsidian-800 pl-3 text-right font-body text-[19px] font-medium text-bone outline-none transition-colors duration-150 focus:border-[var(--gold-focus)] ${
-          suffix ? 'pr-10' : 'pr-3'
-        }`}
+        className={`num h-11 w-full rounded-[4px] border border-obsidian-600 bg-obsidian-800 text-right font-body text-[19px] font-medium text-bone outline-none transition-colors duration-150 focus:border-[var(--gold-focus)] ${
+          suffix ? 'pr-10' : 'pr-2'
+        } ${prefix ? 'pl-5' : 'pl-3'}`}
       />
+      {prefix ? (
+        <span aria-hidden="true" className="font-display pointer-events-none absolute inset-y-0 left-2 flex items-center text-[9px] tracking-[0.2em] text-bone-dim">
+          {prefix}
+        </span>
+      ) : null}
       {suffix ? (
         <span aria-hidden="true" className="num pointer-events-none absolute inset-y-0 right-3 flex items-center font-body text-[14px] text-bone-dim">
           {suffix}

@@ -28,11 +28,17 @@ const ASPECT: Record<StripId, string> = {
   right: 'xMaxYMid slice',
 }
 
+/**
+ * The strips sit flush with the frame's edges. The top strip starts at y 0 (spec section 6: the top
+ * safe area is where it lives, dipping into the header band only at the corners) and the bottom
+ * strip's 8 to 18 px shards sit in the bottom safe area under the bar's colour, never over the tab
+ * labels. The frame already spans the safe areas (viewport-fit=cover), so no further offset.
+ */
 const PLACE: Record<StripId, string> = {
-  top: 'left-0 right-0 top-[var(--safe-top)] h-16',
-  bottom: 'left-0 right-0 bottom-[var(--safe-bottom)] h-16',
-  left: 'left-[var(--safe-left)] top-0 bottom-0 w-16',
-  right: 'right-[var(--safe-right)] top-0 bottom-0 w-16',
+  top: 'left-0 right-0 top-0 h-16',
+  bottom: 'left-0 right-0 bottom-0 h-16',
+  left: 'left-0 top-0 bottom-0 w-16',
+  right: 'right-0 top-0 bottom-0 w-16',
 }
 
 /** glint gradient endpoints for a tilt value: the bright seam crosses the strip as the light moves */

@@ -28,11 +28,12 @@ export function energyText(kcal: number, unit: EnergyUnit): string {
 }
 
 /** Gold Cinzel energy figure with the unit kept lowercase. */
-export function EnergyFigure({ kcal, unit, size = 16, className = '' }: { kcal: number; unit: EnergyUnit; size?: number; className?: string }) {
+export function EnergyFigure({ kcal, unit, size = 16, className = '', testId }: { kcal: number; unit: EnergyUnit; size?: number; className?: string; testId?: string }) {
   return (
-    <span className={`font-display inscribed num whitespace-nowrap tracking-[0.02em] text-gold-400 ${className}`} style={{ fontSize: size }}>
+    <span data-testid={testId} data-kcal={Math.round(kcal)} className={`font-display inscribed num whitespace-nowrap tracking-[0.02em] text-gold-400 ${className}`} style={{ fontSize: size }}>
       {formatEnergy(kcal, unit)}
-      <span className="normal-case" style={{ fontSize: Math.round(size * 0.68) }}>
+      {/* the unit stays lowercase and never drops under the 9 px Cinzel floor */}
+      <span className="normal-case" style={{ fontSize: Math.max(9, Math.round(size * 0.68)) }}>
         {' '}
         {unitLabel(unit)}
       </span>
@@ -41,11 +42,14 @@ export function EnergyFigure({ kcal, unit, size = 16, className = '' }: { kcal: 
 }
 
 /** "260 LEFT" in bone-dim or "340 OVER" in ember-text. Never a minus sign. */
-export function Delta({ kcal, goalKcal, unit }: { kcal: number; goalKcal: number; unit: EnergyUnit }) {
+export function Delta({ kcal, goalKcal, unit, testId }: { kcal: number; goalKcal: number; unit: EnergyUnit; testId?: string }) {
   const rem = goalKcal - kcal
   const over = rem < 0
   return (
     <span
+      data-testid={testId}
+      data-over={over}
+      data-kcal={Math.round(Math.abs(rem))}
       className={`font-display num inline-flex items-center gap-1 whitespace-nowrap text-[10px] tracking-[0.2em] ${over ? 'text-ember-text' : 'text-bone-dim'}`}
       aria-label={over ? `${formatEnergy(-rem, unit)} ${unitLabel(unit)} over the line` : `${formatEnergy(rem, unit)} ${unitLabel(unit)} left`}
     >
@@ -153,7 +157,7 @@ export function DayRow({ d, entries, today, goalKcal, unit, open, onToggle, onOp
 
   if (!tracked) {
     return (
-      <li className="flex min-h-14 items-center gap-3 border-b border-[var(--gold-line)]">
+      <li data-testid={`tp-history-day-${d.day}`} data-tracked="false" className="flex min-h-14 items-center gap-3 border-b border-[var(--gold-line)]">
         <span className={`font-display w-[60px] shrink-0 text-[10px] tracking-[0.28em] ${isToday ? 'text-gold-300' : 'text-bone-mute'}`}>{stamp}</span>
         <span className="font-body italic text-[14px] text-bone-mute">Nothing logged.</span>
       </li>
@@ -161,7 +165,7 @@ export function DayRow({ d, entries, today, goalKcal, unit, open, onToggle, onOp
   }
 
   return (
-    <li className="border-b border-[var(--gold-line)]">
+    <li data-testid={`tp-history-day-${d.day}`} data-tracked="true" className="border-b border-[var(--gold-line)]">
       <button
         type="button"
         aria-expanded={open}
@@ -171,10 +175,10 @@ export function DayRow({ d, entries, today, goalKcal, unit, open, onToggle, onOp
       >
         <span className={`font-display w-[60px] shrink-0 text-[10px] tracking-[0.28em] ${isToday ? 'text-gold-300' : 'text-bone-dim'}`}>{stamp}</span>
         <span className="flex min-w-0 flex-1 items-baseline gap-3">
-          <EnergyFigure kcal={d.totals.kcal} unit={unit} />
+          <EnergyFigure kcal={d.totals.kcal} unit={unit} testId="tp-history-day-kcal" />
           <span className="num font-body text-[13px] text-bone-dim">P {Math.round(d.totals.protein)}</span>
         </span>
-        <Delta kcal={d.totals.kcal} goalKcal={goalKcal} unit={unit} />
+        <Delta kcal={d.totals.kcal} goalKcal={goalKcal} unit={unit} testId="tp-history-day-delta" />
       </button>
       <div
         id={panelId}
@@ -199,7 +203,7 @@ function DayPanel({ day, entries, totals, unit, onOpenDay }: { day: string; entr
       <ul className="mt-1">
         {list.map((e) => (
           <li key={e.id} className="flex min-h-10 items-center gap-3 border-t border-[var(--bone-08)]">
-            <span className="num w-[60px] shrink-0 font-body text-[13px] text-bone-dim">{formatTime(e.at)}</span>
+            <span className="num w-[60px] shrink-0 font-body text-[14px] text-bone-dim">{formatTime(e.at)}</span>
             <span className="min-w-0 flex-1 truncate font-body text-[17px] font-medium text-bone">{e.name}</span>
             <EnergyFigure kcal={e.macros.kcal} unit={unit} size={13} />
           </li>

@@ -88,10 +88,19 @@ export function LibraryScreen() {
     pendingDetail.current = t
     setDetail(null)
   }, [])
+  // an assembled meal reopens in the LOG sheet's BUILD mode once the detail sheet has left
+  const pendingBuild = useRef<string | null>(null)
+  const buildFromDetail = useCallback((mealId: string) => {
+    pendingBuild.current = mealId
+    setDetail(null)
+  }, [])
   const onDetailClosed = useCallback(() => {
     const next = pendingEditor.current
     pendingEditor.current = null
     if (next) setEditor(next)
+    const build = pendingBuild.current
+    pendingBuild.current = null
+    if (build && useStore.getState().meals[build]) useUI.getState().openLog({ mealId: build, mode: 'build' })
   }, [])
 
   const closeEditor = useCallback(() => setEditor(null), [])
@@ -120,17 +129,17 @@ export function LibraryScreen() {
   const rise = (i: number) => (reduced ? '' : i === 0 ? 'rise-in' : `rise-in rise-in-${i}`)
 
   return (
-    <div className="px-5">
+    <div data-testid="tp-library" className="px-5">
       {/* header and search stay put while the archive scrolls beneath them */}
       <div className="sticky top-0 z-10 -mx-5 bg-obsidian-950/92 px-5 pb-4 backdrop-blur-[12px]" style={{ paddingTop: 'var(--safe-top)' }}>
         <header className={`flex h-14 items-center justify-between ${rise(0)}`}>
           <h1 className="font-display inscribed text-[14px] tracking-[0.35em] text-bone">Library</h1>
-          <IconButton label="Add a meal or ingredient" onClick={() => setMenuOpen(true)} className="-mr-2 text-gold-400 hover:text-gold-300">
+          <IconButton label="Add a meal or ingredient" data-testid="tp-library-add" onClick={() => setMenuOpen(true)} className="-mr-2 text-gold-400 hover:text-gold-300">
             <Plus size={22} strokeWidth={1.5} />
           </IconButton>
         </header>
         <div className={`pt-1 ${rise(1)}`}>
-          <LibrarySearch label="Search the library" placeholder="Search" value={query} onChange={setQuery} />
+          <LibrarySearch label="Search the library" data-testid="tp-library-search" placeholder="Search" value={query} onChange={setQuery} />
         </div>
       </div>
 
@@ -167,7 +176,7 @@ export function LibraryScreen() {
       </div>
 
       <LibraryAddMenu open={menuOpen} onClose={() => setMenuOpen(false)} onClosed={onMenuClosed} onPick={pickAdd} />
-      <LibraryDetailSheet target={detail} onClose={closeDetail} onClosed={onDetailClosed} onEdit={editFromDetail} />
+      <LibraryDetailSheet target={detail} onClose={closeDetail} onClosed={onDetailClosed} onEdit={editFromDetail} onBuild={buildFromDetail} />
       <LibraryEditor target={editor} onClose={closeEditor} onClosed={onEditorClosed} />
     </div>
   )

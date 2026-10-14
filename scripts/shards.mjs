@@ -8,7 +8,8 @@
 // Strips (viewBox units): top 390 x 64 (5 shards), bottom 390 x 64 (3 at each corner, shallow),
 // left 64 x 844 (9 shards), right 64 x 844 (11 shards). Every polygon: two points flush on the
 // screen edge plus two to four jagged inner points (4 to 6 total). Depth 18 to 64 px, deepest at
-// the top right and the bottom left; the bottom strip stays 8 to 18 px so it never eats the bar.
+// the top right and the bottom left; the bottom strip stays 8 to 18 px (left corner 11 to 18, right
+// corner 8 to 15 so the deepest bottom shard is at the left) and never eats the bar.
 import { writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -144,7 +145,7 @@ const bottomLeft = strip({
   count: 3,
   from: 0,
   to: 128,
-  depthRange: [8, 18],
+  depthRange: [11, 18],
   deepAt: 'start',
   place: (s, d) => [s, 64 - d],
   jagLo: 0.7,
@@ -154,7 +155,7 @@ const bottomRight = strip({
   count: 3,
   from: 262,
   to: 390,
-  depthRange: [8, 18],
+  depthRange: [8, 15],
   deepAt: 'end',
   place: (s, d) => [s, 64 - d],
   jagLo: 0.7,

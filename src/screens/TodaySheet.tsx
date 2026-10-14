@@ -6,6 +6,7 @@
  * 240 ms with its gold rule drawing left to right. The kJ toggle applies to every number.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Trash2 } from 'lucide-react'
 import { Button, EmptyLine, IconButton, Sheet, useToast } from '../components/ui'
 import type { EnergyUnit, LogEntry } from '../lib/types'
@@ -114,7 +115,7 @@ function TodayRow({ entry, unit, rise, onEdit, onRemove }: RowProps) {
   )
 
   return (
-    <li ref={liRef} className="relative overflow-hidden" style={{ touchAction: 'pan-y' }}>
+    <li ref={liRef} data-testid={`tp-today-entry-${entry.id}`} data-kcal={Math.round(entry.macros.kcal)} className="relative overflow-hidden" style={{ touchAction: 'pan-y' }}>
       <span
         ref={hint}
         aria-hidden="true"
@@ -178,6 +179,14 @@ function TodayEntryList({ entries, unit, onEdit, onRemove }: ListProps) {
   )
 }
 
+/**
+ * The Sheet primitive owns the role="dialog" panel and takes no data attributes, so the test hook is
+ * set from inside: a display: contents wrapper (no layout) marks the nearest dialog when it mounts.
+ */
+const markDialog = (el: HTMLDivElement | null) => {
+  el?.closest('[role="dialog"]')?.setAttribute('data-testid', 'tp-today-sheet')
+}
+
 export function TodaySheet({ today }: { today: string }) {
   const open = useUI((s) => s.todayOpen)
   const close = useUI((s) => s.closeToday)
@@ -224,7 +233,10 @@ export function TodaySheet({ today }: { today: string }) {
     </span>
   )
 
-  return (
+  // <main> is a z 10 stacking context (App.tsx), so a sheet rendered inside it would paint under the
+  // tab bar (z 30) and the shards (z 40). Portal the DOM to <body>; the React tree (store subscriptions,
+  // toasts) is unchanged.
+  const sheet = (
     <Sheet
       open={open}
       onClose={close}
@@ -239,11 +251,14 @@ export function TodaySheet({ today }: { today: string }) {
         ) : undefined
       }
     >
-      {editing ? (
-        <TodayEntryEdit key={editing.id} entry={editing} unit={unit} formId={EDIT_FORM_ID} onSave={save} onBack={() => setEditing(null)} />
-      ) : (
-        <TodayEntryList entries={list} unit={unit} onEdit={setEditing} onRemove={remove} />
-      )}
+      <div ref={markDialog} className="contents" data-today-view={editing ? 'edit' : 'list'}>
+        {editing ? (
+          <TodayEntryEdit key={editing.id} entry={editing} unit={unit} formId={EDIT_FORM_ID} onSave={save} onBack={() => setEditing(null)} />
+        ) : (
+          <TodayEntryList entries={list} unit={unit} onEdit={setEditing} onRemove={remove} />
+        )}
+      </div>
     </Sheet>
   )
+  return typeof document === 'undefined' ? sheet : createPortal(sheet, document.body)
 }

@@ -140,10 +140,13 @@ export function MealFormBuild({ rows, onRows, name, onName, saveOverride, onSave
         <EmptyLine>Add ingredients to build a meal.</EmptyLine>
       ) : null}
 
-      <div className="flex h-11 items-center justify-between border-y border-[var(--gold-line-strong)]">
-        <span className="num font-display inscribed text-[15px] tracking-[0.04em] text-gold-400">{energyLine(totals.kcal, unit)}</span>
-        <span className="num font-display inscribed text-[15px] tracking-[0.04em] text-bone">{macroLine(totals)}</span>
-      </div>
+      <p className="num font-display inscribed flex h-11 items-center gap-2 border-y border-[var(--gold-line-strong)] text-[15px] tracking-[0.04em] text-bone">
+        <span className="text-gold-400">{energyLine(totals.kcal, unit)}</span>
+        <span className="text-bone-dim" aria-hidden="true">
+          {'·'}
+        </span>
+        <span>{macroLine(totals)}</span>
+      </p>
 
       <NameInput label="Meal name" placeholder="Meal" value={name} maxLength={80} onChange={(e) => onName(e.target.value)} />
 

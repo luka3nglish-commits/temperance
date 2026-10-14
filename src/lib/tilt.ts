@@ -38,7 +38,38 @@ function hasOrientation(): boolean {
 
 const clamp1 = (v: number) => (v < -1 ? -1 : v > 1 ? 1 : v)
 
+const HANDBACK = 0.18 // easing per frame when the relay takes the glint back from a timeline
+
 let running = false
+/** while > 0 the loop still writes :root but does not dispatch: a timeline owns the glint (section 5, S2) */
+let suspended = 0
+/** the last value the glint was told, by the loop or by a timeline through emitTilt */
+let told = 0
+/** true on the first relayed frame after a hold, so the seam slides to the keyframe instead of jumping */
+let handback = false
+
+/**
+ * Hold the loop's `tilt` events so a timeline can drive the glint itself without the 30 Hz relay
+ * fighting it. Returns the resume function (idempotent). Nested holds are counted. The root
+ * `--tilt-x` keeps being written meanwhile so the number, borders and keystone never freeze.
+ */
+export function suspendTilt(): () => void {
+  suspended += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    suspended = Math.max(0, suspended - 1)
+    if (suspended === 0) handback = true
+  }
+}
+
+/** Tell the glint where the light is (used by the opening's sweep while the loop is held). */
+export function emitTilt(x: number): void {
+  if (typeof window === 'undefined') return
+  told = x
+  window.dispatchEvent(new CustomEvent<number>('tilt', { detail: x }))
+}
 
 export function startTilt(): () => void {
   if (typeof window === 'undefined' || running) return () => {}
@@ -58,12 +89,22 @@ export function startTilt(): () => void {
   const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)')
   const reduceMq = window.matchMedia('(prefers-reduced-motion: reduce)')
 
+  // relay a value to the glint: held while a timeline owns it; eased back in after a hold
   const dispatch = (x: number) => {
-    window.dispatchEvent(new CustomEvent<number>('tilt', { detail: x }))
+    if (suspended > 0) return
+    if (handback) {
+      const next = told + (x - told) * HANDBACK
+      if (Math.abs(x - next) < 0.01) handback = false
+      else {
+        emitTilt(next)
+        return
+      }
+    }
+    emitTilt(x)
   }
 
   const write = (x: number) => {
-    if (written !== null && Math.abs(written - x) < EPS) return
+    if (written !== null && Math.abs(written - x) < EPS && !handback) return
     written = x
     root.style.setProperty('--tilt-x', x.toFixed(4))
     root.style.setProperty('--tilt-angle', `${(x * 18).toFixed(2)}deg`)
@@ -111,7 +152,7 @@ export function startTilt(): () => void {
       const v = parseFloat(getComputedStyle(root).getPropertyValue('--tilt-x'))
       if (Number.isFinite(v)) {
         current = v
-        dispatch(v)
+        if (suspended > 0 || handback || Math.abs(told - v) >= EPS) dispatch(v)
       }
     }
   }
