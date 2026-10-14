@@ -4,8 +4,8 @@ type Props = {
   value: number
   /** ember gradient (over the line) */
   ember?: boolean
-  /** Cinzel size in px, default 96 */
-  size?: number
+  /** Cinzel size: px number or any CSS length expression (min(), clamp()), default 96 */
+  size?: number | string
   className?: string
   /** aria label, defaults to the plain number */
   label?: string

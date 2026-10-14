@@ -1,6 +1,8 @@
 /**
  * FLANK INSCRIPTIONS (spec section 6, y 400 to 452): EATEN left, GOAL right, cut either side of the
- * column. EATEN opens the TODAY sheet. On short phones both sit on one row under the sub-line.
+ * column 107 px above the plinth top. Anchored to --plinth-y (written by the scene in frame
+ * coordinates; the stage starts 40 px under the top safe area) so they ride with the monument when
+ * it scales on a short phone. EATEN opens the TODAY sheet. `compact` only tightens the type.
  * Also the DOM `GOAL 2 500` label that rides the gold goal line at --goal-y.
  */
 import type { EnergyUnit } from '../lib/types'
@@ -10,56 +12,43 @@ type Props = {
   eaten: number
   goal: number
   unit: EnergyUnit
-  /** one row under the sub-line (short phones) */
+  /** short phones: smaller values, tighter block */
   compact: boolean
   onEaten(): void
 }
 
 const labelCls = 'font-display inscribed block text-[9px] leading-none tracking-[0.35em] text-bone-dim'
-const valueCls = 'font-display inscribed num block text-[22px] leading-[1.1] tracking-[0.02em] text-bone'
+const valueCls = 'font-display inscribed num block leading-[1.1] tracking-[0.02em] text-bone'
+
+/** the plinth top in stage coordinates */
+export const PLINTH_IN_STAGE = 'calc(var(--plinth-y) - var(--safe-top) - 40px)'
 
 export function TodayFlanks({ eaten, goal, unit, compact, onEaten }: Props) {
   const eatenText = formatEnergy(eaten, unit)
   const goalText = formatEnergy(goal, unit)
-
-  if (compact) {
-    return (
-      <div data-intro="flanks" className="absolute inset-x-4 flex items-center justify-center gap-5" style={{ top: 134 }}>
-        <button type="button" onClick={onEaten} aria-label="Today's entries" className="flex h-11 cursor-pointer items-baseline gap-2 rounded-[4px] px-1">
-          <span className={labelCls}>Eaten</span>
-          <span className={valueCls} data-testid="tp-eaten-value" data-kcal={eaten}>
-            {eatenText}
-          </span>
-        </button>
-        <span aria-hidden="true" className="h-3 w-px bg-[var(--gold-line-strong)]" />
-        <div className="flex h-11 items-baseline gap-2 px-1">
-          <span className={labelCls}>Goal</span>
-          <span className={valueCls} data-testid="tp-goal-value" data-kcal={goal}>
-            {goalText}
-          </span>
-        </div>
-      </div>
-    )
-  }
+  const h = compact ? 44 : 52
+  const above = compact ? 84 : 107
+  const valueSize = compact ? 'text-[18px]' : 'text-[22px]'
 
   return (
-    <div data-intro="flanks" className="pointer-events-none absolute inset-x-4 h-[52px]" style={{ top: 313 }}>
+    <div data-intro="flanks" className="pointer-events-none absolute inset-x-4" style={{ height: h, top: `calc(${PLINTH_IN_STAGE} - ${above}px)` }}>
       <button
         type="button"
         onClick={onEaten}
         aria-label="Today's entries"
-        className="pointer-events-auto absolute left-0 top-0 flex h-[52px] w-[104px] cursor-pointer flex-col items-start justify-center gap-1.5 rounded-[4px] text-left"
+        className="pointer-events-auto absolute left-0 top-0 flex w-[104px] cursor-pointer flex-col items-start justify-center gap-1.5 rounded-[4px] text-left"
+        style={{ height: h }}
       >
         <span className={labelCls}>Eaten</span>
-        <span className={valueCls} data-testid="tp-eaten-value" data-kcal={eaten}>
+        <span className={`${valueCls} ${valueSize}`} data-testid="tp-eaten-value" data-kcal={eaten}>
           {eatenText}
         </span>
       </button>
-      <div className="absolute right-0 top-0 flex h-[52px] w-[104px] flex-col items-end justify-center gap-1.5 text-right">
+      <div className="absolute right-0 top-0 flex w-[104px] flex-col items-end justify-center gap-1.5 text-right" style={{ height: h }}>
         <span className={labelCls} style={{ marginRight: '-0.35em' }}>
           Goal
         </span>
-        <span className={valueCls} data-testid="tp-goal-value" data-kcal={goal} style={{ marginRight: '-0.02em' }}>
+        <span className={`${valueCls} ${valueSize}`} data-testid="tp-goal-value" data-kcal={goal} style={{ marginRight: '-0.02em' }}>
           {goalText}
         </span>
       </div>
