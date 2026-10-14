@@ -16,6 +16,7 @@ vite-plugin-pwa, fonts self-hosted in `public/fonts` (copied from `@fontsource` 
 - `npm run deploy` push `dist/` to the `gh-pages` branch
 
 ## Source of truth
+- `docs/test-hooks.md` lists the end-to-end test handles (`data-testid` values, `window.__tp`, performance marks, `dataset.introDone`, `dataset.tier`). Keep them when touching a screen.
 - `docs/design-spec.md` is the design spec. Every colour, size, duration, scene number and copy rule lives there. Read your section before coding.
 - `src/lib/types.ts` data types. `src/store/useStore.ts` the persisted store. `src/store/selectors.ts` pure selectors. `src/store/useUI.ts` transient UI state (tab, sheets, introDone).
 - `src/index.css` tokens: Tailwind `@theme` colours (`bg-obsidian-900`, `text-gold-400`, `text-bone-dim`, `text-ember-text`, `font-display`, `font-body`), root variables (`--gold-grad`, `--gold-line`, `--ease-*`, `--t-*`, `--z-*`, `--safe-*`, `--vv-h`, `--goal-y`, `--plinth-y`, `--tilt-x`) and utilities (`.inscribed`, `.num`, `.digits`, `.gold-num`, `.gold-text`, `.gold-fill`, `.gold-border`, `.rise-in`, `.shake`, `.scrollbar-none`).

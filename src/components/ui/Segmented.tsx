@@ -24,7 +24,7 @@ export function Segmented<T extends string>({ value, options, onChange, label, c
             aria-checked={active}
             onClick={() => onChange(o.value)}
             className={`relative font-display tracking-[0.25em] text-[11px] px-3 transition-colors duration-150 cursor-pointer ${
-              size === 'sm' ? 'h-8' : 'h-11'
+              size === 'sm' ? 'h-8 before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-[""]' : 'h-11'
             } ${i > 0 ? 'border-l border-[var(--gold-line)]' : ''} ${active ? 'text-gold-300' : 'text-bone-dim hover:text-bone'}`}
           >
             {o.label}
