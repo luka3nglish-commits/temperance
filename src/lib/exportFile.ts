@@ -1,4 +1,4 @@
-import type { ExportFile, Ingredient, LogEntry, Macros, Meal, MealComponent, Settings } from './types'
+import type { ExportFile, Ingredient, LogEntry, Macros, Meal, MealComponent, Settings, WeightEntry } from './types'
 import { SCHEMA_VERSION } from './types'
 import { isValidDayKey } from './day'
 
@@ -83,7 +83,9 @@ function settings(x: unknown): Settings {
   const opening = s.opening === 'full' || s.opening === 'off' ? s.opening : 'short'
   const hero = s.hero === 'eaten' ? 'eaten' : 'remaining'
   const hiddenRecents = Array.isArray(s.hiddenRecents) ? s.hiddenRecents.filter((k): k is string => typeof k === 'string').slice(-200) : []
+  const tw = num(s.targetWeightKg, 0)
   return {
+    ...(tw > 0 && tw < 500 ? { targetWeightKg: Math.round(tw * 10) / 10 } : {}),
     goalKcal: goal > 0 ? Math.round(goal) : 2500,
     targets: { protein: Math.max(0, num(t.protein, 180)), carbs: Math.max(0, num(t.carbs, 250)), fat: Math.max(0, num(t.fat, 80)) },
     unit: s.unit === 'kJ' ? 'kJ' : 'kcal',
@@ -97,8 +99,22 @@ function settings(x: unknown): Settings {
   }
 }
 
+function weight(x: unknown): WeightEntry | null {
+  if (!isObj(x) || typeof x.id !== 'string' || !x.id) return null
+  if (typeof x.day !== 'string' || !isValidDayKey(x.day)) return null
+  const kg = num(x.kg)
+  if (kg <= 0 || kg >= 500) return null
+  return {
+    id: x.id,
+    day: x.day,
+    at: num(x.at),
+    kg: Math.round(kg * 10) / 10,
+    note: typeof x.note === 'string' && x.note.trim() ? x.note.trim().slice(0, 120) : undefined,
+  }
+}
+
 /** Backups from any schema version we know how to read. */
-const READABLE_VERSIONS: readonly number[] = [1, 2]
+const READABLE_VERSIONS: readonly number[] = [1, 2, 3]
 
 /**
  * Validate and sanitise an untrusted parsed JSON value into an ExportFile (current schema).
@@ -134,6 +150,16 @@ export function validateExportFile(raw: unknown): ExportFile | null {
   }
   entries.sort((a, b) => a.at - b.at)
 
+  // weights: one per day, the newest `at` wins, sorted by day
+  const weightByDay = new Map<string, WeightEntry>()
+  for (const w of Array.isArray(raw.weights) ? raw.weights : []) {
+    const v = weight(w)
+    if (!v) continue
+    const cur = weightByDay.get(v.day)
+    if (!cur || v.at > cur.at) weightByDay.set(v.day, v)
+  }
+  const weights = [...weightByDay.values()].sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+
   return {
     app: 'temperance',
     version: SCHEMA_VERSION,
@@ -142,6 +168,7 @@ export function validateExportFile(raw: unknown): ExportFile | null {
     meals,
     ingredients,
     entries,
+    weights,
   }
 }
 

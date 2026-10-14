@@ -53,7 +53,7 @@ describe('validateExportFile · gatekeeping', () => {
   })
 
   it('rejects unknown or non-numeric versions', () => {
-    expect(validateExportFile({ ...valid(), version: 3 })).toBeNull()
+    expect(validateExportFile({ ...valid(), version: 4 })).toBeNull()
     expect(validateExportFile({ ...valid(), version: 0 })).toBeNull()
     expect(validateExportFile({ ...valid(), version: '2' })).toBeNull()
     expect(validateExportFile({ ...valid(), version: undefined })).toBeNull()
@@ -85,7 +85,7 @@ describe('validateExportFile · v1 upgrade', () => {
       entries: [],
     }
     const f = validateExportFile(v1)!
-    expect(f.version).toBe(2)
+    expect(f.version).toBe(3)
     expect(f.settings.goalKcal).toBe(2000)
     expect(f.settings.targets).toEqual({ protein: 100, carbs: 150, fat: 60 })
     expect(f.settings.motion).toBe('on')

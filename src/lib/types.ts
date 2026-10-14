@@ -99,14 +99,31 @@ export type Settings = {
   tilt: boolean
   /** `name|kcalPerServing` keys hidden from the recents list */
   hiddenRecents: string[]
+  /** target body weight in kg, optional */
+  targetWeightKg?: number
   /** display name, optional */
   name?: string
 }
 
-/** v1 shipped without opening/hero/tilt/hiddenRecents. v2 adds them with defaults. */
-export const SCHEMA_VERSION = 2 as const
+/** One weigh-in. At most one per local day (adding again that day replaces it). */
+export type WeightEntry = {
+  id: string
+  /** local day key YYYY-MM-DD */
+  day: string
+  /** epoch ms */
+  at: number
+  /** kilograms, one decimal */
+  kg: number
+  note?: string
+}
 
-/** The on-disk / export shape. */
+/**
+ * v1 shipped without opening/hero/tilt/hiddenRecents. v2 added them with defaults.
+ * v3 adds weights and targetWeightKg.
+ */
+export const SCHEMA_VERSION = 3 as const
+
+/** The on-disk / export shape. Progress photos are not part of it (they live in IndexedDB). */
 export type ExportFile = {
   app: 'temperance'
   version: typeof SCHEMA_VERSION
@@ -115,6 +132,7 @@ export type ExportFile = {
   meals: Record<string, Meal>
   ingredients: Record<string, Ingredient>
   entries: LogEntry[]
+  weights: WeightEntry[]
 }
 
 export type ImportMode = 'replace' | 'merge'

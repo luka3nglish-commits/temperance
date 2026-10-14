@@ -15,6 +15,7 @@ import type {
   MotionPref,
   OpeningPref,
   Settings,
+  WeightEntry,
 } from '../lib/types'
 import { SCHEMA_VERSION } from '../lib/types'
 import { newId } from '../lib/id'
@@ -57,6 +58,12 @@ type Data = {
   meals: Record<string, Meal>
   ingredients: Record<string, Ingredient>
   entries: LogEntry[]
+  weights: WeightEntry[]
+}
+
+const clampKg = (kg: number): number | null => {
+  if (!Number.isFinite(kg) || kg <= 0 || kg >= 500) return null
+  return Math.round(kg * 10) / 10
 }
 
 export interface TemperanceStore extends Data {
@@ -87,8 +94,15 @@ export interface TemperanceStore extends Data {
   deleteEntry(id: string, now?: number): void
   /** Put a deleted entry back exactly as it was (UNDO). No-op if an entry with that id exists. */
   restoreEntry(entry: LogEntry, now?: number): void
-  /** Copy every entry from `fromDay` into `toDay` (default today). Returns how many were copied. */
-  repeatDay(fromDay: string, toDay?: string, now?: number): number
+  /** Copy every entry from `fromDay` into `toDay` (default today). Returns the copies (for UNDO). */
+  repeatDay(fromDay: string, toDay?: string, now?: number): LogEntry[]
+
+  // weight
+  /** Record a weigh-in for `day` (default today). A second weigh-in on the same day replaces the first. */
+  addWeight(kg: number, day?: string, now?: number): WeightEntry | null
+  updateWeight(id: string, patch: { kg?: number; note?: string }): void
+  deleteWeight(id: string): void
+  setTargetWeight(kg: number | null): void
 
   // settings
   setGoalKcal(kcal: number): void
@@ -164,6 +178,7 @@ export const useStore = create<TemperanceStore>()(
       meals: {},
       ingredients: {},
       entries: [],
+      weights: [],
       pulse: null,
       persistFailed: false,
 
@@ -394,14 +409,57 @@ export const useStore = create<TemperanceStore>()(
       repeatDay(fromDay, toDay, now = Date.now()) {
         const target = toDay ?? localDayKey(new Date(now))
         const source = get().entries.filter((e) => e.day === fromDay).sort((a, b) => a.at - b.at)
-        if (!source.length) return 0
+        if (!source.length) return []
         const copies: LogEntry[] = source.map((e, i) => ({ ...e, id: newId(), day: target, at: now + i }))
         set((s) => {
           const entries = [...s.entries, ...copies]
           const added = sumMacros(copies.map((c) => c.macros)).kcal
           return { entries, pulse: makePulse('log', added, entries, s.settings, now) }
         })
-        return copies.length
+        return copies
+      },
+
+      // ---------- weight ----------
+      addWeight(kg, day, now = Date.now()) {
+        const v = clampKg(kg)
+        if (v === null) return null
+        const d = day ?? localDayKey(new Date(now))
+        let entry: WeightEntry | null = null
+        set((s) => {
+          const existing = s.weights.find((w) => w.day === d)
+          if (existing) {
+            entry = { ...existing, kg: v, at: now }
+            return { weights: s.weights.map((w) => (w.id === existing.id ? entry! : w)) }
+          }
+          entry = { id: newId(), day: d, at: now, kg: v }
+          return { weights: [...s.weights, entry].sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0)) }
+        })
+        return entry
+      },
+      updateWeight(id, patch) {
+        set((s) => {
+          const cur = s.weights.find((w) => w.id === id)
+          if (!cur) return {}
+          const next: WeightEntry = { ...cur }
+          if (patch.kg !== undefined) {
+            const v = clampKg(patch.kg)
+            if (v !== null) next.kg = v
+          }
+          if (patch.note !== undefined) next.note = patch.note.trim().slice(0, 120) || undefined
+          return { weights: s.weights.map((w) => (w.id === id ? next : w)) }
+        })
+      },
+      deleteWeight(id) {
+        set((s) => (s.weights.some((w) => w.id === id) ? { weights: s.weights.filter((w) => w.id !== id) } : {}))
+      },
+      setTargetWeight(kg) {
+        set((s) => {
+          const v = kg === null ? null : clampKg(kg)
+          const settings = { ...s.settings }
+          if (v === null) delete settings.targetWeightKg
+          else settings.targetWeightKg = v
+          return { settings }
+        })
       },
 
       // ---------- settings ----------
@@ -470,6 +528,7 @@ export const useStore = create<TemperanceStore>()(
           meals: s.meals,
           ingredients: s.ingredients,
           entries: s.entries,
+          weights: s.weights,
         }
       },
 
@@ -482,6 +541,7 @@ export const useStore = create<TemperanceStore>()(
             meals: file.meals,
             ingredients: file.ingredients,
             entries: file.entries.slice().sort((a, b) => a.at - b.at),
+            weights: file.weights.slice(),
             pulse: null,
           })
           return { meals: Object.keys(file.meals).length, ingredients: Object.keys(file.ingredients).length, entries: file.entries.length }
@@ -507,20 +567,27 @@ export const useStore = create<TemperanceStore>()(
           if (!seen.has(e.id)) { entries.push(e); seen.add(e.id); entriesAdded++ }
         }
         entries.sort((a, b) => a.at - b.at)
-        set({ meals, ingredients, entries, pulse: null })
+        // weights: one per day; the newer `at` wins
+        const byDay = new Map(s.weights.map((w) => [w.day, w]))
+        for (const w of file.weights) {
+          const cur = byDay.get(w.day)
+          if (!cur || w.at > cur.at) byDay.set(w.day, w)
+        }
+        const weights = [...byDay.values()].sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+        set({ meals, ingredients, entries, weights, pulse: null })
         return { meals: mealsAdded, ingredients: ingAdded, entries: entriesAdded }
       },
 
       resetAll() {
-        set({ settings: { ...DEFAULT_SETTINGS }, meals: {}, ingredients: {}, entries: [], pulse: null })
+        set({ settings: { ...DEFAULT_SETTINGS }, meals: {}, ingredients: {}, entries: [], weights: [], pulse: null })
       },
     }),
     {
       name: STORAGE_KEY,
       version: SCHEMA_VERSION,
       storage: createJSONStorage(safeStorage),
-      partialize: (s) => ({ settings: s.settings, meals: s.meals, ingredients: s.ingredients, entries: s.entries }),
-      // v1 -> v2: new settings fields are filled by `merge` below; nothing else changed shape.
+      partialize: (s) => ({ settings: s.settings, meals: s.meals, ingredients: s.ingredients, entries: s.entries, weights: s.weights }),
+      // v1 -> v2 -> v3: new fields are filled by `merge` below; nothing changed shape.
       migrate: (persisted) => persisted as Data,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<Data>
@@ -535,6 +602,7 @@ export const useStore = create<TemperanceStore>()(
           meals: p.meals ?? {},
           ingredients: p.ingredients ?? {},
           entries: Array.isArray(p.entries) ? p.entries : [],
+          weights: Array.isArray(p.weights) ? p.weights : [],
         }
       },
     },

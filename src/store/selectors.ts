@@ -1,4 +1,4 @@
-import type { Ingredient, LogEntry, Macros, MacroTargets, Meal } from '../lib/types'
+import type { Ingredient, LogEntry, Macros, MacroTargets, Meal, WeightEntry } from '../lib/types'
 import { dayKeyOffset } from '../lib/day'
 import { sumMacros, ZERO_MACROS } from '../lib/macros'
 
@@ -164,6 +164,54 @@ export function averageKcal(days: readonly DaySummary[], n = 7): number {
   const logged = days.slice(0, n).filter((d) => d.count > 0)
   if (!logged.length) return 0
   return Math.round(logged.reduce((s, d) => s + d.totals.kcal, 0) / logged.length)
+}
+
+// ---------- weight ----------
+
+/** Weigh-ins oldest first (the store keeps them sorted; this is defensive). */
+export function weightsByDay(weights: readonly WeightEntry[]): WeightEntry[] {
+  return weights.slice().sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+}
+
+export function latestWeight(weights: readonly WeightEntry[]): WeightEntry | null {
+  const w = weightsByDay(weights)
+  return w.length ? w[w.length - 1] : null
+}
+
+/** Weigh-ins within the last `days` days ending at `today`, oldest first. */
+export function weightsInWindow(weights: readonly WeightEntry[], today: string, days: number): WeightEntry[] {
+  const from = dayKeyOffset(today, -(days - 1))
+  return weightsByDay(weights).filter((w) => w.day >= from && w.day <= today)
+}
+
+export type WeightTrend = {
+  /** mean of the last 7 days with a weigh-in */
+  recent: number | null
+  /** mean of the 7 days before those */
+  previous: number | null
+  /** recent minus previous, kg; null when either side is empty */
+  delta: number | null
+}
+
+/**
+ * Seven-day moving comparison: the mean of weigh-ins in the last 7 days against the 7 before.
+ * Daily weight noise is about a kilogram, so the trend is what matters, not one morning.
+ */
+export function weightTrend(weights: readonly WeightEntry[], today: string): WeightTrend {
+  const recentList = weightsInWindow(weights, today, 7)
+  const prevEnd = dayKeyOffset(today, -7)
+  const previousList = weightsInWindow(weights, prevEnd, 7)
+  const mean = (list: WeightEntry[]) => (list.length ? Math.round((list.reduce((s, w) => s + w.kg, 0) / list.length) * 10) / 10 : null)
+  const recent = mean(recentList)
+  const previous = mean(previousList)
+  const delta = recent !== null && previous !== null ? Math.round((recent - previous) * 10) / 10 : null
+  return { recent, previous, delta }
+}
+
+/** Kilograms still to go to the target (positive = above target), or null without both numbers. */
+export function kgToTarget(latest: WeightEntry | null, targetKg: number | undefined): number | null {
+  if (!latest || typeof targetKg !== 'number' || !(targetKg > 0)) return null
+  return Math.round((latest.kg - targetKg) * 10) / 10
 }
 
 /** How many of the last `n` days were logged and at or under the goal, and how many were logged at all. */
