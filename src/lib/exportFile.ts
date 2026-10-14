@@ -15,7 +15,7 @@ function macros(x: unknown): Macros {
 function component(x: unknown): MealComponent | null {
   if (!isObj(x)) return null
   const unit = x.unit === 'ml' || x.unit === 'serve' ? x.unit : 'g'
-  return { ingredientId: str(x.ingredientId), name: str(x.name, 'Ingredient'), amount: num(x.amount), unit, macros: macros(x.macros) }
+  return { ingredientId: str(x.ingredientId), name: (str(x.name).trim() || 'Ingredient'), amount: num(x.amount), unit, macros: macros(x.macros) }
 }
 
 function components(x: unknown): MealComponent[] | undefined {
@@ -29,7 +29,7 @@ function meal(x: unknown): Meal | null {
   const comps = components(x.components)
   return {
     id: x.id,
-    name: str(x.name, 'Meal'),
+    name: (str(x.name).trim() || 'Meal'),
     kind: x.kind === 'built' || comps ? 'built' : 'quick',
     macros: macros(x.macros),
     components: comps,
@@ -48,7 +48,7 @@ function ingredient(x: unknown): Ingredient | null {
   const amount = num(per.amount, 100)
   return {
     id: x.id,
-    name: str(x.name, 'Ingredient'),
+    name: (str(x.name).trim() || 'Ingredient'),
     per: { amount: amount > 0 ? amount : 100, unit },
     macros: macros(x.macros),
     favourite: bool(x.favourite),
@@ -68,7 +68,7 @@ function entry(x: unknown): LogEntry | null {
     day: x.day,
     at: num(x.at),
     mealId: typeof x.mealId === 'string' ? x.mealId : undefined,
-    name: str(x.name, 'Meal'),
+    name: (str(x.name).trim() || 'Meal'),
     servings: servings > 0 ? servings : 1,
     macros: macros(x.macros),
     components: components(x.components),

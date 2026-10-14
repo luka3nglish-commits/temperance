@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw, ImageFilter
 OUT = Path(__file__).resolve().parent.parent / "public" / "icons"
 OUT.mkdir(parents=True, exist_ok=True)
 
-OBSIDIAN = (7, 6, 6, 255)
+OBSIDIAN = (5, 5, 7, 255)
 STONE_DARK = (20, 17, 17, 255)
 STONE_MID = (34, 28, 28, 255)
 STONE_LIGHT = (58, 50, 50, 255)

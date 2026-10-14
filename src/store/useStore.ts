@@ -184,12 +184,13 @@ export const useStore = create<TemperanceStore>()(
       },
 
       addBuiltMeal({ name, components, favourite = false }, now = Date.now()) {
+        const rounded = components.map((c) => ({ ...c, macros: roundMacros(c.macros) }))
         const meal: Meal = {
           id: newId(),
           name: cleanName(name) || 'Meal',
           kind: 'built',
-          components: components.map((c) => ({ ...c, macros: roundMacros(c.macros) })),
-          macros: roundMacros(sumMacros(components.map((c) => c.macros))),
+          components: rounded,
+          macros: roundMacros(sumMacros(rounded.map((c) => c.macros))),
           favourite,
           createdAt: now,
           updatedAt: now,
@@ -206,8 +207,9 @@ export const useStore = create<TemperanceStore>()(
           const next: Meal = { ...cur, ...patch, updatedAt: now }
           if (patch.name !== undefined) next.name = cleanName(patch.name) || cur.name
           if (patch.components) {
-            next.components = patch.components.map((c) => ({ ...c, macros: roundMacros(c.macros) }))
-            next.macros = roundMacros(sumMacros(patch.components.map((c) => c.macros)))
+            const rounded = patch.components.map((c) => ({ ...c, macros: roundMacros(c.macros) }))
+            next.components = rounded
+            next.macros = roundMacros(sumMacros(rounded.map((c) => c.macros)))
             next.kind = 'built'
           } else if (patch.macros) {
             next.macros = roundMacros(patch.macros)
@@ -311,8 +313,10 @@ export const useStore = create<TemperanceStore>()(
         return entry
       },
 
-      logQuick({ name, macros, servings, components, saveToLibrary = false, favourite = false }, now = Date.now()) {
+      logQuick({ name, macros: givenMacros, servings, components, saveToLibrary = false, favourite = false }, now = Date.now()) {
         const n = clampServings(servings)
+        // a built meal's numbers are its components; never let a caller's total drift from them
+        const macros = components && components.length ? sumMacros(components.map((c) => roundMacros(c.macros))) : givenMacros
         let mealId: string | undefined
         if (saveToLibrary) {
           const meal = components && components.length
@@ -419,13 +423,16 @@ export const useStore = create<TemperanceStore>()(
         set((s) => ({ settings: { ...s.settings, unit: u === 'kJ' ? 'kJ' : 'kcal' } }))
       },
       setMotion(m) {
-        set((s) => ({ settings: { ...s.settings, motion: m } }))
+        const v: MotionPref = m === 'on' || m === 'off' ? m : 'system'
+        set((s) => ({ settings: { ...s.settings, motion: v } }))
       },
       setOpening(o) {
-        set((s) => ({ settings: { ...s.settings, opening: o } }))
+        const v: OpeningPref = o === 'full' || o === 'off' ? o : 'short'
+        set((s) => ({ settings: { ...s.settings, opening: v } }))
       },
       setHero(h) {
-        set((s) => ({ settings: { ...s.settings, hero: h } }))
+        const v: HeroFigure = h === 'eaten' ? 'eaten' : 'remaining'
+        set((s) => ({ settings: { ...s.settings, hero: v } }))
       },
       setTilt(on) {
         set((s) => ({ settings: { ...s.settings, tilt: !!on } }))

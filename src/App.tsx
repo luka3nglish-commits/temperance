@@ -13,6 +13,7 @@ import { LogSheet } from './screens/LogSheet'
 import { LibraryScreen } from './screens/LibraryScreen'
 import { HistoryScreen } from './screens/HistoryScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
+import { InstallPrompt } from './screens/SettingsInstall'
 
 const SCREENS: Record<Tab, () => React.JSX.Element> = {
   today: TodayScreen,
@@ -77,6 +78,7 @@ export default function App() {
       </div>
       <LogSheet />
       <Toaster />
+      <InstallPrompt />
       <Opening />
     </div>
   )
