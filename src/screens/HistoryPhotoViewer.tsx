@@ -250,9 +250,9 @@ function ViewerBody({ photo, canCompare, flush, onCompare, onDeleted, onNoteSave
       <div
         className="bracketed lg mx-auto mt-1 rounded-[4px] p-1.5"
         style={{
-          width: `min(100%, calc((min(92svh, var(--vv-h)) - 256px) * ${ratio.toFixed(4)} + 12px))`,
+          width: `min(100%, calc((min(92svh, calc(var(--vv-h) - var(--safe-top) - 80px)) - 256px) * ${ratio.toFixed(4)} + 12px))`,
           background: 'linear-gradient(180deg, var(--color-tablet-hi), var(--color-tablet-lo))',
-          boxShadow: '0 0 0 1px #2A2A33, 0 0 0 2px rgba(0,0,0,0.8), 0 20px 40px -20px rgba(0,0,0,0.9)',
+          boxShadow: '0 0 0 1px var(--color-stone-edge), 0 0 0 2px rgba(0,0,0,0.8), 0 20px 40px -20px rgba(0,0,0,0.9)',
         }}
       >
         <div

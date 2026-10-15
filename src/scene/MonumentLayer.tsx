@@ -158,8 +158,12 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       }
       const safeTop = readSafe('--safe-top')
       const safeBottom = readSafe('--safe-bottom')
-      // header 40, ring row 124, stoic 64, air 19, bar 56
-      const available = frame.clientHeight - safeTop - safeBottom - 40 - 124 - 64 - 19 - 56
+      // The TODAY chrome the stage must leave room for, kept in step with src/screens/TodayStoic.tsx
+      // (stoicMinFor) and TodayScreen: header 40, ring row 132, the stoic floor (108 on a frame of at
+      // least 780 px, else 67), then air 16 + tab bar 56. Off by even a few px and the plinth sits on
+      // the ring row on a real phone with safe areas.
+      const stoic = frame.clientHeight >= 780 ? 108 : 67
+      const available = frame.clientHeight - safeTop - safeBottom - 40 - 132 - stoic - 72
       const k = Math.max(0.55, Math.min(1, available / 460))
       const rounded = Math.round(k * 1000) / 1000
       bus.layerScale = rounded

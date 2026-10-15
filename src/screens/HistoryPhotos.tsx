@@ -47,7 +47,7 @@ function PhotoTile({ photo, today, selecting, mark, onTap }: TileProps) {
         aria-pressed={selecting ? mark > 0 : undefined}
         onClick={() => onTap(photo)}
         className="press relative block aspect-square w-full cursor-pointer overflow-hidden rounded-[2px] bg-obsidian-800"
-        style={{ boxShadow: '0 0 0 1px #2A2A33, 0 0 0 2px rgba(0,0,0,0.8)' }}
+        style={{ boxShadow: '0 0 0 1px var(--color-stone-edge), 0 0 0 2px rgba(0,0,0,0.8)' }}
       >
         {url ? <img src={url} alt="" draggable={false} decoding="async" className="absolute inset-0 h-full w-full object-cover" /> : null}
         <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-12 bg-[linear-gradient(to_top,rgba(5,5,7,0.9),rgba(5,5,7,0.55)_45%,rgba(5,5,7,0))]" />

@@ -99,9 +99,9 @@ function MacroHint({ kcalTyped, macros, testId }: { kcalTyped: number | null; ma
 function MacroFields({ p, c, f, onP, onC, onF, testPrefix }: { p: string; c: string; f: string; onP(v: string): void; onC(v: string): void; onF(v: string): void; testPrefix: string }) {
   return (
     <div className="grid grid-cols-3 gap-3">
-      <Field label="Protein" labelInside inputClassName="pr-8!" data-testid={`${testPrefix}-protein`} {...decimalInputProps} value={p} onChange={(e) => onP(e.target.value)} suffix="g" placeholder="0" />
-      <Field label="Carbs" labelInside inputClassName="pr-8!" data-testid={`${testPrefix}-carbs`} {...decimalInputProps} value={c} onChange={(e) => onC(e.target.value)} suffix="g" placeholder="0" />
-      <Field label="Fat" labelInside inputClassName="pr-8!" data-testid={`${testPrefix}-fat`} {...decimalInputProps} value={f} onChange={(e) => onF(e.target.value)} suffix="g" placeholder="0" />
+      <Field label="Protein" labelInside data-testid={`${testPrefix}-protein`} {...decimalInputProps} value={p} onChange={(e) => onP(e.target.value)} suffix="g" placeholder="0" />
+      <Field label="Carbs" labelInside data-testid={`${testPrefix}-carbs`} {...decimalInputProps} value={c} onChange={(e) => onC(e.target.value)} suffix="g" placeholder="0" />
+      <Field label="Fat" labelInside data-testid={`${testPrefix}-fat`} {...decimalInputProps} value={f} onChange={(e) => onF(e.target.value)} suffix="g" placeholder="0" />
     </div>
   )
 }

@@ -29,7 +29,7 @@ function CompareFigure({ photo, ratio, today, kg }: { photo: PhotoMeta; ratio: n
     <figure data-testid={`tp-photo-compare-${photo.id}`} className="m-0 min-w-0" style={{ flex: `${ratio.toFixed(4)} 1 0px` }}>
       <div
         className={`relative w-full overflow-hidden rounded-[2px] ${url ? '' : 'bg-obsidian-800'}`}
-        style={{ aspectRatio: `${ratio}`, boxShadow: '0 0 0 1px #2A2A33, 0 0 0 2px rgba(0,0,0,0.8)' }}
+        style={{ aspectRatio: `${ratio}`, boxShadow: '0 0 0 1px var(--color-stone-edge), 0 0 0 2px rgba(0,0,0,0.8)' }}
       >
         {url ? <img src={url} alt={`Progress photo, ${formatDayLong(photo.day)}`} className="absolute inset-0 h-full w-full object-cover" /> : null}
       </div>

@@ -47,7 +47,7 @@ export function GoldNumber({ value, text: textProp, ember, brush = true, size = 
     <span
       className={`gold-num font-display font-bold leading-[1.08] tracking-[-0.01em] ${ember ? 'ember' : ''} ${brush ? '' : 'no-brush'} ${className}`}
       style={{ fontSize: size }}
-      role="text"
+      role="img"
       aria-label={label ?? text.replace(/[  ]/g, '')}
     >
       <span className="gold-shadow digits" aria-hidden="true">

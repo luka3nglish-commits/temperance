@@ -425,7 +425,11 @@ try {
 
   if (want('settings')) {
     await step('settings', async () => {
+      // a settings-only run reaches here right after the quiet reload: let the app finish starting
+      // first, or the switch races the opening and the shot shows a blank frame or TODAY
+      await page.waitForFunction(() => document.documentElement.dataset.introDone === 'true', { timeout: 15000 }).catch(() => {})
       await tab(page, 'settings')
+      await page.waitForSelector('[data-testid=tp-settings-group-goals]', { timeout: 5000 }).catch(() => {})
       await sleep(800)
       await shot(page, 'settings')
       await page.evaluate(() => document.querySelector('main')?.scrollTo({ top: 9999 }))

@@ -39,7 +39,7 @@ export function LogSuggestions({ query, entries, unit, onPick, max = 5 }: Props)
   if (!hits.length) return null
 
   return (
-    <div role="group" aria-label="Suggestions" className="chip-row -mx-5 mt-2 px-5">
+    <div role="group" aria-label="Suggestions" className="chip-row -mx-5 mt-1.5 -mb-0.5 px-5 py-0.5">
       {hits.map((e) => {
         const label = portionLabel(e)
         const spoken = portionAria(e)

@@ -35,7 +35,7 @@ export function Opening() {
             style={{
               bottom: 'calc(var(--safe-bottom) + 84px)',
               right: 20,
-              border: '1px solid var(--bone-edge, rgba(231, 225, 210, 0.4))',
+              border: '1px solid var(--bone-edge, rgba(231, 225, 210, 0.46))',
               background: 'rgba(5, 5, 7, 0.55)',
             }}
           >
