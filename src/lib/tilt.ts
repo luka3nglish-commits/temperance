@@ -1,35 +1,37 @@
 import { useStore } from '../store/useStore'
 import { getTier } from '../scene/tier'
-import { isReducedMotion } from './motion'
+import { featureOff } from './boot'
 
 /**
  * THE ONE LIGHT (docs/design-spec.md section 8 "Light").
  *
- * One rAF-throttled loop at 30 Hz (15 Hz on the low tier) writes `--tilt-x` (-1 to 1) and
- * `--tilt-angle` on :root and dispatches a `tilt` CustomEvent (detail = the value) so the shard
- * glint gradients, which are SVG attributes and cannot read a CSS variable, follow the same light.
+ * `--tilt-x` (-1 to 1) and `--tilt-angle` on :root place the light on the gold; a `tilt`
+ * CustomEvent (detail = the value) relays it to the shard glint gradients and the scene's sweep
+ * light, which cannot read a CSS variable.
  *
- * Sources. Desktop: the mouse position normalised across the 430 px slab. Phone: DeviceOrientation
- * gamma / 30, clamped, lerped 0.12 per frame; listened to only when the platform needs no permission
- * or Settings GOLD FOLLOWS TILT is on (iOS asks inside a gesture, see requestTiltPermission).
+ * AT REST NOTHING RUNS. The light sits at 0 (the :root rule), there is no animation, no
+ * requestAnimationFrame loop, no computed-style read and no `tilt` event. (Until the iOS crash
+ * hotfix a 9 s infinite goldSweep keyframe animated `--tilt-x` on :root, which restyled the whole
+ * document every frame forever, and this loop polled it at 30 Hz to relay it to the glints.)
  *
- * Until a source is live, :root carries `auto-sweep` and the 9 s goldSweep keyframe drives
- * `--tilt-x` (CSS animations beat inline styles, so the loop only reads the computed value then).
- * The sweep pauses while the document is hidden. Reduced motion: no auto sweep, `--tilt-x` rests
- * at 0, user-driven tilt still allowed.
+ * The loop (30 Hz, 15 Hz on the low tier) runs only while a source is live:
+ *  - phone: DeviceOrientation gamma / 30, clamped, lerped 0.12 per frame, listened to only while
+ *    Settings GOLD FOLLOWS TILT is on (iOS asks inside the tap, see requestTiltPermission);
+ *  - desktop: the mouse position across the 430 px slab (fine pointers only).
+ * When samples stop for LIVE_TIMEOUT the light eases back to 0 and the loop ends by itself. It
+ * pauses while the document is hidden. `data-sweep="0"` (boot guard) disables it entirely.
+ *
+ * The opening holds the relay (suspendTilt) while its own shard sweep drives the glint through
+ * emitTilt; on release the glint eases back to the resting light in a short finite pass.
  */
 
 const LERP = 0.12
-const LIVE_TIMEOUT = 2500 // ms without an orientation sample before the sweep takes over again
+const LIVE_TIMEOUT = 2500 // ms without a sample before the light returns to rest
 const EPS = 0.0005
+const HANDBACK = 0.18 // easing per frame when the relay takes the glint back from a timeline
 
 type OrientationCtor = {
   requestPermission?: () => Promise<'granted' | 'denied'>
-}
-
-function needsPermission(): boolean {
-  const D = (window as unknown as { DeviceOrientationEvent?: OrientationCtor }).DeviceOrientationEvent
-  return !!D && typeof D.requestPermission === 'function'
 }
 
 function hasOrientation(): boolean {
@@ -38,20 +40,20 @@ function hasOrientation(): boolean {
 
 const clamp1 = (v: number) => (v < -1 ? -1 : v > 1 ? 1 : v)
 
-const HANDBACK = 0.18 // easing per frame when the relay takes the glint back from a timeline
-
 let running = false
 /** while > 0 the loop still writes :root but does not dispatch: a timeline owns the glint (section 5, S2) */
 let suspended = 0
 /** the last value the glint was told, by the loop or by a timeline through emitTilt */
 let told = 0
-/** true on the first relayed frame after a hold, so the seam slides to the keyframe instead of jumping */
+/** true after a hold ends, until the glint has slid back to the light */
 let handback = false
+/** starts the loop for one finite pass (set by startTilt while it runs) */
+let kick: (() => void) | null = null
 
 /**
- * Hold the loop's `tilt` events so a timeline can drive the glint itself without the 30 Hz relay
- * fighting it. Returns the resume function (idempotent). Nested holds are counted. The root
- * `--tilt-x` keeps being written meanwhile so the number, borders and keystone never freeze.
+ * Hold the loop's `tilt` events so a timeline can drive the glint itself without the relay
+ * fighting it. Returns the resume function (idempotent). Nested holds are counted. On the last
+ * release the glint slides back to the light (0 at rest) and the loop stops again.
  */
 export function suspendTilt(): () => void {
   suspended += 1
@@ -60,7 +62,15 @@ export function suspendTilt(): () => void {
     if (released) return
     released = true
     suspended = Math.max(0, suspended - 1)
-    if (suspended === 0) handback = true
+    if (suspended === 0) {
+      if (kick) {
+        handback = true
+        kick()
+      } else if (told !== 0) {
+        // no loop (sweep switched off, or not started): put the glint straight back at rest
+        emitTilt(0)
+      }
+    }
   }
 }
 
@@ -71,8 +81,16 @@ export function emitTilt(x: number): void {
   window.dispatchEvent(new CustomEvent<number>('tilt', { detail: x }))
 }
 
+/** Test seam: true while the requestAnimationFrame loop is scheduled. */
+let loopScheduled = false
+export function isTiltLoopRunning(): boolean {
+  return loopScheduled
+}
+
 export function startTilt(): () => void {
   if (typeof window === 'undefined' || running) return () => {}
+  // the boot guard switched moving gold off: the light stays at rest, nothing is installed
+  if (featureOff('sweep')) return () => {}
   running = true
 
   const root = document.documentElement
@@ -84,84 +102,79 @@ export function startTilt(): () => void {
   let lastSample = 0
   let written: number | null = null
   let orientationOn = false
-  let reduced = isReducedMotion()
 
   const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)')
-  const reduceMq = window.matchMedia('(prefers-reduced-motion: reduce)')
 
   // relay a value to the glint: held while a timeline owns it; eased back in after a hold
-  const dispatch = (x: number) => {
+  const relay = (x: number) => {
     if (suspended > 0) return
     if (handback) {
       const next = told + (x - told) * HANDBACK
-      if (Math.abs(x - next) < 0.01) handback = false
-      else {
+      if (Math.abs(x - next) >= 0.01) {
         emitTilt(next)
         return
       }
+      handback = false
     }
-    emitTilt(x)
+    if (Math.abs(told - x) >= EPS) emitTilt(x)
   }
 
-  const write = (x: number) => {
-    if (written !== null && Math.abs(written - x) < EPS && !handback) return
+  const writeRoot = (x: number) => {
+    if (written !== null && Math.abs(written - x) < EPS) return
     written = x
     root.style.setProperty('--tilt-x', x.toFixed(4))
     root.style.setProperty('--tilt-angle', `${(x * 18).toFixed(2)}deg`)
-    dispatch(x)
   }
 
-  const clearWrite = () => {
+  // back at rest: no inline value, so the :root rule's 0 applies
+  const clearRoot = () => {
+    if (written === null) return
     written = null
     root.style.removeProperty('--tilt-x')
     root.style.removeProperty('--tilt-angle')
   }
 
-  const setAuto = (on: boolean) => {
-    root.classList.toggle('auto-sweep', on)
-  }
-
-  const syncMode = () => {
-    const wantAuto = !live && !reduced
-    if (wantAuto !== root.classList.contains('auto-sweep')) {
-      setAuto(wantAuto)
-      // hand the variable back to the keyframe (an inline value would hold once the animation ends)
-      if (wantAuto) clearWrite()
-    }
-    if (!live && reduced) write(0)
+  const stopLoop = () => {
+    if (raf) cancelAnimationFrame(raf)
+    raf = 0
+    loopScheduled = false
   }
 
   const frame = (ts: number) => {
-    raf = requestAnimationFrame(frame)
+    raf = 0
+    loopScheduled = false
+    if (document.visibilityState === 'hidden') return
     const interval = getTier() === 'low' ? 1000 / 15 : 1000 / 30
-    if (ts - last < interval) return
+    if (last && ts - last < interval) {
+      schedule()
+      return
+    }
     last = ts
 
-    if (live && lastSample && ts - lastSample > LIVE_TIMEOUT && !finePointer.matches) {
+    if (live && performance.now() - lastSample > LIVE_TIMEOUT) {
+      // the samples stopped: the light returns to rest and the loop ends once it is there
       live = false
       target = 0
-      syncMode()
     }
+    current += (target - current) * LERP
+    if (Math.abs(target - current) < EPS) current = target
+    if (current === 0 && !live) clearRoot()
+    else writeRoot(current)
+    relay(current)
 
-    if (live) {
-      current += (target - current) * LERP
-      if (Math.abs(target - current) < EPS) current = target
-      write(current)
-    } else if (!reduced) {
-      // the goldSweep keyframe owns --tilt-x; relay its computed value to the SVG gradients
-      const v = parseFloat(getComputedStyle(root).getPropertyValue('--tilt-x'))
-      if (Number.isFinite(v)) {
-        current = v
-        if (suspended > 0 || handback || Math.abs(told - v) >= EPS) dispatch(v)
-      }
-    }
+    if (live || current !== target || handback) schedule()
+    else last = 0
+  }
+
+  function schedule() {
+    if (raf || document.visibilityState === 'hidden') return
+    raf = requestAnimationFrame(frame)
+    loopScheduled = true
   }
 
   const goLive = () => {
-    if (!live) {
-      live = true
-      syncMode()
-    }
+    live = true
+    schedule()
   }
 
   const onPointerMove = (e: PointerEvent) => {
@@ -180,59 +193,43 @@ export function startTilt(): () => void {
     goLive()
   }
 
+  // orientation only while GOLD FOLLOWS TILT is on (on iOS that also means permission was granted)
   const syncOrientation = () => {
-    const want = hasOrientation() && (!needsPermission() || useStore.getState().settings.tilt)
+    const want = hasOrientation() && useStore.getState().settings.tilt
     if (want === orientationOn) return
     orientationOn = want
     if (want) window.addEventListener('deviceorientation', onOrientation)
     else {
       window.removeEventListener('deviceorientation', onOrientation)
-      if (!finePointer.matches) {
-        live = false
-        target = 0
-        syncMode()
-      }
+      live = false
+      target = 0
+      schedule()
     }
-  }
-
-  const onReduce = () => {
-    reduced = isReducedMotion()
-    syncMode()
   }
 
   const onVisibility = () => {
-    const hidden = document.visibilityState === 'hidden'
-    root.classList.toggle('sweep-paused', hidden)
-    if (hidden) {
-      cancelAnimationFrame(raf)
-      raf = 0
-    } else if (!raf) {
-      raf = requestAnimationFrame(frame)
-    }
+    if (document.visibilityState === 'hidden') stopLoop()
+    else if (live || current !== target || handback) schedule()
   }
 
   const unsub = useStore.subscribe((s, prev) => {
     if (s.settings.tilt !== prev.settings.tilt) syncOrientation()
-    if (s.settings.motion !== prev.settings.motion) onReduce()
   })
 
+  kick = schedule
   window.addEventListener('pointermove', onPointerMove, { passive: true })
-  reduceMq.addEventListener('change', onReduce)
   document.addEventListener('visibilitychange', onVisibility)
   syncOrientation()
-  syncMode()
-  raf = requestAnimationFrame(frame)
 
   return () => {
     running = false
-    cancelAnimationFrame(raf)
+    if (kick === schedule) kick = null
+    stopLoop()
     unsub()
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('deviceorientation', onOrientation)
-    reduceMq.removeEventListener('change', onReduce)
     document.removeEventListener('visibilitychange', onVisibility)
-    root.classList.remove('auto-sweep', 'sweep-paused')
-    clearWrite()
+    clearRoot()
   }
 }
 
@@ -247,4 +244,14 @@ export async function requestTiltPermission(): Promise<boolean> {
     }
   }
   return true
+}
+
+/** Test seam: forget module state between tests. */
+export function resetTiltForTests(): void {
+  running = false
+  suspended = 0
+  told = 0
+  handback = false
+  kick = null
+  loopScheduled = false
 }

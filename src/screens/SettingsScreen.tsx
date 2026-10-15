@@ -7,6 +7,7 @@ import { useStore } from '../store/useStore'
 import { SettingsNote, SettingsRow, SmallInput } from './SettingsRow'
 import { SettingsData } from './SettingsData'
 import { SettingsFooter } from './SettingsFooter'
+import { SettingsSafeMode } from './SettingsSafeMode'
 
 const UNIT_OPTIONS = [
   { value: 'kcal', label: 'kcal' },
@@ -141,6 +142,8 @@ export function SettingsScreen() {
       <header className="rise-in sticky top-0 z-10 -mx-5 flex h-14 items-center justify-center bg-obsidian-950/95 px-5 backdrop-blur-[20px]" style={{ marginTop: 'var(--safe-top)' }}>
         <h1 className="font-display inscribed text-[14px] tracking-[0.35em] text-bone">Settings</h1>
       </header>
+
+      <SettingsSafeMode />
 
       <div className="rise-in rise-in-1">
         <SettingsRow label="Daily goal" htmlFor="set-goal">

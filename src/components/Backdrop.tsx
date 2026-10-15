@@ -1,3 +1,4 @@
+import { featureOff, isBare } from '../lib/boot'
 import { useReducedMotion } from '../lib/motion'
 
 /**
@@ -7,6 +8,9 @@ import { useReducedMotion } from '../lib/motion'
  * static feTurbulence grain rendered once into a data-URI SVG and tiled as a background image at
  * opacity 0.05 so pure black never bands. The grain is an image, not a live filter: it costs one
  * rasterisation. Under reduced motion only the grain remains.
+ *
+ * Safe mode (src/lib/boot.ts): `data-fx="0"` drops the key light (a 96vmax compositing layer), and
+ * level 2 (`data-bare="1"`) drops the whole backdrop for the plain obsidian page.
  */
 
 const GRAIN_SVG =
@@ -20,9 +24,11 @@ const GRAIN_URL = `url("data:image/svg+xml,${encodeURIComponent(GRAIN_SVG)}")`
 
 export function Backdrop() {
   const reduced = useReducedMotion()
+  if (isBare()) return null
+  const keyLight = !reduced && !featureOff('fx')
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[var(--z-backdrop)] overflow-hidden">
-      {!reduced && (
+      {keyLight && (
         <div
           className="absolute left-1/2 top-[40%] h-[96vmax] w-[96vmax] rounded-full"
           style={{

@@ -1,5 +1,6 @@
 import gsap from 'gsap'
 import { CustomEase } from 'gsap/CustomEase'
+import { featureOff } from '../lib/boot'
 import { getMonumentHandle } from '../scene/handle'
 import { queryArcs, targetList, type Targets } from './targets'
 
@@ -79,6 +80,8 @@ const cutNumber = (tl: gsap.core.Timeline, el: HTMLElement | undefined, at: numb
     { clipPath: 'inset(0% 0 0 0)', duration: ms(cutDur), ease: EASE.cut, clearProps: 'clipPath' },
     ms(at),
   )
+  // the boot guard's sweep=0 (any safe level): the number is cut but no light crosses it
+  if (featureOff('sweep')) return
   tl.fromTo(
     el,
     { '--tilt-x': -1 },
@@ -96,6 +99,7 @@ const cutNumber = (tl: gsap.core.Timeline, el: HTMLElement | undefined, at: numb
 const revealShards = (tl: gsap.core.Timeline, el: HTMLElement | undefined, at: number, fadeDur: number, sweepDur: number, onTilt: (x: number) => void) => {
   if (!el) return
   tl.to(el, { opacity: 1, duration: ms(fadeDur), ease: 'none', clearProps: 'opacity' }, ms(at))
+  if (featureOff('sweep')) return
   const sweep = { x: -1 }
   tl.to(
     sweep,

@@ -98,11 +98,11 @@
 }
 
 /* ---------- root variables ---------- */
-@property --tilt-x {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
+/*
+  --tilt-x is deliberately NOT a registered @property. A registered, inherited custom property that
+  changes on :root every frame is the WebKit style-cache bug behind the iOS crash; nothing animates
+  it in CSS any more, and the opt-in tilt writes it as a plain custom property from src/lib/tilt.ts.
+*/
 
 :root {
   color-scheme: dark;
@@ -124,7 +124,7 @@
   --bone-08: rgba(231, 225, 210, 0.08);
   --scrim: rgba(5, 5, 7, 0.6);
 
-  /* tilt-driven light: -1 to 1, written by the tilt loop or the goldSweep keyframe */
+  /* tilt-driven light: -1 to 1, 0 at rest; written only while a tilt source is live (src/lib/tilt.ts) */
   --tilt-x: 0;
   --tilt-angle: calc(var(--tilt-x) * 18deg);
 
@@ -302,7 +302,6 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  will-change: background-position;
 }
 .gold-num.ember .gold-face {
   background: var(--ember-grad);
@@ -354,21 +353,10 @@
   border-color: var(--gold-line);
 }
 
-/* the gold auto sweep until tilt is live */
-@keyframes goldSweep {
-  from {
-    --tilt-x: -1;
-  }
-  to {
-    --tilt-x: 1;
-  }
-}
-:root.auto-sweep {
-  animation: goldSweep var(--t-gold-sweep) ease-in-out infinite alternate;
-}
-:root.auto-sweep.sweep-paused {
-  animation-play-state: paused;
-}
+/*
+  No auto sweep. An infinite keyframe on :root's inherited --tilt-x restyled the whole document every
+  frame forever (the iOS crash hotfix removed it). At rest the light sits at 0 and nothing restyles.
+*/
 
 /* entrance stagger for LIBRARY, HISTORY, SETTINGS (mount only) */
 @keyframes riseIn {
@@ -439,10 +427,6 @@
     transition-duration: 0.01ms !important;
     animation-fill-mode: both !important;
   }
-  :root:not(.force-motion).auto-sweep {
-    animation: none;
-    --tilt-x: 0;
-  }
 }
 :root.reduce-motion *,
 :root.reduce-motion *::before,
@@ -452,7 +436,49 @@
   transition-duration: 0.01ms !important;
   animation-fill-mode: both !important;
 }
-:root.reduce-motion.auto-sweep {
-  animation: none;
-  --tilt-x: 0;
+
+/*
+  ---------- safe mode (the crash-loop guard in index.html, src/lib/boot.ts) ----------
+  data-fx="0" (any safe level, or ?fx=0): flat gold, no clipped or blended backgrounds, no filters,
+  no compositing hints, no CSS animation or transition. Sheets still open and close, instantly
+  (Sheet unmounts on a timer, never on transitionend). data-bare="1" (level 2): plain backgrounds.
+*/
+html[data-fx="0"] .gold-num .gold-face,
+html[data-fx="0"] .gold-text {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: #d8b45a;
+}
+html[data-fx="0"] .gold-num.ember .gold-face {
+  color: var(--color-ember-text);
+}
+html[data-fx="0"] .gold-fill {
+  background: linear-gradient(100deg, #9c7b33 0%, #d8b45a 45%, #f6e3a1 55%, #b8902e 100%);
+}
+html[data-fx="0"] .gold-border::before {
+  background: none;
+  padding: 0;
+  -webkit-mask: none;
+  mask: none;
+  border: 1px solid rgba(216, 180, 90, 0.55);
+}
+html[data-fx="0"],
+html[data-fx="0"] *,
+html[data-fx="0"] *::before,
+html[data-fx="0"] *::after {
+  animation: none !important;
+  transition: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  background-blend-mode: normal !important;
+  will-change: auto !important;
+}
+html[data-bare="1"] body::after {
+  content: none;
+}
+html[data-bare="1"] #root > div {
+  background-image: none !important;
 }

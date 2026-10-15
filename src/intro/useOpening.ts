@@ -1,5 +1,6 @@
 import gsap from 'gsap'
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { featureOff } from '../lib/boot'
 import { isReducedMotion } from '../lib/motion'
 import { emitTilt, suspendTilt } from '../lib/tilt'
 import type { Settings } from '../lib/types'
@@ -16,7 +17,8 @@ import { buildFade, buildFull, buildShort, type BuildInput } from './timeline'
  *
  * Variants: full (first launch or Settings OPENING = FULL DAILY), short (every later launch),
  * fade (OPENING = OFF, or reduced motion: one 240 ms crossfade) and none (returning within ten
- * minutes, per `sessionStorage` `temperance.seen`). The variant is decided once per launch.
+ * minutes, per `sessionStorage` `temperance.seen`, or switched off by the boot guard's `data-intro="0"`).
+ * The variant is decided once per launch.
  */
 
 export const SEEN_KEY = 'temperance.seen'
@@ -113,6 +115,8 @@ export function useOpening(wordmarkRef: RefObject<HTMLDivElement | null>): Openi
   const setIntroDone = useUI((s) => s.setIntroDone)
   const [variant] = useState<OpeningVariant>(() => {
     if (playedThisLaunch) return 'none'
+    // the boot guard's intro=0 (any safe level): no timeline at all, the final frame at once
+    if (featureOff('intro')) return 'none'
     if (useUI.getState().tab !== 'today') return 'none'
     return decideVariant(useStore.getState().settings, isReducedMotion(), readSeen(), Date.now())
   })
