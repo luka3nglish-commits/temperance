@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { isBare } from '../../lib/boot'
 import { SHARDS, SHARD_VIEWBOX, type ShardPoly, type StripId } from './shards-data'
 
 /**
@@ -176,6 +177,8 @@ function Strip({ id, polys }: { id: StripId; polys: ShardPoly[] }) {
 }
 
 export function Shards() {
+  // safe level 2 (src/lib/boot.ts): no shards at all
+  if (isBare()) return null
   return (
     <div data-intro="shards" aria-hidden="true" className="pointer-events-none absolute inset-0 z-[var(--z-shards)]">
       {STRIPS.map((id) => (

@@ -8,6 +8,7 @@ import { useStore } from '../store/useStore'
 import { SettingsGroup, SettingsRow, SmallInput } from './SettingsRow'
 import { SettingsData } from './SettingsData'
 import { SettingsFooter } from './SettingsFooter'
+import { SettingsSafeMode } from './SettingsSafeMode'
 
 const UNIT_OPTIONS = [
   { value: 'kcal', label: 'kcal' },
@@ -151,6 +152,7 @@ export function SettingsScreen() {
       </header>
 
       <div className={`flex flex-col gap-4 ${stagger}`}>
+        <SettingsSafeMode />
         <SettingsGroup numeral="I" title="Goals" id="settings-goals" testId="tp-settings-group-goals">
           <SettingsRow label="Daily goal" htmlFor="set-goal">
             <SmallInput
