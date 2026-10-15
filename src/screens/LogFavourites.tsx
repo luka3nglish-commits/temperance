@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { EnergyUnit, Meal } from '../lib/types'
-import { formatAmount } from '../lib/portion'
+import { formatAmountLong, resolvePortion } from '../lib/portion'
 import { Chip, ChipRow } from '../components/ui'
 import { energyLine } from '../components/MealForm'
 
@@ -15,8 +15,8 @@ type Props = {
 
 /** What one tap on a favourite logs, spoken: `180 grams` for a per-100 g meal with a usual amount. */
 function usualSpoken(m: Meal): string {
-  if (m.per && m.per.unit !== 'serve') return formatAmount(m.usual && m.usual > 0 ? m.usual : m.per.amount, m.per.unit)
-  if (m.usual && m.usual > 0 && m.usual !== 1) return formatAmount(m.usual, 'serve')
+  if (m.per && m.per.unit !== 'serve') return formatAmountLong(m.usual && m.usual > 0 ? m.usual : m.per.amount, m.per.unit)
+  if (m.usual && m.usual > 0 && m.usual !== 1) return formatAmountLong(m.usual, 'serve')
   return ''
 }
 
@@ -33,13 +33,16 @@ export function LogFavourites({ meals, unit, onPick, lead, className = '' }: Pro
       {lead}
       {meals.map((m) => {
         const usual = usualSpoken(m)
+        // what one tap adds: the usual amount resolved against the meal's basis
+        const r = resolvePortion(m.per, undefined, m.usual)
+        const kcal = r ? m.macros.kcal * r.servings : m.macros.kcal
         return (
           <Chip
             key={m.id}
             testId={`tp-fav-chip-${m.id}`}
             label={m.name}
             onClick={() => onPick(m)}
-            aria-label={`Log ${m.name}${usual ? `, ${usual}` : ''}, ${energyLine(m.macros.kcal, unit)}${m.per && m.per.unit !== 'serve' ? ` per ${formatAmount(m.per.amount, m.per.unit)}` : ''}`}
+            aria-label={`Log ${m.name}${usual ? `, ${usual}` : ''}, ${energyLine(kcal, unit)}`}
           />
         )
       })}

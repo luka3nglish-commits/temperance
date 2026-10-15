@@ -49,6 +49,11 @@ type Props = {
    * own line and the control full width beneath (three-way segmented, wide confirms).
    */
   layout?: 'column' | 'stack'
+  /**
+   * `fixed` (default): the right column is the 168 px `SETTINGS_COL`. `auto`: the column shrinks to the
+   * control (a 48 px toggle) so a short label stays on one line; its right edge stays flush.
+   */
+  col?: 'fixed' | 'auto'
   testId?: string
   className?: string
 }
@@ -57,7 +62,7 @@ type Props = {
  * One settings row, min-h 60 with 14 px top and bottom. Two layouts only: the label left with the
  * control in the fixed 168 px right column, or the label above a full-width control.
  */
-export function SettingsRow({ label, children, below, htmlFor, layout = 'column', testId, className = '' }: Props) {
+export function SettingsRow({ label, children, below, htmlFor, layout = 'column', col = 'fixed', testId, className = '' }: Props) {
   const labelEl = htmlFor ? (
     <label htmlFor={htmlFor} className="label block leading-[1.35]">
       {label}
@@ -75,7 +80,7 @@ export function SettingsRow({ label, children, below, htmlFor, layout = 'column'
       ) : (
         <div className="flex min-h-8 items-center gap-3">
           <div className="min-w-0 flex-1">{labelEl}</div>
-          <div className="flex shrink-0 items-center justify-end" style={{ width: SETTINGS_COL }}>
+          <div className="flex shrink-0 items-center justify-end" style={col === 'auto' ? undefined : { width: SETTINGS_COL }}>
             {children}
           </div>
         </div>

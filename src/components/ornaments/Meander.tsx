@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 
 type Props = {
-  /** px width; the pattern tiles 12 x 6 and fades out at both ends. Default 96. */
+  /** px width; the pattern tiles 12 x 6 from the left and fades out at both ends. Keep it a multiple of 12 so it ends on a whole key. Default 96. */
   width?: number
   /** left, centre or right in its line box. Default centre. */
   align?: 'left' | 'center' | 'right'

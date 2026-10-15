@@ -104,6 +104,15 @@ describe('Monument choreography', () => {
     expect(m.mon.rotY).toBeCloseTo(0.035, 5)
   })
 
+  it('an over-goal crack never keeps the demand loop alive on its own (design-spec 7, rest rule)', () => {
+    const m = new Monument(hooks(false))
+    m.mon.crack = 1
+    m.mon.trauma = 0
+    const t0 = m.mon.crackTime
+    expect(m.tick(0.016, true, false)).toBe(false)
+    expect(m.mon.crackTime - t0).toBeCloseTo(0.016)
+  })
+
   it('the ghost waits for the opening: hidden at mount, revealed by setInstant or playGhostReveal', () => {
     const live = new Monument(hooks(false))
     expect(live.mon.ghost).toBe(0)

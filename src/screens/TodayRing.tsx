@@ -9,12 +9,13 @@
  *      #A88A55 to #8E7243). Split by calorie contribution (macroEnergySplit) so the ring matches the
  *      big number. A zero macro draws no arc but keeps its gap. Empty day: three 114 deg arcs in #2A2A33.
  *   3. Inner bezel: r 41, a radial #121218 to #0B0B0F, a gold 0.35 hairline.
- *   4. Centre (DOM): protein grams Cinzel 700 22 px gold-300 plus `g`, caption PROTEIN.
+ *   4. Centre (DOM): protein grams Cinzel 700 22 px gold-300 plus `g`, caption PROTEIN. Compact: 18 px,
+ *      the caption 2 px under it with no tracking, so it clears the bezel hairline (bezelClears).
  *   5. Letters P C F: Cinzel 700 12 px bone-dim (15 units in compact, so still 12 px), 5 unit ticks.
  *   8. Tip glint: while the angles tween (520 ms --ease-stone) a 3 px #FFF7DA dot rides each moving arc
  *      end, fading out over 300 ms after; a soft drop-shadow on the high tier only; none when reduced.
  *
- * Readouts (x 160 to 370, three 36 px rows): swatch, label, grams, and the right column: the macro's
+ * Readouts (x 160 to 370, three 44 px rows filling the 132 px row, so each is a full touch target): swatch, label, grams, and the right column: the macro's
  * goal (`of 180 g`) when its target is set, else its energy share. Compact (under 372 px wide): the
  * right column is hidden (kept for screen readers and tests) and a 2 px progress underline runs under
  * each value instead; ring 96 px, readouts from x 132. Tapping a readout row flips the ring into
@@ -45,6 +46,8 @@ export const RING_START = -87
 export const RING_SPAN = 342
 export const RING_GAP = 6
 export const RING_R = 50
+/** the inner bezel radius in viewBox units (the gold hairline the centre caption must stay inside) */
+export const BEZEL_R = 41
 export const TRACK = '#0A0A0D'
 /** the empty-day placeholder arcs */
 export const EMPTY_ARC = '#2A2A33'
@@ -67,6 +70,18 @@ export function layoutArcs(shares: Shares): ArcSpan[] {
     a += len + RING_GAP
     return span
   })
+}
+
+/**
+ * Does a centred caption of `halfWidth` px, whose bottom edge sits `dyBottom` px below the ring centre,
+ * stay inside the bezel hairline of a `size` px ring? The bezel's half-chord at that depth must exceed
+ * the caption's half-width by `clearance` px.
+ */
+export function bezelClears(halfWidth: number, dyBottom: number, size: number, clearance = 0.5): boolean {
+  const r = (BEZEL_R * size) / 120
+  const dy = Math.abs(dyBottom)
+  if (dy >= r) return false
+  return halfWidth + clearance <= Math.sqrt(r * r - dy * dy)
 }
 
 /** Calorie shares for the ring; equal thirds (and `empty`) when nothing is logged. */
@@ -286,19 +301,19 @@ export function TodayRingRow({ totals, targets, compact = false, onOpen }: RowPr
         <TodayRing totals={totals} targets={targets} focus={focus} size={ringSize} />
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span data-testid="tp-ring-centre" data-grams={centreValue} className="num inline-flex items-baseline whitespace-nowrap">
-            <span className={`font-display inscribed text-[22px] font-bold leading-none ${placeholder ? 'text-bone-dim' : 'text-gold-300'}`}>{centreValue}</span>
+            <span className={`font-display inscribed ${compact ? 'text-[18px]' : 'text-[22px]'} font-bold leading-none ${placeholder ? 'text-bone-dim' : 'text-gold-300'}`}>{centreValue}</span>
             <span className="unit">{' '}g</span>
           </span>
           <span
-            className="label mt-[6px] whitespace-nowrap"
-            style={{ letterSpacing: compact ? '0.04em' : '0.1em', marginRight: compact ? '-0.04em' : '-0.1em' }}
+            className={`label whitespace-nowrap ${compact ? 'mt-[2px]' : 'mt-[6px]'}`}
+            style={{ letterSpacing: compact ? '0' : '0.1em', marginRight: compact ? 0 : '-0.1em' }}
           >
             {centreLabel}
           </span>
         </span>
       </button>
 
-      <div data-intro="ring-readouts" className={`absolute right-5 top-3 ${compact ? 'left-[132px]' : 'left-40'}`}>
+      <div data-intro="ring-readouts" className={`absolute right-5 top-0 ${compact ? 'left-[132px]' : 'left-40'}`}>
         {MACRO_KEYS.map((k) => {
           const active = focus === k
           const target = Math.round(targets[k])
@@ -315,7 +330,7 @@ export function TodayRingRow({ totals, targets, compact = false, onOpen }: RowPr
               data-target={target}
               aria-pressed={active}
               aria-label={`${MACRO_LABEL[k]} ${grams(k)} grams${target > 0 ? ` of ${target}, ${ratio} percent of target` : ''}`}
-              className="relative flex h-9 w-full cursor-pointer items-center gap-2.5 text-left"
+              className="relative flex h-11 w-full cursor-pointer items-center gap-2.5 text-left"
             >
               <span
                 aria-hidden="true"

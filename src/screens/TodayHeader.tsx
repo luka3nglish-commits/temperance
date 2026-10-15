@@ -1,5 +1,7 @@
 /**
  * HEADER BAND (polish-spec 6.1, y 47 to 87): date left, wordmark centre, streak right. 40 px tall.
+ * A 12 px column gap keeps the date off the wordmark; under 390 px wide the weekday drops (`30 MAY`),
+ * the full date stays in the aria-label.
  * The opening lands the big wordmark on the [data-intro="wordmark"] slot by FLIP and fades the streak
  * slot in ([data-intro="streak"]). The settings gear is gone: the tab bar already has SETTINGS.
  *
@@ -26,10 +28,12 @@ export function streakLabel(n: number): string {
 
 export function TodayHeader({ today, streak }: { today: string; streak: number }) {
   const setTab = useUI((s) => s.setTab)
+  const d = parseDayKey(today)
   return (
-    <header className="grid h-10 shrink-0 grid-cols-[1fr_auto_1fr] items-center px-5">
-      <time dateTime={today} data-intro="date" className="label whitespace-nowrap">
-        {formatHeaderDate(today)}
+    <header className="grid h-10 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-x-3 px-5">
+      <time dateTime={today} aria-label={formatHeaderDate(today)} data-intro="date" className="label whitespace-nowrap">
+        <span className="max-[389px]:hidden">{WEEKDAYS[d.getDay()]} </span>
+        {d.getDate()} {MONTHS[d.getMonth()]}
       </time>
       <h1
         data-intro="wordmark"

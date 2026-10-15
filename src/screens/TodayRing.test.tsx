@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { arcPath, EMPTY_ARC, EMPTY_SHARES, layoutArcs, letterUnits, progressArcs, readoutAside, RING_GAP, RING_START, ringShares, TodayRingRow } from './TodayRing'
+import { arcPath, bezelClears, EMPTY_ARC, EMPTY_SHARES, layoutArcs, letterUnits, progressArcs, readoutAside, RING_GAP, RING_START, ringShares, TodayRingRow } from './TodayRing'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -59,6 +59,21 @@ describe('ring geometry', () => {
     expect(big).toContain('A 50 50 0 1 1')
     const full = arcPath(60, 60, 50, 0, 360)
     expect(full.split(' A ').length).toBe(3)
+  })
+})
+
+describe('compact centre caption vs the bezel', () => {
+  it('the old compact caption (half width 30.4 px, bottom 18 px below centre) crossed the 96 px bezel', () => {
+    expect(bezelClears(30.4, 18, 96)).toBe(false)
+  })
+
+  it('the 18 px value with a 2 px gap and untracked caption (28.7 px, bottom 14 px) clears it', () => {
+    expect(bezelClears(28.7, 14, 96)).toBe(true)
+  })
+
+  it('a caption at or below the bezel never clears', () => {
+    expect(bezelClears(1, 41, 120)).toBe(false)
+    expect(bezelClears(1, 33, 96)).toBe(false)
   })
 })
 
@@ -188,5 +203,7 @@ describe('readout rows in the DOM', () => {
     const u = container.querySelector<HTMLElement>('[data-underline="protein"] > span')
     expect(u?.style.width).toBe('78.9%')
     expect(container.querySelector('[data-underline="carbs"]')).toBeNull()
+    // the rows are full 44 px touch targets
+    expect($('tp-readout-protein')?.className).toContain('h-11')
   })
 })

@@ -376,15 +376,17 @@ async function portionFlow() {
     if (!target) throw new Error('no gram entry to find')
     const rowText = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('[data-testid^=tp-recent-row-]')]
-      const r = rows.find((x) => /\d+\s*g\b/.test(x.textContent || ''))
-      return r ? r.textContent : null
+      // the visible spans sit flush ('180 gP 16'), so match the spoken aria-label ('180 grams')
+      const r = rows.find((x) => /\d+(?:\.\d+)? grams?\b/.test(x.getAttribute('aria-label') || ''))
+      return r ? r.getAttribute('aria-label') : null
     })
     if (!rowText) throw new Error('no recent row shows a gram amount')
     const before = await page.evaluate(() => window.__tp.store.getState().entries.length)
     const relogged = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('[data-testid^=tp-recent-row-]')]
-      const r = rows.find((x) => /\d+\s*g\b/.test(x.textContent || ''))
-      const btn = r && [...r.querySelectorAll('button')].pop()
+      const r = rows.find((x) => /\d+(?:\.\d+)? grams?\b/.test(x.getAttribute('aria-label') || ''))
+      // the test id sits on the row button itself
+      const btn = r && (r.matches('button') ? r : [...r.querySelectorAll('button')].pop())
       if (!btn) return false
       btn.click()
       return true

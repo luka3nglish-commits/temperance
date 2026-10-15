@@ -28,6 +28,7 @@ export function Opening() {
           {/* the SKIP pill (polish-spec 5.5): 44 px tall, clear of the keystone, readable at 12 px */}
           <button
             type="button"
+            data-testid="tp-opening-skip"
             aria-label="Skip"
             onClick={skip}
             className="font-display pointer-events-auto absolute flex h-11 items-center justify-center rounded-[4px] px-4 text-[12px] font-bold uppercase leading-none tracking-[0.12em] text-bone-dim cursor-pointer"

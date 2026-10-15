@@ -59,7 +59,7 @@ export function HistoryStones({ avgKcal, under, streak, unit, anyLogged }: Props
         testId="tp-stat-streak"
         caption="Streak"
         value={v.streak}
-        ornament={v.streak ? <Laurel /> : undefined}
+        ornament={v.streak ? <Laurel className="block translate-y-[6px]" /> : undefined}
         data={{ 'data-value': v.streak || '0', 'aria-label': `Streak ${streak} ${streak === 1 ? 'day' : 'days'}` } as Record<`data-${string}`, string>}
       />
     </StatStones>

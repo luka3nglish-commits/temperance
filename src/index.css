@@ -143,16 +143,12 @@
   --gold-line: rgba(216, 180, 90, 0.42); /* 2.58:1: section rules, tab bar top edge, dividers inside controls */
   --gold-line-strong: rgba(216, 180, 90, 0.55); /* 3.64:1: one lead rule per screen, sheet top edge */
   --gold-edge: rgba(216, 180, 90, 0.55); /* 3.64:1: borders of gold controls (segmented, chips, hairline buttons, toggles) */
-  --bone-edge: rgba(231, 225, 210, 0.4); /* 3.18:1: borders of inputs and the PortionField at rest */
+  --bone-edge: rgba(231, 225, 210, 0.46); /* ~3.6:1 css, >=3.0:1 rendered on raised tablets: borders of inputs and the PortionField at rest */
   --rule: rgba(231, 225, 210, 0.16); /* decorative: row rules between list rows */
   --bone-rule: rgba(231, 225, 210, 0.36); /* ring groove hairlines */
   --ember-edge: rgba(255, 90, 31, 0.7); /* 3.54:1: danger button border */
   --ember-glow: rgba(255, 90, 31, 0.45);
   --scrim: rgba(5, 5, 7, 0.74); /* sheet scrim and the hero number scrim */
-  /* DEPRECATED aliases kept so screens written before the polish keep their look mid-build.
-     Phase C deletes both once `grep -rn "bone-08\|gold-focus" src` only finds this file. */
-  --gold-focus: #e6cb78;
-  --bone-08: var(--rule);
 
   /* tilt-driven light: -1 to 1, 0 at rest; written only while a tilt source is live (src/lib/tilt.ts) */
   --tilt-x: 0;
@@ -567,6 +563,12 @@
     line-height: 1;
     letter-spacing: 0.06em;
   }
+  /* under 380 px the four tab slots are 72 px wide: drop the tracking so SETTINGS clears the edge and HISTORY */
+  @media (max-width: 379px) {
+    .label-tab {
+      letter-spacing: 0;
+    }
+  }
   /* hero eyebrow: REMAINING, EATEN, OVER THE LINE */
   .eyebrow {
     font-family: var(--font-display);
@@ -677,7 +679,7 @@
     display: block;
     height: 6px;
     opacity: 0.55;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='6' viewBox='0 0 12 6'%3E%3Cpath d='M0 5.5H12M9 5.5V0.5H3V3.5H6' fill='none' stroke='%23D8B45A' stroke-width='1'/%3E%3C/svg%3E") repeat-x center / 12px 6px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='6' viewBox='0 0 12 6'%3E%3Cpath d='M0 5.5H12M9 5.5V0.5H3V3.5H6' fill='none' stroke='%23D8B45A' stroke-width='1'/%3E%3C/svg%3E") repeat-x 0 50% / 12px 6px;
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
     mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
   }
@@ -1057,13 +1059,24 @@
   .chip.chip-sm {
     height: 32px;
   }
+  /* hit areas are measured from the padding box (inside the 1 px border): 30 + 2 x 7 = 44 */
   .chip.chip-sm::after {
     content: "";
     position: absolute;
     left: 0;
     right: 0;
-    top: -6px;
-    bottom: -6px;
+    top: -7px;
+    bottom: -7px;
+  }
+  /* 40 px chips and portion picks keep their look but take a 44 px hit area: 38 + 2 x 3 */
+  .chip:not(.chip-sm)::after,
+  .portion-pick::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -3px;
+    bottom: -3px;
   }
   .chip-label {
     min-width: 0;
@@ -1109,6 +1122,9 @@
     display: flex;
     gap: 8px;
     overflow-x: auto;
+    /* a chip's hit extension (::after, 2 px past its border) must never make the row scroll vertically
+       under a diagonal thumb; a row needs 2 px of vertical padding for that extension to be tappable */
+    overflow-y: hidden;
     scrollbar-width: none;
     -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
     mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
@@ -1179,6 +1195,8 @@
   .portion-value {
     position: relative;
     display: inline-grid;
+    /* 0.6em of the 30 px value: a caret slot when the draft is empty (px, the cell inherits a smaller size) */
+    min-width: 18px;
   }
   /* the mirror's digits size the cell, so the box hugs the value and the unit sits 6 px after it */
   .portion-value > input,
@@ -1197,9 +1215,13 @@
     font-variant-numeric: lining-nums tabular-nums;
     outline: none;
   }
+  /* the input lies over the mirror, which alone sizes the cell, so the unit sits 6 px after the digits */
   .portion-value > input {
+    position: absolute;
+    inset: 0;
     width: 100%;
-    min-width: 0.6em;
+    height: 100%;
+    min-width: 0;
   }
   .portion-value > input:focus-visible {
     outline: none;
@@ -1207,6 +1229,10 @@
   .portion-value > .portion-mirror {
     pointer-events: none;
     white-space: pre;
+  }
+  /* an empty draft keeps a line box, so the caret has its height and the unit keeps its baseline */
+  .portion-mirror:empty::before {
+    content: "\200b";
   }
   /* while not editing, the mirror draws the digits so a changed digit can wipe in */
   .portion-field:not(:focus-within) .portion-value > input {
@@ -1460,6 +1486,11 @@
     padding-top: 20px;
     background: linear-gradient(180deg, rgba(11, 11, 15, 0) 0, #0b0b0f 20px);
   }
+  /* once scrolled, rows fade out under the header over 20 px instead of a hard cut (matches the footer) */
+  .sheet-content[data-scrolled="1"] {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 20px);
+    mask-image: linear-gradient(180deg, transparent 0, #000 20px);
+  }
 
   /* ----- TabBar (polish-spec 4.14) ----- */
   .tabbar {
@@ -1678,6 +1709,13 @@ html[data-fx="0"] .gold-border::before {
   -webkit-mask: none;
   mask: none;
   border: 1px solid rgba(216, 180, 90, 0.55);
+}
+html[data-fx="0"] .tablet {
+  background-image: linear-gradient(180deg, #17171e 0%, #111117 55%, #0d0d12 100%);
+  background-size: 100% 100%;
+}
+html[data-fx="0"] .gold-num .gold-hi {
+  display: none;
 }
 html[data-fx="0"],
 html[data-fx="0"] *,

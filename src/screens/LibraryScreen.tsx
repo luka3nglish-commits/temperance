@@ -15,7 +15,7 @@ import { LibraryEditor, type EditorTarget } from './LibraryEditor'
 import { favouriteItems, loggedText, mostLogged } from './LibraryFormat'
 
 /** The header fades into the page instead of ending on a hard edge (polish-spec 6.3; no blur, C23). */
-const HEADER_FADE = 'linear-gradient(180deg, #050507 0%, #050507 70%, rgba(5,5,7,0) 100%)'
+const HEADER_FADE = 'linear-gradient(180deg, var(--color-obsidian-950) 0%, var(--color-obsidian-950) 70%, transparent 100%)'
 
 /**
  * THE ARCHIVE (polish-spec 6.3). A 56 px header (LIBRARY, the gold plus) and the carved search stay

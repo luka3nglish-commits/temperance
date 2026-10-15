@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { searchIngredients } from '../store/selectors'
-import type { AmountUnit, Ingredient, Macros, Meal, MealComponent, Portion } from '../lib/types'
+import type { AmountUnit, EnergyUnit, Ingredient, Macros, Meal, MealComponent, Portion } from '../lib/types'
 import { kcalFromMacros, makeComponent, roundMacros, scaleMacros, sumMacros } from '../lib/macros'
 import { formatEnergy, fromInputEnergy, parseNumber, toDisplayEnergy, unitLabel } from '../lib/units'
 import { Button, EmptyLine, Field, IconButton, Input, PortionField, SectionHeading, Segmented, Sheet, Toggle, ValueUnit, decimalInputProps } from '../components/ui'
@@ -33,8 +33,10 @@ const DEFAULT_USUAL: Record<AmountUnit, number> = { serve: 1, g: 100, ml: 250 }
 
 const text = (n: number | undefined) => (n === undefined || n === 0 ? '' : fmtGrams(n))
 const grams = (t: string) => parseNumber(t) ?? 0
+/** The energy field's first text: the stored kcal in the display unit, whole. */
+const seedText = (kcal: number | undefined, unit: EnergyUnit) => (kcal === undefined ? '' : String(Math.round(toDisplayEnergy(kcal, unit))))
 
-/** Add and edit forms for a meal or an ingredient, in a tall sheet with SAVE in the sticky footer. */
+/** Add and edit forms for a meal or an ingredient, in a sheet sized to the form (tall for built and new meals) with SAVE in the sticky footer. */
 export function LibraryEditor({ target, onClose, onClosed }: Props) {
   const [held, setHeld] = useState<EditorTarget | null>(target)
   useEffect(() => {
@@ -42,6 +44,10 @@ export function LibraryEditor({ target, onClose, onClosed }: Props) {
   }, [target])
   const current = target ?? held
   const open = target !== null
+  // short forms (an ingredient, a quick meal being edited) size to their content; built and new meals
+  // stay tall, since a new meal can switch to BUILT and its search list would make the sheet jump
+  const quickMeal = useStore((s) => (current?.kind === 'meal' && current.id ? s.meals[current.id]?.kind === 'quick' : false))
+  const compact = current?.kind === 'ingredient' || quickMeal
   const [valid, setValid] = useState(false)
 
   const title = current?.kind === 'ingredient' ? (current.id ? 'Edit ingredient' : 'New ingredient') : current?.id ? 'Edit meal' : 'New meal'
@@ -56,7 +62,7 @@ export function LibraryEditor({ target, onClose, onClosed }: Props) {
         onClosed?.()
       }}
       title={title}
-      height="tall"
+      height={compact ? 'auto' : 'tall'}
       footer={
         <Button type="submit" form={formId} variant="gold" full disabled={!valid} data-testid={current?.kind === 'ingredient' ? 'tp-ingredient-edit-save' : 'tp-meal-edit-save'}>
           Save
@@ -112,7 +118,10 @@ function FormFoot({ note, favourite, onFavourite }: { note: string; favourite: b
 
 /* ---------------- meal ---------------- */
 
-type ComponentRow = { comp: MealComponent; amountText: string }
+/** perMacros / perAmount: the macros of a known amount, so a removed ingredient's row rescales without losing them at 0 */
+type ComponentRow = { comp: MealComponent; amountText: string; perMacros: Macros; perAmount: number }
+
+const rowFor = (comp: MealComponent): ComponentRow => ({ comp, amountText: fmtGrams(comp.amount), perMacros: comp.macros, perAmount: comp.amount > 0 ? comp.amount : 1 })
 
 type FormProps = { id?: string; formId: string; onDone(): void; onValidity(valid: boolean): void }
 
@@ -123,12 +132,14 @@ function MealForm({ id, formId, onDone, onValidity }: FormProps) {
 
   const [name, setName] = useState(existing?.name ?? '')
   const [kind, setKind] = useState<Meal['kind']>(existing?.kind ?? 'quick')
-  const [kcalText, setKcalText] = useState(existing ? String(Math.round(toDisplayEnergy(existing.macros.kcal, unit))) : '')
+  // the energy text as first shown; saving it unchanged keeps the stored kcal (no kJ round-trip drift)
+  const [kcalSeed] = useState(() => seedText(existing?.macros.kcal, unit))
+  const [kcalText, setKcalText] = useState(kcalSeed)
   const [p, setP] = useState(text(existing?.macros.protein))
   const [c, setC] = useState(text(existing?.macros.carbs))
   const [f, setF] = useState(text(existing?.macros.fat))
   const [favourite, setFavourite] = useState(existing?.favourite ?? false)
-  const [rows, setRows] = useState<ComponentRow[]>(() => (existing?.components ?? []).map((comp) => ({ comp, amountText: fmtGrams(comp.amount) })))
+  const [rows, setRows] = useState<ComponentRow[]>(() => (existing?.components ?? []).map(rowFor))
   const [query, setQuery] = useState('')
 
   // the basis: per serve, or per an amount (per 100 g, per 100 ml) as a label prints it
@@ -139,7 +150,8 @@ function MealForm({ id, formId, onDone, onValidity }: FormProps) {
 
   const built = kind === 'built'
   const typedKcal = parseNumber(kcalText)
-  const quickMacros: Macros = { kcal: typedKcal === null ? 0 : fromInputEnergy(typedKcal, unit), protein: grams(p), carbs: grams(c), fat: grams(f) }
+  const kcalIn = typedKcal === null ? null : existing && kcalText.trim() === kcalSeed ? existing.macros.kcal : fromInputEnergy(typedKcal, unit)
+  const quickMacros: Macros = { kcal: kcalIn ?? 0, protein: grams(p), carbs: grams(c), fat: grams(f) }
   const totals = useMemo(() => roundMacros(sumMacros(rows.map((r) => r.comp.macros))), [rows])
   const results = useMemo(() => (built ? searchIngredients(ingredients, query).slice(0, 6) : []), [built, ingredients, query])
   const hasIngredients = Object.keys(ingredients).length > 0
@@ -180,7 +192,7 @@ function MealForm({ id, formId, onDone, onValidity }: FormProps) {
 
   const add = (ing: Ingredient) => {
     const comp = makeComponent(ing, ing.per.amount)
-    setRows((r) => [...r, { comp, amountText: fmtGrams(comp.amount) }])
+    setRows((r) => [...r, rowFor(comp)])
     setQuery('')
   }
   const setAmount = (i: number, amountText: string) => {
@@ -192,8 +204,8 @@ function MealForm({ id, formId, onDone, onValidity }: FormProps) {
         const ing = ingredients[row.comp.ingredientId]
         const comp: MealComponent = ing
           ? makeComponent(ing, n)
-          : { ...row.comp, amount: n, macros: roundMacros(scaleMacros(row.comp.macros, row.comp.amount > 0 ? n / row.comp.amount : 0)) }
-        return { comp, amountText }
+          : { ...row.comp, amount: n, macros: roundMacros(scaleMacros(row.perMacros, n / row.perAmount)) }
+        return { ...row, comp, amountText }
       }),
     )
   }
@@ -333,7 +345,7 @@ function MealForm({ id, formId, onDone, onValidity }: FormProps) {
             enterKeyHint="done"
           />
           <MacroFields p={p} c={c} f={f} onP={setP} onC={setC} onF={setF} testPrefix="tp-meal-edit" />
-          <MacroHint kcalTyped={typedKcal === null ? null : fromInputEnergy(typedKcal, unit)} macros={quickMacros} testId="tp-meal-edit-hint" />
+          <MacroHint kcalTyped={kcalIn} macros={quickMacros} testId="tp-meal-edit-hint" />
         </>
       )}
 
@@ -361,7 +373,8 @@ function IngredientForm({ id, formId, onDone, onValidity }: FormProps) {
   const [name, setName] = useState(existing?.name ?? '')
   const [perText, setPerText] = useState(existing ? fmtGrams(existing.per.amount) : '100')
   const [perUnit, setPerUnit] = useState<AmountUnit>(existing?.per.unit ?? 'g')
-  const [kcalText, setKcalText] = useState(existing ? String(Math.round(toDisplayEnergy(existing.macros.kcal, unit))) : '')
+  const [kcalSeed] = useState(() => seedText(existing?.macros.kcal, unit))
+  const [kcalText, setKcalText] = useState(kcalSeed)
   const [p, setP] = useState(text(existing?.macros.protein))
   const [c, setC] = useState(text(existing?.macros.carbs))
   const [f, setF] = useState(text(existing?.macros.fat))
@@ -369,7 +382,8 @@ function IngredientForm({ id, formId, onDone, onValidity }: FormProps) {
 
   const perAmount = parseNumber(perText)
   const typedKcal = parseNumber(kcalText)
-  const macros: Macros = { kcal: typedKcal === null ? 0 : fromInputEnergy(typedKcal, unit), protein: grams(p), carbs: grams(c), fat: grams(f) }
+  const kcalIn = typedKcal === null ? null : existing && kcalText.trim() === kcalSeed ? existing.macros.kcal : fromInputEnergy(typedKcal, unit)
+  const macros: Macros = { kcal: kcalIn ?? 0, protein: grams(p), carbs: grams(c), fat: grams(f) }
   const valid = typedKcal !== null && perAmount !== null && perAmount > 0
   const per = { amount: perAmount && perAmount > 0 ? perAmount : 1, unit: perUnit }
   useEffect(() => onValidity(valid), [valid, onValidity])
@@ -433,7 +447,7 @@ function IngredientForm({ id, formId, onDone, onValidity }: FormProps) {
         enterKeyHint="done"
       />
       <MacroFields p={p} c={c} f={f} onP={setP} onC={setC} onF={setF} testPrefix="tp-ingredient-edit" />
-      <MacroHint kcalTyped={typedKcal === null ? null : fromInputEnergy(typedKcal, unit)} macros={macros} testId="tp-ingredient-edit-hint" />
+      <MacroHint kcalTyped={kcalIn} macros={macros} testId="tp-ingredient-edit-hint" />
 
       <FormFoot note={existing ? 'Saved meals keep their numbers.' : ''} favourite={favourite} onFavourite={setFavourite} />
     </form>

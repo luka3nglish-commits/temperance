@@ -11,9 +11,11 @@
  *   SENECA                Cinzel 700 12 px 0.12em bone-dim
  *
  * The block grows into the free space (flex 1 from a 0 basis, never pushing the stage), so the
- * monument's scale budget holds. When the room is tight (a real 844 px phone with its safe areas gives
- * it about 67 px) the meander steps out first, then the small rule, and the lines close up; the words
- * and the author always stay.
+ * monument's scale budget holds. Its floor steps with the frame: a tall frame (780 px and up, safe
+ * areas included, so a real 390 x 844 phone) always keeps 108 px, the meander and the rule; a short
+ * frame (iPhone SE, 360 x 640) keeps 67 px. When the room is tight the meander steps out first, then
+ * the small rule, and the lines close up; the words and the author always stay. MonumentLayer budgets
+ * the same step (stoicMinFor) when it scales the stage.
  */
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Meander } from '../components/ornaments'
@@ -22,18 +24,33 @@ import { stoicLineForDay } from '../lib/stoic'
 /** room needed with the meander (two lines), and with tight gaps */
 const ROOMY = 108
 const SNUG = 86
-/** the monument scales against a fixed chrome budget (MonumentLayer: 303 px = header 40 + ring row 132 + this + air 64) */
-export const STOIC_MIN = 67
+/** the floor on a tall frame: room for the meander and the rule */
+export const STOIC_MIN_TALL = ROOMY
+/** the floor on a short frame */
+export const STOIC_MIN_SHORT = 67
+/** frame height (safe areas included) from which the tall floor applies */
+export const TALL_FRAME = 780
+
+/**
+ * The stoic floor for a frame. The monument scales against the same chrome budget
+ * (MonumentLayer: header 40 + ring row 132 + this + air 16 + bar 56, plus the safe areas).
+ */
+export function stoicMinFor(frameH: number): number {
+  return frameH >= TALL_FRAME ? STOIC_MIN_TALL : STOIC_MIN_SHORT
+}
 
 export function TodayStoic({ today }: { today: string }) {
   const line = stoicLineForDay(today)
   const ref = useRef<HTMLElement>(null)
   const [room, setRoom] = useState<'roomy' | 'snug' | 'tight'>('roomy')
+  const [frameH, setFrameH] = useState(0)
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
+    const frame = el.parentElement
     const measure = () => {
+      if (frame && frame.clientHeight) setFrameH(frame.clientHeight)
       const h = el.clientHeight
       if (!h) return
       setRoom(h >= ROOMY ? 'roomy' : h >= SNUG ? 'snug' : 'tight')
@@ -42,6 +59,7 @@ export function TodayStoic({ today }: { today: string }) {
     if (typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    if (frame) ro.observe(frame)
     return () => ro.disconnect()
   }, [])
 
@@ -53,7 +71,7 @@ export function TodayStoic({ today }: { today: string }) {
       data-testid="tp-stoic"
       data-room={room}
       className="flex flex-col items-center justify-center px-8 text-center"
-      style={{ flex: '1 1 0px', minHeight: STOIC_MIN }}
+      style={{ flex: '1 1 0px', minHeight: stoicMinFor(frameH) }}
     >
       {room === 'roomy' ? <Meander width={96} className="mb-[14px] shrink-0" /> : null}
       <blockquote

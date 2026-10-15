@@ -6,7 +6,7 @@ import type { CSSProperties } from 'react'
  * gold wash). One 2 px gold-400 indicator travels under the active segment (360 ms on the spring),
  * computed from the index, so it needs no layout measurement.
  *
- * Sizes: `sm` h 32 (44 px hit area), `md` h 44 (default), `lg` h 40 and full width (the basis switch).
+ * Sizes: `sm` h 32 (44 px hit area), `md` h 44 (default), `lg` h 40 (44 px hit area) and full width (the basis switch).
  * `full` stretches any size to the container. An option may carry its own `testId` and `disabled`.
  *
  *   <Segmented label="Basis" size="lg" value={basis} onChange={setBasis} testId="tp-log-basis"
@@ -58,7 +58,11 @@ export function Segmented<T extends string>({ value, options, onChange, label, c
             disabled={o.disabled}
             onClick={() => onChange(o.value)}
             className={`seg-option press ${HEIGHT[size]} ${
-              size === 'sm' ? 'before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-[""]' : ''
+              size === 'sm'
+                ? 'before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-[""]'
+                : size === 'lg'
+                  ? 'before:absolute before:inset-x-0 before:-top-0.5 before:-bottom-0.5 before:content-[""]'
+                  : ''
             } ${stretch ? '' : 'px-4'}`}
           >
             {o.label}

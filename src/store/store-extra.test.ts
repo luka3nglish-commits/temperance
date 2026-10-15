@@ -143,10 +143,10 @@ describe('updateEntry', () => {
   it('a macros patch replaces the numbers without touching servings', () => {
     const s = useStore.getState()
     const e = s.logQuick({ name: 'Guess', macros: macros(500, 30, 50, 10), servings: 2 }, T0)
-    s.updateEntry(e.id, { macros: macros(612.44, 40.06, 60, 12) }, T0 + 10)
+    s.updateEntry(e.id, { macros: macros(612.444, 40.066, 60, 12) }, T0 + 10)
     const next = useStore.getState().entries[0]
     expect(next.servings).toBe(2)
-    expect(next.macros).toEqual(macros(612.4, 40.1, 60, 12))
+    expect(next.macros).toEqual(macros(612.44, 40.07, 60, 12))
   })
 
   it('a macros patch wins over a servings patch in the same call', () => {
@@ -259,7 +259,7 @@ describe('logQuick and logMeal', () => {
     // servings keep 4 decimals so typed portions and gram ratios stay exact
     const b = s.logQuick({ name: 'X', macros: macros(100), servings: 1.55555 }, T0 + 1)
     expect(b.servings).toBe(1.5556)
-    expect(b.macros.kcal).toBe(155.6)
+    expect(b.macros.kcal).toBe(155.56)
   })
 
   it('logMeal returns null for a missing meal and leaves the log alone', () => {
@@ -286,14 +286,14 @@ describe('addBuiltMeal and updateMeal', () => {
   it('addBuiltMeal totals the rounded components', () => {
     const s = useStore.getState()
     const comps = [
-      { ingredientId: 'a', name: 'A', amount: 100, unit: 'g' as const, macros: macros(100.04, 10.04, 20.04, 5.04) },
-      { ingredientId: 'b', name: 'B', amount: 50, unit: 'g' as const, macros: macros(50.06, 5.06, 10.06, 2.06) },
+      { ingredientId: 'a', name: 'A', amount: 100, unit: 'g' as const, macros: macros(100.004, 10.004, 20.004, 5.004) },
+      { ingredientId: 'b', name: 'B', amount: 50, unit: 'g' as const, macros: macros(50.006, 5.006, 10.006, 2.006) },
     ]
     const meal = s.addBuiltMeal({ name: 'Two parts', components: comps }, T0)
     expect(meal.kind).toBe('built')
     expect(meal.components![0].macros).toEqual(macros(100, 10, 20, 5))
-    expect(meal.components![1].macros).toEqual(macros(50.1, 5.1, 10.1, 2.1))
-    expect(meal.macros).toEqual(macros(150.1, 15.1, 30.1, 7.1))
+    expect(meal.components![1].macros).toEqual(macros(50.01, 5.01, 10.01, 2.01))
+    expect(meal.macros).toEqual(macros(150.01, 15.01, 30.01, 7.01))
     expect(meal.useCount).toBe(0)
     expect(meal.favourite).toBe(false)
   })

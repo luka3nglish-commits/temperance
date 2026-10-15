@@ -93,7 +93,7 @@ export function targetList(targets: Targets): HTMLElement[] {
 
 /** Remove every inline style the opening may have left so the final frame is pure CSS. */
 export function clearTargetStyles(targets: Targets, arcs: SVGElement[] = []): void {
-  const props = ['opacity', 'clip-path', 'transform', 'translate', '--tilt-x', 'will-change']
+  const props = ['opacity', 'clip-path', 'transform', 'translate', '--tilt-x', '--shard-glint', 'will-change']
   for (const name of TARGET_NAMES) {
     const el = targets[name]
     if (!el) continue

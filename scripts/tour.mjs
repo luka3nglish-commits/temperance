@@ -333,9 +333,16 @@ try {
         if (!(await waitFor(page, '[data-testid=tp-meal-detail]'))) throw new Error('meal detail sheet did not open')
         await sleep(600)
         await shot(page, 'library-detail')
-        if (await click(page, '[data-testid=tp-meal-detail-edit]')) {
-          await sleep(900)
-          await shot(page, 'library-editor')
+        // the editor proof is a per 100 g meal (basis switch, PER 100 G tag, USUAL PortionField at 170 g)
+        await page.keyboard.press('Escape')
+        await sleep(500)
+        const yid = await page.evaluate(() => Object.values(window.__tp.store.getState().meals).find((m) => m.name === 'Greek yoghurt')?.id)
+        if (yid && (await clickRow(page, `[data-testid=tp-meal-row-${yid}]`)) && (await waitFor(page, '[data-testid=tp-meal-detail]'))) {
+          await sleep(600)
+          if (await click(page, '[data-testid=tp-meal-detail-edit]')) {
+            await sleep(900)
+            await shot(page, 'library-editor')
+          }
         }
         await page.keyboard.press('Escape')
         await sleep(500)
@@ -402,6 +409,9 @@ try {
       }
       await page.evaluate(() => document.querySelector('main')?.scrollTo({ top: 9999 }))
       await sleep(600)
+      // the tile labels sit where the bottom-lane toast lands: wait it out (plus its 200 ms exit)
+      await page.waitForSelector('[data-testid=tp-toast]', { hidden: true, timeout: 8000 }).catch(() => {})
+      await sleep(300)
       await shot(page, 'body-photos')
       if (await click(page, '[data-testid=tp-photo-grid] button, [data-testid=tp-photo-grid] [role=button]')) {
         await sleep(900)

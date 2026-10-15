@@ -226,7 +226,7 @@ export function TodayOdometer({ value, ember = false, size, label }: Props) {
   return (
     <span
       ref={root}
-      role="text"
+      role="img"
       aria-label={label ?? text.replace(/\D/g, '')}
       data-odometer=""
       className="font-display relative inline-flex font-bold leading-[1.08] tracking-[-0.01em]"

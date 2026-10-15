@@ -197,6 +197,7 @@ function BasisTag({ basis }: { basis: Basis }) {
  */
 function PortionResult({ draft, unit, preview }: { draft: QuickDraft; unit: EnergyUnit; preview: number | null }) {
   const result = quickResult(draft, unit, preview)
+  const has = result !== null
   const target = result ? Math.round(toDisplayEnergy(result.kcal, unit)) : 0
   const counted = Math.round(useCountTo(target))
   const glow = useRef<HTMLSpanElement>(null)
@@ -205,10 +206,10 @@ function PortionResult({ draft, unit, preview }: { draft: QuickDraft; unit: Ener
     if (last.current === target) return
     last.current = target
     const el = glow.current
-    if (!el || !result || isReducedMotion() || typeof el.animate !== 'function') return
+    if (!el || !has || isReducedMotion() || typeof el.animate !== 'function') return
     const a = el.animate([{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 0 }], { duration: 300, easing: 'ease-out' })
     return () => a.cancel()
-  }, [target, result])
+  }, [target, has])
 
   const protein = result ? Math.round(result.protein) : 0
   return (

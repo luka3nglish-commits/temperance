@@ -19,7 +19,7 @@ function Sprig() {
     <g>
       <path d="M14 13Q6 11 2 3" />
       {LEAVES.map(([cx, cy]) => (
-        <ellipse key={cx} cx={cx} cy={cy} rx="2.2" ry="0.9" transform={`rotate(-40 ${cx} ${cy})`} />
+        <ellipse key={cx} cx={cx} cy={cy} rx="2.2" ry="0.9" fill="#B8902E" stroke="none" transform={`rotate(-40 ${cx} ${cy})`} />
       ))}
     </g>
   )
@@ -27,7 +27,8 @@ function Sprig() {
 
 /**
  * Laurel, polish-spec 3.3 item 4. Used ONCE in the app: behind the HISTORY STREAK value, 56 x 28 px
- * at opacity 0.7. Two mirrored sprigs, gold-500 stroke 0.6, no fill. Decorative.
+ * at opacity 0.7. Two mirrored sprigs in gold-500: stem stroke 0.6, leaves filled (outlined leaves read as chain links at
+ * phone size). Decorative.
  *
  *   <span className="relative inline-grid place-items-center">
  *     <Laurel className="absolute" />

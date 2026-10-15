@@ -8,6 +8,8 @@ import { buildEntryPatch, entryPortion, TodayEntryEdit } from './TodayEntryEdit'
 import { odometerCells, rollPlan } from './TodayOdometer'
 import { OVER_MAX_PX } from '../scene/tokens'
 import { useUI } from '../store/useUI'
+import { useStore } from '../store/useStore'
+import { localDayKey } from '../lib/day'
 import type { LogEntry } from '../lib/types'
 
 declare global {
@@ -81,20 +83,34 @@ describe('today copy helpers', () => {
 
 describe('entry edit patch', () => {
   it('returns null without calories and parses grams with 0 defaults', () => {
-    expect(buildEntryPatch({ name: 'Oats', amount: 1, kcal: '', protein: '1', carbs: '', fat: '' }, 'kcal')).toBeNull()
-    const p = buildEntryPatch({ name: 'Oats', amount: 1.5, kcal: '612', protein: '32', carbs: '', fat: '12.5' }, 'kcal')
+    expect(buildEntryPatch({ name: 'Oats', amount: 1, kcal: '', protein: '1', carbs: '', fat: '', typedAny: true }, 'kcal')).toBeNull()
+    const p = buildEntryPatch({ name: 'Oats', amount: 1.5, kcal: '612', protein: '32', carbs: '', fat: '12.5', typedAny: true }, 'kcal')
     expect(p).toEqual({ name: 'Oats', servings: 1.5, macros: { kcal: 612, protein: 32, carbs: 0, fat: 12.5 } })
   })
 
   it('an entry with a recorded portion saves the portion in its unit, not servings', () => {
-    const p = buildEntryPatch({ name: 'Greek yoghurt', amount: 200, portionUnit: 'g', kcal: '194', protein: '18', carbs: '8', fat: '10' }, 'kcal')
+    const p = buildEntryPatch(
+      { name: 'Greek yoghurt', amount: 200, portionUnit: 'g', kcal: '194', protein: '18', carbs: '8', fat: '10', typedAny: true },
+      'kcal',
+    )
     expect(p).toEqual({ name: 'Greek yoghurt', portion: { amount: 200, unit: 'g' }, macros: { kcal: 194, protein: 18, carbs: 8, fat: 10 } })
     expect(p && 'servings' in p).toBe(false)
   })
 
   it('typed kJ is stored as kcal (symmetric with the display conversion)', () => {
-    const p = buildEntryPatch({ name: 'Oats', amount: 1, kcal: '2560', protein: '0', carbs: '0', fat: '0' }, 'kJ')
-    expect(p?.macros.kcal).toBe(612)
+    const p = buildEntryPatch({ name: 'Oats', amount: 1, kcal: '2560', protein: '0', carbs: '0', fat: '0', typedAny: true }, 'kJ')
+    expect(p?.macros?.kcal).toBe(612)
+  })
+
+  it('with nothing typed the patch carries no macros (the store rescales the exact snapshot)', () => {
+    const p = buildEntryPatch(
+      { name: 'Greek yoghurt', amount: 250, portionUnit: 'g', kcal: '243', protein: '22.2', carbs: '9.7', fat: '12.5', typedAny: false },
+      'kcal',
+    )
+    expect(p).toEqual({ name: 'Greek yoghurt', portion: { amount: 250, unit: 'g' } })
+    expect(p && 'macros' in p).toBe(false)
+    // still null without calories
+    expect(buildEntryPatch({ name: 'Oats', amount: 1, kcal: '', protein: '', carbs: '', fat: '', typedAny: false }, 'kcal')).toBeNull()
   })
 
   it('the portion control edits the recorded portion, else servings', () => {
@@ -129,6 +145,15 @@ describe('odometer', () => {
     expect(rollPlan(4, 4, false)).toEqual({ snap: null, to: 4 })
   })
 })
+
+const seedEntry = (e: LogEntry) => useStore.setState((s) => ({ entries: [...s.entries.filter((x) => x.id !== e.id), e] }))
+const storedEntry = (id: string) => useStore.getState().entries.find((x) => x.id === id)
+/** set a controlled input's value the way React sees a keystroke */
+const typeInto = (input: HTMLInputElement, value: string) => {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  setter.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
 
 describe('TODAY in the DOM', () => {
   let container: HTMLDivElement
@@ -188,6 +213,53 @@ describe('TODAY in the DOM', () => {
     expect(container.querySelector<HTMLElement>('[data-testid="tp-today-edit-portion"]')?.dataset.unit).toBe('serve')
     act(() => container.querySelector<HTMLButtonElement>('[data-testid="tp-today-edit-portion-pick-1.5"]')!.click())
     act(() => container.querySelector<HTMLFormElement>('form')!.requestSubmit())
-    expect(onSave.mock.calls[0][0]).toMatchObject({ servings: 1.5, macros: { kcal: 918 } })
+    const patch = onSave.mock.calls[0][0]
+    expect(patch).toMatchObject({ servings: 1.5 })
+    expect('macros' in patch).toBe(false)
+    // through the store: 612 x 1.5
+    seedEntry(entry)
+    act(() => useStore.getState().updateEntry(entry.id, patch))
+    expect(storedEntry(entry.id)?.macros.kcal).toBe(918)
+  })
+
+  it('a typed macro wins, while the untyped numbers keep following the portion', () => {
+    const onSave = vi.fn()
+    act(() => root.render(<TodayEntryEdit entry={yoghurt} unit="kcal" formId="f" onSave={onSave} onBack={() => {}} />))
+    const protein = container.querySelector<HTMLInputElement>('[data-testid="tp-today-edit-protein"]')!
+    act(() => typeInto(protein, '20'))
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="tp-today-edit-portion-pick-250"]')!.click())
+    const k = 250 / 180
+    expect(container.querySelector<HTMLInputElement>('[data-testid="tp-today-edit-kcal"]')?.value).toBe(String(Math.round(175 * k)))
+    expect(protein.value).toBe('20')
+    act(() => container.querySelector<HTMLFormElement>('form')!.requestSubmit())
+    const patch = onSave.mock.calls[0][0]
+    expect(patch.portion).toEqual({ amount: 250, unit: 'g' })
+    expect(patch.macros.protein).toBe(20)
+    expect(patch.macros.kcal).toBe(Math.round(175 * k))
+    expect(patch.macros.carbs).toBeCloseTo(7 * k, 1)
+    expect(patch.macros.fat).toBeCloseTo(9 * k, 1)
+    // through the store: the saved entry matches its new portion, protein as typed
+    seedEntry(yoghurt)
+    act(() => useStore.getState().updateEntry(yoghurt.id, patch))
+    const saved = storedEntry(yoghurt.id)!
+    expect(saved.portion).toEqual({ amount: 250, unit: 'g' })
+    expect(saved.macros.kcal).toBeCloseTo(175 * k, 0)
+    expect(saved.macros.carbs).toBeCloseTo(7 * k, 1)
+    expect(saved.macros.fat).toBeCloseTo(9 * k, 1)
+    expect(saved.macros.protein).toBe(20)
+  })
+
+  it('saving an untouched entry changes nothing and fires no strike', () => {
+    const onSave = vi.fn()
+    const odd: LogEntry = { ...yoghurt, id: 'e3', day: localDayKey(), macros: { kcal: 164.9, protein: 15.04, carbs: 6.6, fat: 8.5 } }
+    act(() => root.render(<TodayEntryEdit entry={odd} unit="kcal" formId="f" onSave={onSave} onBack={() => {}} />))
+    act(() => container.querySelector<HTMLFormElement>('form')!.requestSubmit())
+    const patch = onSave.mock.calls[0][0]
+    expect('macros' in patch).toBe(false)
+    seedEntry(odd)
+    const pulse = useStore.getState().pulse
+    act(() => useStore.getState().updateEntry(odd.id, patch))
+    expect(storedEntry(odd.id)?.macros.kcal).toBeCloseTo(164.9, 6)
+    expect(useStore.getState().pulse).toBe(pulse)
   })
 })

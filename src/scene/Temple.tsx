@@ -8,6 +8,8 @@
  * short phones). `TempleBack` renders behind the canvas, `TempleFront` (the haze) above it and
  * below the inscriptions. The root carries `data-live` while the idle ticker runs (the shaft
  * breathes only then) and `data-over` on an over day (the arch haze turns to ember).
+ * The boot guard flattens it: data-fx="0" drops the masks (and MonumentLayer the parallax), and
+ * the bare level (data-bare="1") does not render it at all.
  * Opening targets: `data-intro="colonnade"` and `data-intro="shaft"` on the wrappers, so the
  * opening's opacity never fights the breathing keyframe on the inner shaft.
  */
@@ -45,6 +47,7 @@ const STYLE = `
 }
 :root.reduce-motion .tp-shaft { animation: none; opacity: 1; }
 :root.reduce-motion .tp-parallax .tp-col-near, :root.reduce-motion .tp-parallax .tp-col-far { transform: none; }
+html[data-fx="0"] .tp-shaft, html[data-fx="0"] .tp-shaft-flare, html[data-fx="0"] .tp-colonnade { -webkit-mask-image: none; mask-image: none; }
 `
 
 /** nine semicircular arches, opening 34 px, pier 10 px, springing at y 250, as one even-odd wall */

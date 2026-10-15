@@ -69,6 +69,11 @@ export function PortionField({ value, unit, onChange, label = 'Portion', max, cl
   const field = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const timer = useRef<number>(0)
+  const abortRef = useRef<AbortController | null>(null)
+  // true once a key has been typed since focus: the frame-time re-select must not swallow it
+  const typed = useRef(false)
+  // Escape blurs to cancel; the blur must not commit the draft it is cancelling
+  const cancelled = useRef(false)
   const latest = useRef(value)
   latest.current = value
 
@@ -110,12 +115,17 @@ export function PortionField({ value, unit, onChange, label = 'Portion', max, cl
       if (trimmed !== '' && trimmed !== formatAmountNumber(latest.current)) shake()
       return
     }
-    if (v !== latest.current) onChange(v)
+    if (v !== latest.current) {
+      latest.current = v
+      onChange(v)
+    }
   }
 
   const stopRepeat = () => {
     window.clearTimeout(timer.current)
     timer.current = 0
+    abortRef.current?.abort()
+    abortRef.current = null
     setHeld(0)
   }
 
@@ -144,17 +154,18 @@ export function PortionField({ value, unit, onChange, label = 'Portion', max, cl
       }, delay)
     }
     timer.current = window.setTimeout(() => loop(REPEAT_EVERY), REPEAT_DELAY)
-    // a button that disables at the limit never sees its own pointerup
-    window.addEventListener('pointerup', stopRepeat, { once: true })
-    window.addEventListener('pointercancel', stopRepeat, { once: true })
+    // a button that disables at the limit never sees its own pointerup; one abort removes both listeners
+    abortRef.current?.abort()
+    const ac = new AbortController()
+    abortRef.current = ac
+    window.addEventListener('pointerup', stopRepeat, { signal: ac.signal })
+    window.addEventListener('pointercancel', stopRepeat, { signal: ac.signal })
   }
   useEffect(
     () => () => {
       window.clearTimeout(timer.current)
-      window.removeEventListener('pointerup', stopRepeat)
-      window.removeEventListener('pointercancel', stopRepeat)
+      abortRef.current?.abort()
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
 
@@ -166,16 +177,21 @@ export function PortionField({ value, unit, onChange, label = 'Portion', max, cl
       onEnter?.()
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setDraft(null)
+      // a typed amount counts: 183 then up is 190, not the old value plus a step
+      if (draft !== null) commit(e.currentTarget.value)
       step(1)
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setDraft(null)
+      if (draft !== null) commit(e.currentTarget.value)
       step(-1)
     } else if (e.key === 'Escape') {
+      // cancel the typing only; the sheet's Escape listener must not see this one
+      e.stopPropagation()
+      cancelled.current = true
       setDraft(null)
       onPreview?.(null)
       input.current?.blur()
+      cancelled.current = false
     }
   }
 
@@ -218,7 +234,7 @@ export function PortionField({ value, unit, onChange, label = 'Portion', max, cl
       {stepButton(-1)}
       <span aria-hidden="true" className="portion-divider" />
       <label className="portion-middle">
-        <span className="sr-only">{`${label} amount`}</span>
+        <span className="sr-only">{`${label} amount in ${unit === 'g' ? 'grams' : unit === 'ml' ? 'millilitres' : 'serves'}`}</span>
         <span className="portion-value">
           <input
             ref={input}
@@ -230,13 +246,26 @@ export function PortionField({ value, unit, onChange, label = 'Portion', max, cl
             enterKeyHint={enterKeyHint}
             value={shown}
             onFocus={(e) => {
+              const el = e.target
+              typed.current = false
               setFocused(true)
               setDraft(formatAmountNumber(value))
-              const el = e.target
-              requestAnimationFrame(() => el.select())
+              // select now, so a key that lands before the next frame replaces the whole value; select
+              // again at frame time (after the re-render, and after iOS undoes the tap's selection)
+              // only while nothing has been typed
+              el.select()
+              requestAnimationFrame(() => {
+                if (!typed.current && document.activeElement === el) el.select()
+              })
               onFocus?.()
             }}
+            // onInput too: typing the digit that is already selected ("1" over "1") changes nothing,
+            // so React skips onChange, but it is still a keystroke the re-select must not swallow
+            onInput={() => {
+              typed.current = true
+            }}
             onChange={(e) => {
+              typed.current = true
               const raw = e.target.value.replace(/[^0-9.,]/g, '').slice(0, 7)
               setDraft(raw)
               if (onPreview) {
@@ -246,6 +275,7 @@ export function PortionField({ value, unit, onChange, label = 'Portion', max, cl
             }}
             onBlur={(e) => {
               setFocused(false)
+              if (cancelled.current) return
               commit(e.target.value)
             }}
             onKeyDown={onKeyDown}

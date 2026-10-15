@@ -13,7 +13,9 @@
  * `{ portion }`; any other entry edits servings with any typed amount and saves `{ servings }`. The
  * fields always show the totals that will be saved: changing the portion (stepping, a pick, or each
  * keystroke while typing) rescales the untouched numbers by newAmount / oldAmount, and a typed number
- * wins from then on. The store scales by the portion first, then the typed macros override.
+ * wins from then on (each field on its own: the untyped ones keep following the portion). With nothing
+ * typed the patch carries no macros, so the store rescales the exact snapshot by the portion (no
+ * rounding drift, no stray strike); once a number is typed all four are sent and override the rescale.
  */
 import { useId, useState, type FormEvent } from 'react'
 import { ChevronLeft } from 'lucide-react'
@@ -24,7 +26,7 @@ import { formatAmount } from '../lib/portion'
 import { formatTime } from '../lib/day'
 import { useStore } from '../store/useStore'
 
-export type EntryPatch = { name: string; macros: Macros; servings?: number; portion?: Portion }
+export type EntryPatch = { name: string; macros?: Macros; servings?: number; portion?: Portion }
 
 type Props = {
   entry: LogEntry
@@ -56,6 +58,8 @@ type PatchInput = {
   protein: string
   carbs: string
   fat: string
+  /** a number field was typed: send the macros; else leave them to the store's portion rescale */
+  typedAny: boolean
 }
 
 /** Builds the patch from the typed strings; null when calories are missing. */
@@ -69,8 +73,9 @@ export function buildEntryPatch(input: PatchInput, unit: EnergyUnit): EntryPatch
     carbs: g(input.carbs),
     fat: g(input.fat),
   }
-  if (input.portionUnit) return { name: input.name, portion: { amount: input.amount, unit: input.portionUnit }, macros }
-  return { name: input.name, servings: input.amount, macros }
+  const typed = input.typedAny ? { macros } : {}
+  if (input.portionUnit) return { name: input.name, portion: { amount: input.amount, unit: input.portionUnit }, ...typed }
+  return { name: input.name, servings: input.amount, ...typed }
 }
 
 type Numbers = { kcal: string; protein: string; carbs: string; fat: string }
@@ -83,7 +88,7 @@ export function TodayEntryEdit({ entry, unit, formId, onSave, onBack }: Props) {
   const [name, setName] = useState(entry.name)
   const [amount, setAmount] = useState(start.amount)
   const [preview, setPreview] = useState<number | null>(null)
-  const [typed, setTyped] = useState<Numbers | null>(null)
+  const [typed, setTyped] = useState<Partial<Numbers>>({})
   const nameId = useId()
 
   // untouched numbers follow the portion (live while typing it)
@@ -95,10 +100,13 @@ export function TodayEntryEdit({ entry, unit, formId, onSave, onBack }: Props) {
     carbs: fmt(entry.macros.carbs * k),
     fat: fmt(entry.macros.fat * k),
   }
-  const nums = typed ?? derived
-  const type = (key: keyof Numbers) => (v: string) => setTyped({ ...(typed ?? derived), [key]: v })
+  const nums: Numbers = { ...derived, ...typed }
+  const type = (key: keyof Numbers) => (v: string) => setTyped((t) => ({ ...t, [key]: v }))
 
-  const patch = buildEntryPatch({ name, amount, portionUnit: start.recorded ? start.unit : undefined, ...nums }, unit)
+  const patch = buildEntryPatch(
+    { name, amount, portionUnit: start.recorded ? start.unit : undefined, ...nums, typedAny: Object.keys(typed).length > 0 },
+    unit,
+  )
   const changed = Math.abs(amount - start.amount) > 1e-9
 
   const submit = (e: FormEvent) => {

@@ -250,8 +250,8 @@ function ViewerBody({ photo, canCompare, flush, onCompare, onDeleted, onNoteSave
       <div
         className="bracketed lg mx-auto mt-1 rounded-[4px] p-1.5"
         style={{
-          width: `min(100%, calc(58svh * ${ratio.toFixed(4)} + 12px))`,
-          background: 'linear-gradient(180deg, #17171E, #0D0D12)',
+          width: `min(100%, calc((min(92svh, var(--vv-h)) - 256px) * ${ratio.toFixed(4)} + 12px))`,
+          background: 'linear-gradient(180deg, var(--color-tablet-hi), var(--color-tablet-lo))',
           boxShadow: '0 0 0 1px #2A2A33, 0 0 0 2px rgba(0,0,0,0.8), 0 20px 40px -20px rgba(0,0,0,0.9)',
         }}
       >
@@ -343,7 +343,7 @@ export function HistoryPhotoViewer({ photo, open, canCompare, onClose, onCompare
     onClose()
   }, [onClose])
   const sheet = (
-    <Sheet open={open} onClose={close} title={formatDayLong(photo.day)} height="tall" closeLabel="Close photo">
+    <Sheet open={open} onClose={close} title={formatDayLong(photo.day)} height="auto" closeLabel="Close photo">
       <ViewerBody photo={photo} canCompare={canCompare} flush={flush} onCompare={onCompare} onDeleted={onDeleted} onNoteSaved={onNoteSaved} />
     </Sheet>
   )

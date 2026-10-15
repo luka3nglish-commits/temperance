@@ -18,7 +18,7 @@ type Props = {
   children: ReactNode
   /** sticky footer inside the sheet; stays above the keyboard; rows dissolve under it */
   footer?: ReactNode
-  /** 'tall' = min(92svh, --vv-h); 'auto' = content height up to the same cap */
+  /** 'tall' = min(92svh, --vv-h minus the toast lane); 'auto' = content height up to the same cap */
   height?: 'tall' | 'auto'
   /** label for the close button */
   closeLabel?: string
@@ -137,9 +137,11 @@ export function Sheet({
     installVisualViewport()
   }, [])
 
-  // the open count the Toaster reads
+  // the open count the Toaster reads (App makes the frame behind a sheet inert on it). The opener is
+  // taken first: once the frame goes inert, a focused control inside it loses focus.
   useEffect(() => {
     if (!open) return
+    restoreFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     useSheets.getState().add()
     return () => useSheets.getState().remove()
   }, [open])
@@ -148,8 +150,14 @@ export function Sheet({
   useEffect(() => {
     if (open) {
       setMounted(true)
-      const id = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)))
-      return () => cancelAnimationFrame(id)
+      let inner = 0
+      const outer = requestAnimationFrame(() => {
+        inner = requestAnimationFrame(() => setShown(true))
+      })
+      return () => {
+        cancelAnimationFrame(outer)
+        cancelAnimationFrame(inner)
+      }
     }
     setShown(false)
     if (!mounted) return
@@ -175,10 +183,10 @@ export function Sheet({
     if (canAnimate(scrimRef.current)) scrimRef.current.animate([{ opacity: 0 }, { opacity: 1 }], timing)
   }, [mounted, open])
 
-  // focus moves into the dialog and returns to the opener on close
+  // focus moves into the dialog and returns to the opener on close (the opener is taken when it opens,
+  // above; this cleanup runs after the sheet has left useSheets, so the frame is no longer inert)
   useEffect(() => {
     if (!mounted || !open) return
-    restoreFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const panel = panelRef.current
     const id = window.setTimeout(() => {
       if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true })
@@ -266,7 +274,8 @@ export function Sheet({
   if (!mounted) return null
 
   const pinned = kbUp && open
-  const cap = 'min(92svh, var(--vv-h))'
+  // clear the top-docked toast lane: its 12 px offset, the 56 px toast and a 12 px gap
+  const cap = 'min(92svh, calc(var(--vv-h) - var(--safe-top) - 80px))'
   const transform = reduced ? 'none' : shown ? 'translateY(0)' : 'translateY(100%)'
   const showOrnament = ornament && !!title
 
@@ -332,8 +341,13 @@ export function Sheet({
         </div>
         <div
           id={contentId}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 scrollbar-none"
+          className="sheet-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 scrollbar-none"
           style={{ '--stagger-delay': '120ms' } as CSSProperties}
+          onScroll={(e) => {
+            const el = e.currentTarget
+            const v = el.scrollTop > 0 ? '1' : ''
+            if ((el.dataset.scrolled ?? '') !== v) el.dataset.scrolled = v
+          }}
         >
           {children}
         </div>

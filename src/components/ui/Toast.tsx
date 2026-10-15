@@ -108,7 +108,7 @@ export function Toaster() {
           key={item.id}
           data-testid={exiting ? undefined : 'tp-toast'}
           data-key={item.key}
-          className={`tablet pointer-events-auto flex min-h-14 w-[min(358px,calc(100%-32px))] items-stretch py-0 pr-1.5 pl-4 ${
+          className={`tablet pointer-events-auto flex min-h-14 w-full max-w-[358px] items-stretch py-0 pr-1.5 pl-4 ${
             item.tone === 'warn' ? 'border-[var(--ember-edge)]' : 'border-[var(--gold-line-strong)]'
           }`}
           style={

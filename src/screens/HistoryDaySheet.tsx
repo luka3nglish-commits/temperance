@@ -148,13 +148,13 @@ function SwipeRow({ entry, unit, onDelete }: { entry: LogEntry; unit: EnergyUnit
         <Trash2 size={22} strokeWidth={1.5} className={armed ? 'text-ember' : 'text-ember-text'} />
       </div>
       <div
-        className="relative grid h-14 select-none grid-cols-[14px_minmax(0,1fr)_auto_44px] items-center"
+        className="relative grid h-[60px] select-none grid-cols-[14px_minmax(0,1fr)_auto_44px] items-center"
         style={{
           transform: `translateX(${dx}px)`,
           transition: dragging ? 'none' : 'transform var(--t-sheet-out) var(--ease-stone)',
           touchAction: 'pan-y',
           // opaque only while it slides, so at rest it shows the sheet's own lit gradient
-          background: moved ? '#0B0B0F' : 'transparent',
+          background: moved ? 'var(--color-obsidian-900)' : 'transparent',
         }}
         onPointerDown={onDown}
         onPointerMove={onMove}

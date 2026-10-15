@@ -5,9 +5,11 @@
  * number scrim: the shaft, colonnade and pools belong to the scene.
  *
  * Vertical rhythm, relative to the top safe area (the spec assumes 47 px):
- *   header 40 | stage 460 (the monument, shrinks to a 280 px floor) | ring row 132 | stoic (flex, 67 floor) | air 64 + safe bottom
- * The non-stage rows add up to the 303 px the monument layer budgets for when it scales the stage on a
- * short phone, so the inscriptions and the scaled monument stay registered. Under 700 px tall the
+ *   header 40 | stage 460 (the monument, shrinks to a 280 px floor) | ring row 132 | stoic (flex; floor
+ *   108 on a frame of 780 px and up, 67 below, stoicMinFor) | air 72 + safe bottom (bar 56, the keystone
+ *   rising 8 above it, 8 of air)
+ * The non-stage rows add up to the 352 px (tall) or 311 px (short) the monument layer budgets for when
+ * it scales the stage, so the inscriptions and the scaled monument stay registered. Under 700 px tall the
  * number drops to 72 px and the flanks tighten; under 372 px wide the ring row goes compact.
  * The final layout IS the home screen: nothing re-lays out after the opening.
  */
@@ -66,8 +68,8 @@ export function TodayScreen() {
       <TodayRingRow totals={totals} targets={settings.targets} compact={narrow} onOpen={openToday} />
       <TodayStoic today={today} />
 
-      {/* 8 px of air above the tab bar (56 px) and the bottom safe area */}
-      <div aria-hidden="true" className="shrink-0" style={{ flex: '0 0 calc(64px + var(--safe-bottom))' }} />
+      {/* the tab bar (56 px), the keystone rising 8 px above it, 8 px of air, and the bottom safe area */}
+      <div aria-hidden="true" className="shrink-0" style={{ flex: '0 0 calc(72px + var(--safe-bottom))' }} />
 
       <TodayGoalLabel goal={settings.goalKcal} unit={settings.unit} />
       <TodaySheet today={today} />

@@ -132,14 +132,15 @@ const STYLE = `
 }
 .tp-svg-dust { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: ${COL.dust}; opacity: 0; visibility: hidden; pointer-events: none; }
 .tp-svg-dust.on { animation: tpDustRise 800ms var(--ease-stone) forwards; will-change: transform, opacity; }
-.tp-svg-band { animation: tpBandSweep var(--t-light-sweep) linear infinite; }
+.tp-svg-band { animation: tpBandSweep var(--t-light-sweep) linear infinite; animation-play-state: paused; }
+[data-live] .tp-svg-band { animation-play-state: running; }
 .tp-svg-crack { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset var(--t-crack) var(--ease-stone); }
 .tp-svg-crack.on { stroke-dashoffset: 0; }
 .tp-svg-paused .tp-svg-band { animation-play-state: paused; }
 `
 
 type Props = {
-  /** the webgl canvas has joined: fade out over 200 ms (or at once) and stop rendering */
+  /** the webgl canvas has joined: fade out over 400 ms (or at once) and stop rendering */
   hidden?: boolean
   /** crossfade the hide (late join) rather than cutting (early join) */
   crossfade?: boolean
@@ -345,10 +346,10 @@ export function FallbackMonument({ hidden = false, crossfade = true, standalone 
       data-svg-monument
       className={`absolute inset-0 ${dim} ${hidden ? 'tp-svg-paused' : ''}`}
       style={{
-        transition: crossfade ? 'opacity 200ms var(--ease-stone)' : 'none',
+        transition: crossfade ? 'opacity 400ms var(--ease-stone)' : 'none',
         visibility: hidden ? 'hidden' : 'visible',
         transitionProperty: crossfade ? 'opacity, visibility' : 'none',
-        transitionDelay: hidden && crossfade ? '0ms, 200ms' : '0ms',
+        transitionDelay: hidden && crossfade ? '0ms, 400ms' : '0ms',
         pointerEvents: 'none',
       }}
     >
@@ -427,6 +428,9 @@ export function FallbackMonument({ hidden = false, crossfade = true, standalone 
           <g stroke="#E6CB78" strokeOpacity="0.9" strokeWidth="1" fill="none">
             <polygon points={pts(DIE_TOP)} />
             <line x1={DIE_FRONT[3][0]} y1={DIE_FRONT[3][1]} x2={DIE_FRONT[2][0]} y2={DIE_FRONT[2][1]} />
+            {/* the two broader steps catch the same light along their front top edges, as in 3D */}
+            <line x1={S2_FRONT[0][0]} y1={S2_FRONT[0][1]} x2={S2_FRONT[1][0]} y2={S2_FRONT[1][1]} strokeOpacity="0.6" />
+            <line x1={S3_FRONT[0][0]} y1={S3_FRONT[0][1]} x2={S3_FRONT[1][0]} y2={S3_FRONT[1][1]} strokeOpacity="0.6" />
           </g>
           <text
             x="0"
@@ -466,11 +470,11 @@ export function FallbackMonument({ hidden = false, crossfade = true, standalone 
           </clipPath>
           <g ref={ghost} clipPath="url(#tpGhostClip)" style={{ opacity: 0 }}>
             <rect x={-46} y={SVG_GOAL_Y} width={92} height={STAGE_PLINTH_Y - SVG_GOAL_Y} fill="url(#tpGhostFill)" />
-            <g stroke="#D8B45A" strokeWidth="1.25" opacity="0.5">
+            <g stroke="#D8B45A" strokeWidth="1" opacity="0.22">
               <line x1={-46} x2={-46} y1={SVG_GOAL_Y} y2={STAGE_PLINTH_Y} />
               <line x1={46} x2={46} y1={SVG_GOAL_Y} y2={STAGE_PLINTH_Y} />
             </g>
-            <g stroke="#D8B45A" strokeWidth="1" opacity="0.14">
+            <g stroke="#D8B45A" strokeWidth="1" opacity="0.08">
               {[-0.81, -0.31, 0.31, 0.81].map((k) => (
                 <line key={k} x1={k * 46} x2={k * 46} y1={SVG_GOAL_Y} y2={STAGE_PLINTH_Y} />
               ))}
@@ -498,27 +502,30 @@ export function FallbackMonument({ hidden = false, crossfade = true, standalone 
           <clipPath id="tpCrackClip">
             <rect ref={crackClip} x={-HALF_W - 20} y={SVG_GOAL_Y} width={COL_W + 40} height="0" />
           </clipPath>
-          <g
-            clipPath="url(#tpCrackClip)"
-            fill="none"
-            stroke={COL.ember}
-            strokeWidth="1.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={high ? { filter: 'drop-shadow(0 0 6px var(--ember-glow))' } : undefined}
-            transform={`translate(0 ${SVG_GOAL_Y}) scale(${(COL_W / 112).toFixed(3)} 1)`}
-          >
-            {CRACK_PATHS.map((d, i) => (
-              <path
-                key={i}
-                ref={(el) => {
-                  cracks.current[i] = el
-                }}
-                d={d}
-                pathLength={1}
-                className="tp-svg-crack"
-              />
-            ))}
+          {/* the clip sits on an untransformed wrapper: a userSpaceOnUse clip resolves in the
+              referencing element's own space, and the crack group below is translated to the seam */}
+          <g clipPath="url(#tpCrackClip)">
+            <g
+              fill="none"
+              stroke={COL.ember}
+              strokeWidth="1.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={high ? { filter: 'drop-shadow(0 0 6px var(--ember-glow))' } : undefined}
+              transform={`translate(0 ${SVG_GOAL_Y}) scale(${(COL_W / 112).toFixed(3)} 1)`}
+            >
+              {CRACK_PATHS.map((d, i) => (
+                <path
+                  key={i}
+                  ref={(el) => {
+                    cracks.current[i] = el
+                  }}
+                  d={d}
+                  pathLength={1}
+                  className="tp-svg-crack"
+                />
+              ))}
+            </g>
           </g>
 
           {/* the goal collar */}

@@ -5,7 +5,7 @@ import { startTilt } from './lib/tilt'
 import { TabBar } from './components/TabBar'
 import { Backdrop } from './components/Backdrop'
 import { Shards } from './components/ui/Shards'
-import { Toaster } from './components/ui'
+import { Toaster, useSheets } from './components/ui'
 import { MonumentLayer } from './scene/MonumentLayer'
 import { Opening } from './intro/Opening'
 import { TodayScreen } from './screens/TodayScreen'
@@ -59,6 +59,17 @@ export default function App() {
   const [phase, setPhase] = useState<'idle' | 'out' | 'in'>('idle')
   const dir = useRef(0)
   const wipeRef = useRef<HTMLDivElement>(null)
+  // while a sheet is open the frame behind it is inert, so Tab and switch access stay in the dialog.
+  // Set imperatively and synchronously (never as a render prop) so the sheet's focus restore on close
+  // runs after the frame is live again.
+  const frameRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const apply = (n: number) => {
+      if (frameRef.current) frameRef.current.inert = n > 0
+    }
+    apply(useSheets.getState().open)
+    return useSheets.subscribe((s) => apply(s.open))
+  }, [])
   useEffect(() => {
     if (tab === shown) return
     // reduced motion: transitions are zeroed globally, so a fade-out phase would only blank the frame; swap at once
@@ -100,7 +111,9 @@ export default function App() {
   return (
     <div className="relative min-h-dvh bg-obsidian-950 md:bg-[#040406] md:[background-image:radial-gradient(60%_50%_at_50%_40%,rgba(216,180,90,0.06),transparent_70%)]">
       <Backdrop />
-      <div className="relative mx-auto h-dvh w-full max-w-[430px] overflow-hidden md:h-[min(100vh,932px)] md:shadow-[0_0_0_1px_#1A1A21,0_0_0_2px_rgba(216,180,90,0.06),0_40px_120px_rgba(0,0,0,0.8)]">
+      <div
+        ref={frameRef}
+        className="relative mx-auto h-dvh w-full max-w-[430px] overflow-hidden md:h-[min(100vh,932px)] md:shadow-[0_0_0_1px_#1A1A21,0_0_0_2px_rgba(216,180,90,0.06),0_40px_120px_rgba(0,0,0,0.8)]">
         <MonumentLayer visible={shown === 'today' && !kit} />
         <main
           id="main"

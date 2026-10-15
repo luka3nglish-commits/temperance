@@ -98,11 +98,22 @@ const cutNumber = (tl: gsap.core.Timeline, el: HTMLElement | undefined, at: numb
   )
 }
 
-/** Shards fade in while the glint band sweeps once from the top left to the bottom right. */
-const revealShards = (tl: gsap.core.Timeline, el: HTMLElement | undefined, at: number, fadeDur: number, sweepDur: number, onTilt: (x: number) => void) => {
+/**
+ * Shards fade in while the glint band sweeps once from the top left to the bottom right, and the
+ * glint strength (`--shard-glint` on the shards root, 0.4 at rest) flares 0 to 0.8 over `glintHalf`
+ * then settles to 0.4 over the same again (polish-spec 3.5). Finite, on the shards root only, never
+ * :root; a skip clears the inline value through clearTargetStyles.
+ */
+const revealShards = (tl: gsap.core.Timeline, el: HTMLElement | undefined, at: number, fadeDur: number, sweepDur: number, glintHalf: number, onTilt: (x: number) => void) => {
   if (!el) return
   tl.to(el, { opacity: 1, duration: ms(fadeDur), ease: 'none', clearProps: 'opacity' }, ms(at))
   if (featureOff('sweep')) return
+  tl.fromTo(el, { '--shard-glint': 0 }, { '--shard-glint': 0.8, duration: ms(glintHalf), ease: 'power1.out' }, ms(at))
+  tl.to(
+    el,
+    { '--shard-glint': 0.4, duration: ms(glintHalf), ease: 'power1.inOut', onComplete: () => el.style.removeProperty('--shard-glint') },
+    ms(at + glintHalf),
+  )
   const sweep = { x: -1 }
   tl.to(
     sweep,
@@ -230,8 +241,9 @@ export function buildFull(input: BuildInput): gsap.core.Timeline {
   riseIn(tl, targets.colonnade, 0, 900, 6)
   fadeIn(tl, targets.shaft, 120, 700)
 
-  // S2 the shards: fade 120 to 420, glint sweep 120 to 720, then the tilt loop takes the light back
-  revealShards(tl, targets.shards, 120, 300, 600, onTilt)
+  // S2 the shards: fade 120 to 420, glint 0 to 0.8 (120 to 420) then 0.4 (420 to 720), sweep 120 to
+  // 720, then the tilt loop takes the light back
+  revealShards(tl, targets.shards, 120, 300, 600, 300, onTilt)
   tl.call(() => input.releaseTilt(), [], ms(720))
 
   // S3 the line: the gold goal slab draws 300 to 1020; its label follows the slab's landing
@@ -326,7 +338,7 @@ export function buildShort(input: BuildInput): gsap.core.Timeline {
     [],
     0,
   )
-  revealShards(tl, targets.shards, 0, 200, 500, onTilt)
+  revealShards(tl, targets.shards, 0, 200, 500, 150, onTilt)
   tl.call(() => input.releaseTilt(), [], ms(500))
   riseIn(tl, targets.colonnade, 0, 400, 6)
   fadeIn(tl, targets.shaft, 0, 400)

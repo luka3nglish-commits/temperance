@@ -234,6 +234,8 @@ export function LogSheet() {
 
   const onEditFirst = useCallback(
     (e: LogEntry) => {
+      // a long-press timer landing during the close animation must not reopen the sheet
+      if (!useUI.getState().logOpen) return
       editRef.current = e
       openLog({ name: e.name, macros: perServingMacros(e), servings: e.servings, mealId: liveMealFor(e, meals)?.id, mode: 'quick' })
     },

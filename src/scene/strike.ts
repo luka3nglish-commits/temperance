@@ -575,8 +575,10 @@ export class Monument {
   }
 
   /**
-   * Per-frame integration. `dt` seconds, clamped by the caller. Returns true while something is
-   * still in motion (trauma or a crack pulse) so a demand loop can keep asking for frames.
+   * Per-frame integration. `dt` seconds, clamped by the caller. Returns true while trauma is
+   * decaying, so a demand loop keeps asking for frames only then. The crack pulse advances on frames
+   * something else already asked for (the demand ticker, a strike, the opening); it never keeps the
+   * loop alive on its own, so an over-goal day still rests (the 90 s rule and the ticker cap hold).
    */
   tick(dt: number, idleOn: boolean, reduced: boolean, turnRate = 0.035): boolean {
     const m = this.mon
@@ -599,7 +601,6 @@ export class Monument {
     if (m.crack > 0) {
       m.crackTime += dt
       m.emberPulse += dt
-      moving = moving || idleOn
     }
     return moving
   }

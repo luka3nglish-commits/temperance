@@ -56,7 +56,7 @@ function PhotoTile({ photo, today, selecting, mark, onTap }: TileProps) {
         </span>
         {mark ? (
           <>
-            <span aria-hidden="true" className="absolute inset-0 rounded-[2px] shadow-[inset_0_0_0_2px_#E6CB78]" />
+            <span aria-hidden="true" className="absolute inset-0 rounded-[2px] shadow-[inset_0_0_0_2px_var(--color-gold-300)]" />
             <span aria-hidden="true" className="font-display gold-fill engraved absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-[2px] text-[12px] font-bold leading-none">
               {mark}
             </span>

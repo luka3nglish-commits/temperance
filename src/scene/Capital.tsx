@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BoxGeometry, type Group, LatheGeometry, TorusGeometry, Vector2 } from 'three'
+import { BoxGeometry, type Group, LatheGeometry, type Mesh, TorusGeometry, Vector2 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { useBus } from './bus'
 import { createGoldMaterial, createObsidianMaterial, type ObsidianUniforms } from './obsidianMaterial'
@@ -28,6 +28,7 @@ const ABACUS_H = 0.045
 export function Capital({ uniforms, lathe }: { uniforms: ObsidianUniforms; lathe: number }) {
   const bus = useBus()
   const group = useRef<Group>(null)
+  const abacus = useRef<Mesh>(null)
   const goldGeo = useMemo(() => {
     const echinus = new LatheGeometry(ECHINUS.map(([r, y]) => new Vector2(r, y)), Math.max(24, Math.round(lathe * 0.75)))
     const astragal = new TorusGeometry(0.37, 0.016, 10, 96)
@@ -44,7 +45,14 @@ export function Capital({ uniforms, lathe }: { uniforms: ObsidianUniforms; lathe
     return g
   }, [])
   const gold = useMemo(() => createGoldMaterial(), [])
-  const stone = useMemo(() => createObsidianMaterial({ color: COL.column, roughness: 0.22, fluteOn: 0, f0: 0.3, reflect: 1.6, rim: 0.18, uniforms }), [uniforms])
+  // the abacus cancels the idle turn on its mesh, so its crack field must not un-turn either: its own
+  // uTurn stays 0 while every other entry is the shaft's shared uniform (uCrack, uTime still flow).
+  // f0 and reflect are per material: a softer sheen than the shaft so the slab reads as obsidian.
+  const stone = useMemo(
+    () =>
+      createObsidianMaterial({ color: COL.column, roughness: 0.22, fluteOn: 0, f0: 0.12, reflect: 0.6, rim: 0.18, uniforms: { ...uniforms, uTurn: { value: 0 } } }),
+    [uniforms],
+  )
   useEffect(() => () => goldGeo.dispose(), [goldGeo])
   useEffect(
     () => () => {
@@ -66,13 +74,16 @@ export function Capital({ uniforms, lathe }: { uniforms: ObsidianUniforms; lathe
       g.scale.setScalar(Math.max(0.0001, s))
       g.visible = rh > 0.001
     }
+    // the square abacus stays square to the plinth: it cancels the idle turn it inherits (the round
+    // gold lathe parts keep turning, where it cannot show)
+    if (abacus.current) abacus.current.rotation.y = -mon.rotY
     gold.emissiveIntensity = mon.capital
   })
 
   return (
     <group ref={group}>
       <mesh geometry={goldGeo} material={gold} />
-      <mesh geometry={abacusGeo} material={stone} />
+      <mesh ref={abacus} geometry={abacusGeo} material={stone} />
     </group>
   )
 }

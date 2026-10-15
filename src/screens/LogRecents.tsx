@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { SquarePlus } from 'lucide-react'
 import type { EnergyUnit, LogEntry } from '../lib/types'
 import { recentKey } from '../store/selectors'
@@ -131,6 +131,15 @@ function RecentRow({ entry, unit, newest, rising, reduced, menuOpen, onMenu, onR
     a.onfinish = () => onHide()
     a.oncancel = () => onHide()
   }
+
+  // RECENT unmounts when the sheet closes: a pending long-press must never fire after the row is gone
+  useEffect(
+    () => () => {
+      if (press.current) window.clearTimeout(press.current.timer)
+      press.current = null
+    },
+    [],
+  )
 
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return

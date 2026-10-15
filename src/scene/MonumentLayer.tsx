@@ -14,6 +14,7 @@ import { useUI } from '../store/useUI'
 import { localDayKey } from '../lib/day'
 import { useToday } from '../lib/useToday'
 import { isReducedMotion, useReducedMotion } from '../lib/motion'
+import { featureOff, isBare } from '../lib/boot'
 import { totalsForDay } from '../store/selectors'
 import { BusContext, createBus } from './bus'
 import { type MonumentHandle, type MonumentMode, setMonumentHandle } from './handle'
@@ -70,11 +71,11 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
   // the demand ticker: created in an effect (it owns window listeners), never during render
   const tickerRef = useRef<Ticker | null>(null)
   const idleRef = useRef(false)
-  const modeRef = useRef(mode)
-  modeRef.current = mode
   const applyIdle = useCallback(() => {
     bus.idle = idleRef.current
-    tickerRef.current?.setEnabled(idleRef.current && modeRef.current === 'webgl' && !isReducedMotion())
+    // both modes: in SVG mode the ticks are no-ops (no sceneInvalidate), but the ticker still owns
+    // data-live under its gates, so the SVG light band and the temple shaft stop at rest too
+    tickerRef.current?.setEnabled(idleRef.current && !isReducedMotion())
   }, [bus])
 
   useEffect(() => {
@@ -420,8 +421,12 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
         data-mode={mode}
         data-ready={ready ? 'true' : 'false'}
         aria-hidden="true"
-        className="pointer-events-none absolute left-0 w-full z-[var(--z-canvas)]"
+        className="pointer-events-none absolute z-[var(--z-canvas)]"
         style={{
+          // scaled stages (short phones): widen the box by 1/k about the centre so that after
+          // scale(k) it still spans the whole frame, and the goal line reaches both gutters
+          left: scale === 1 ? 0 : `${(50 - 50 / scale).toFixed(3)}%`,
+          width: scale === 1 ? '100%' : `${(100 / scale).toFixed(3)}%`,
           top: 'var(--safe-top)',
           height: STAGE_H,
           visibility: visible ? 'visible' : 'hidden',
@@ -431,11 +436,12 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
           WebkitMaskImage: DEBUG.nomask ? undefined : STAGE_MASK,
         }}
       >
-        {DEBUG.notemple ? null : <TempleBack parallax={parallax} />}
+        {/* safe level 2 (bare) drops the temple; fx=0 drops its parallax (and Temple.tsx its masks) */}
+        {DEBUG.notemple || isBare() ? null : <TempleBack parallax={parallax && !featureOff('fx')} />}
         {showCanvas ? (
           <div
             className="absolute inset-0"
-            style={{ opacity: joined ? 1 : 0, transition: lateJoin ? 'opacity 200ms var(--ease-stone)' : 'none' }}
+            style={{ opacity: joined ? 1 : 0, transition: lateJoin ? 'opacity 400ms var(--ease-stone)' : 'none' }}
           >
             <SafeCanvas settings={mountSettings} onFallback={onFallback} onRemount={onRemount}>
               <ColumnScene bus={bus} settings={mountSettings} onReady={onSceneReady} />
@@ -443,7 +449,7 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
           </div>
         ) : null}
         <FallbackMonument hidden={showCanvas && joined} crossfade={lateJoin} />
-        {DEBUG.notemple ? null : <TempleFront />}
+        {DEBUG.notemple || isBare() ? null : <TempleFront />}
       </div>
     </BusContext.Provider>
   )

@@ -175,6 +175,9 @@ type ActionsProps = {
   note: ReactNode
 }
 
+/** Under 380 px the half-width EDIT and FAVOURITE buttons take 12 px sides and a 6 px gap so FAVOURITE fits whole. */
+const NARROW_PAD = 'max-[379px]:px-3! max-[379px]:gap-1.5'
+
 /** LOG (gold) with its meta line, then EDIT and FAVOURITE side by side, DELETE under them, then the note. */
 function Actions({ kind, onLog, meta, onEdit, favourite, onFavourite, del, note }: ActionsProps) {
   return (
@@ -186,13 +189,14 @@ function Actions({ kind, onLog, meta, onEdit, favourite, onFavourite, del, note 
         {meta}
       </p>
       <div className="mt-5 grid grid-cols-2 gap-3">
-        <Button variant="hairline" size="lg" full data-testid={`tp-${kind}-detail-edit`} icon={<Pencil size={16} strokeWidth={1.5} />} onClick={onEdit}>
+        <Button variant="hairline" size="lg" full className={NARROW_PAD} data-testid={`tp-${kind}-detail-edit`} icon={<Pencil size={16} strokeWidth={1.5} />} onClick={onEdit}>
           Edit
         </Button>
         <Button
           variant="hairline"
           size="lg"
           full
+          className={NARROW_PAD}
           data-testid={`tp-${kind}-detail-fav`}
           aria-pressed={favourite}
           icon={<Star size={16} strokeWidth={1.5} className={favourite ? 'fill-current' : ''} />}
@@ -255,7 +259,6 @@ function MealDetail({ meal, onClose, onEdit, onBuild }: { meal: Meal; onClose():
   })
 
   const components = meal.kind === 'built' ? meal.components ?? [] : []
-  const logFactor = unit === 'serve' && !meal.per ? amount : amount / base
 
   return (
     <div
@@ -283,7 +286,7 @@ function MealDetail({ meal, onClose, onEdit, onBuild }: { meal: Meal; onClose():
       <Actions
         kind="meal"
         onLog={log}
-        meta={`${formatAmount(amount, unit)} · ${energyText(meal.macros.kcal * logFactor, eu)}`}
+        meta={`${formatAmount(shown, unit)} · ${energyText(scaled.kcal, eu)}`}
         onEdit={onEdit}
         favourite={meal.favourite}
         onFavourite={() => {
@@ -352,7 +355,6 @@ function IngredientDetail({ ingredient, onClose, onEdit }: { ingredient: Ingredi
   const [preview, setPreview] = useState<number | null>(null)
   const shown = preview ?? amount
   const scaled = useMemo(() => ingredientMacrosFor(ingredient, shown), [ingredient, shown])
-  const logged = useMemo(() => ingredientMacrosFor(ingredient, amount), [ingredient, amount])
 
   const log = () => {
     // the entry records the amount eaten (180 g), so the TODAY sheet and recents can show it
@@ -395,7 +397,7 @@ function IngredientDetail({ ingredient, onClose, onEdit }: { ingredient: Ingredi
       <Actions
         kind="ingredient"
         onLog={log}
-        meta={`${formatAmount(amount, unit)} · ${energyText(logged.kcal, eu)}`}
+        meta={`${formatAmount(shown, unit)} · ${energyText(scaled.kcal, eu)}`}
         onEdit={onEdit}
         favourite={ingredient.favourite}
         onFavourite={() => {

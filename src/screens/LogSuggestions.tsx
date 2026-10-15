@@ -39,7 +39,7 @@ export function LogSuggestions({ query, entries, unit, onPick, max = 5 }: Props)
   if (!hits.length) return null
 
   return (
-    <div role="listbox" aria-label="Suggestions" className="chip-row -mx-5 mt-2 px-5">
+    <div role="group" aria-label="Suggestions" className="chip-row -mx-5 mt-2 px-5">
       {hits.map((e) => {
         const label = portionLabel(e)
         const spoken = portionAria(e)
@@ -47,8 +47,6 @@ export function LogSuggestions({ query, entries, unit, onPick, max = 5 }: Props)
         return (
           <Chip
             key={e.id}
-            role="option"
-            aria-selected="false"
             testId={`tp-suggest-${e.id}`}
             aria-label={`${e.name}${spoken ? `, ${spoken}` : ''}, ${energy}`}
             onClick={() => onPick(e)}

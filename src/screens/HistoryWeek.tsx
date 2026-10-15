@@ -150,8 +150,8 @@ export function MacroReadouts({ macros, className = '' }: { macros: Macros; clas
 
 // ---------- rows ----------
 
-/** One week-list grid: mark 14, day 72, figures, delta. */
-const ROW_GRID = 'grid grid-cols-[14px_72px_minmax(0,1fr)_auto] items-center'
+/** One week-list grid: mark 14, day 72, energy 96 (right-aligned), protein, delta. */
+const ROW_GRID = 'grid grid-cols-[14px_72px_96px_minmax(0,1fr)_auto] items-center'
 
 type RowProps = {
   d: DaySummary
@@ -184,7 +184,7 @@ export function DayRow({ d, entries, today, goalKcal, unit, open, onToggle, onOp
       <li data-testid={`tp-history-day-${d.day}`} data-tracked="false" className={`row-rule ${ROW_GRID} h-14`}>
         <span className="flex items-center">{isToday ? <Rhombus solid /> : null}</span>
         <span className={stampCls}>{text}</span>
-        <span className="hint col-span-2 text-bone-mute">Nothing logged.</span>
+        <span className="hint col-span-3 text-bone-mute">Nothing logged.</span>
       </li>
     )
   }
@@ -200,12 +200,10 @@ export function DayRow({ d, entries, today, goalKcal, unit, open, onToggle, onOp
       >
         <span className="flex items-center">{isToday ? <Rhombus solid /> : null}</span>
         <span className={stampCls}>{text}</span>
-        <span className="flex min-w-0 items-baseline gap-3">
-          <span data-testid="tp-history-day-kcal" data-kcal={Math.round(d.totals.kcal)} className="inline-flex">
-            <ValueUnit value={formatEnergy(d.totals.kcal, unit)} unit={unitLabel(unit)} size={17} tone={isToday ? 'gold' : 'bone'} />
-          </span>
-          <span className="meta truncate">P {Math.round(d.totals.protein)}</span>
+        <span data-testid="tp-history-day-kcal" data-kcal={Math.round(d.totals.kcal)} className="flex justify-end">
+          <ValueUnit value={formatEnergy(d.totals.kcal, unit)} unit={unitLabel(unit)} size={17} tone={isToday ? 'gold' : 'bone'} />
         </span>
+        <span className="meta truncate pl-3">P {Math.round(d.totals.protein)}</span>
         <span className="flex items-center justify-end">
           <Delta kcal={d.totals.kcal} goalKcal={goalKcal} unit={unit} testId="tp-history-day-delta" />
         </span>

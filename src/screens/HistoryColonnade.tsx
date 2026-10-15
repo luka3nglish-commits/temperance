@@ -82,8 +82,8 @@ export function HistoryColonnade({ days, goalKcal, today, unit, onPick, empty = 
       {/* the stylobate: one stone step under every column, a gold top edge, then a shadow */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0" style={{ top: COL_H, height: STYLOBATE_H }}>
         <div className="h-px" style={{ background: 'rgba(216,180,90,0.42)' }} />
-        <div className="h-[3px]" style={{ background: '#121218' }} />
-        <div className="h-[2px]" style={{ background: '#0B0B0F' }} />
+        <div className="h-[3px]" style={{ background: 'var(--color-obsidian-800)' }} />
+        <div className="h-[2px]" style={{ background: 'var(--color-obsidian-900)' }} />
       </div>
 
       {/* the goal: a fixed gold hairline across the whole strip, labelled at the right gutter */}
@@ -91,7 +91,7 @@ export function HistoryColonnade({ days, goalKcal, today, unit, onPick, empty = 
       <span
         aria-hidden="true"
         className="font-display pointer-events-none absolute z-[2] text-[12px] font-bold uppercase leading-none tracking-[0.08em] text-gold-300"
-        style={{ top: GOAL_TOP - 17, right: GUTTER, textShadow: '0 0 3px #050507, 0 0 8px #050507' }}
+        style={{ top: GOAL_TOP - 17, right: GUTTER, textShadow: '0 0 3px var(--color-obsidian-950), 0 0 8px var(--color-obsidian-950)' }}
       >
         Goal
       </span>
@@ -114,8 +114,8 @@ export function HistoryColonnade({ days, goalKcal, today, unit, onPick, empty = 
           paddingRight: GUTTER - GAP,
           WebkitOverflowScrolling: 'touch',
           // columns scrolled past the gutters fade out instead of being cut
-          maskImage: `linear-gradient(90deg, transparent 0, transparent 6px, #000 ${GUTTER + 2}px, #000 calc(100% - ${GUTTER - GAP}px), transparent 100%)`,
-          WebkitMaskImage: `linear-gradient(90deg, transparent 0, transparent 6px, #000 ${GUTTER + 2}px, #000 calc(100% - ${GUTTER - GAP}px), transparent 100%)`,
+          maskImage: `linear-gradient(90deg, transparent 0, transparent 14px, #000 ${GUTTER - 2}px, #000 calc(100% - ${GUTTER - GAP}px), transparent 100%)`,
+          WebkitMaskImage: `linear-gradient(90deg, transparent 0, transparent 14px, #000 ${GUTTER - 2}px, #000 calc(100% - ${GUTTER - GAP}px), transparent 100%)`,
         }}
       >
         <svg width="0" height="0" aria-hidden="true" className="absolute">

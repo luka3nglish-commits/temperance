@@ -5,7 +5,7 @@ import { vibrate } from '../../lib/motion'
  * Field and Input, polish-spec 4.2. Inputs are carved stone (`.tablet-inset`): you write into them.
  *
  * Input: h 56, padding 0 16 px, value Cormorant 600 22 px `.num` bone, caret gold-400, placeholder
- * bone-mute, border `--bone-edge` (3.18:1) at rest, gold-300 plus a 1 px gold-300 ring on focus.
+ * bone-mute, border `--bone-edge` (0.46, at least 3:1 as rendered) at rest, gold-300 plus a 1 px gold-300 ring on focus.
  * `suffix` (kcal, g, kg) sits inside at right 16 px in Cormorant 500 16 px bone-soft lowercase.
  * `invalid` turns the border ember and, when it flips on, shakes 140 ms and vibrates 10 ms.
  * `disabled` dims the border and the value. `fieldSize`: `sm` h 44 (settings rows), `md` h 56
@@ -65,7 +65,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         ref={ref}
         disabled={disabled}
         aria-invalid={invalid || undefined}
-        className={`field-input tablet-inset ${HEIGHT[fieldSize]} ${invalid ? 'is-invalid' : ''} ${disabled ? 'is-disabled' : ''} ${suffix ? 'pr-14' : ''} ${
+        className={`field-input tablet-inset ${HEIGHT[fieldSize]} ${invalid ? 'is-invalid' : ''} ${disabled ? 'is-disabled' : ''} ${suffix ? (innerLabel ? 'pr-8' : 'pr-14') : ''} ${
           innerLabel ? 'pt-[18px] pl-3' : ''
         } ${inputClassName}`}
         {...rest}

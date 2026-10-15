@@ -209,7 +209,7 @@ export function SettingsScreen() {
             <Segmented<HeroFigure> testId="tp-settings-hero" full label="Hero figure" value={settings.hero} options={HERO_OPTIONS} onChange={setHero} />
           </SettingsRow>
 
-          <SettingsRow label="Gold follows tilt">
+          <SettingsRow label="Gold follows tilt" col="auto">
             <Toggle testId="tp-settings-tilt" label="Gold follows tilt" hideLabel checked={settings.tilt} onChange={onTilt} />
           </SettingsRow>
 

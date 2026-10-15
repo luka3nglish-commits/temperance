@@ -115,7 +115,7 @@ export function HistoryScreen() {
       {/* two rows: the switch and the month row; the bottom 24 px fades so rows dissolve under it, no hard edge */}
       <header
         className="sticky top-0 z-10 px-5 pb-6"
-        style={{ marginTop: 'var(--safe-top)', background: 'linear-gradient(180deg, #050507 0, #050507 calc(100% - 24px), rgba(5,5,7,0) 100%)' }}
+        style={{ marginTop: 'var(--safe-top)', background: 'linear-gradient(180deg, var(--color-obsidian-950) 0, var(--color-obsidian-950) calc(100% - 24px), rgba(5,5,7,0) 100%)' }}
       >
         <div className="flex h-14 items-center justify-center">
           <div data-testid="tp-history-mode" data-mode={mode} className="w-[168px]">

@@ -73,7 +73,7 @@ const CHROME_SHORT = 39
 /** air always kept between the header and the eyebrow */
 const TOP_AIR = 8
 
-const OVER_HALO = '0 0 2px #050507, 0 0 10px #050507, 0 0 18px rgba(5, 5, 7, 0.9)'
+const OVER_HALO = '0 0 2px var(--color-obsidian-950), 0 0 10px var(--color-obsidian-950), 0 0 18px rgba(5, 5, 7, 0.9)'
 
 export function TodayNumber({ remaining, eaten, goal, unit, hero, short, onSwap }: Props) {
   const over = remaining < 0
