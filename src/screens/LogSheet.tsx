@@ -221,7 +221,8 @@ export function LogSheet() {
 
   const onFavourite = useCallback(
     (m: Meal) => {
-      const entry = logMeal(m.id, 1)
+      // one tap logs the meal's usual amount (the last one he chose)
+      const entry = logMeal(m.id)
       if (entry) afterLog(entry)
     },
     [afterLog, logMeal],
@@ -229,7 +230,8 @@ export function LogSheet() {
 
   const onRelog = useCallback(
     (e: LogEntry) => {
-      const entry = logQuick({ name: e.name, macros: perServingMacros(e), servings: e.servings, components: perServingComponents(e) })
+      // exactly what he had last time: amount, portion and components included
+      const entry = useStore.getState().relogEntry(e.id) ?? logQuick({ name: e.name, macros: perServingMacros(e), servings: e.servings, components: perServingComponents(e) })
       afterLog(entry)
     },
     [afterLog, logQuick],

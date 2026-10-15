@@ -45,12 +45,22 @@ export type MealComponent = {
 export type MealKind = 'quick' | 'built'
 
 /** A saved meal in the library. `macros` is the total for ONE serving. */
+/** How much of something: `amount` of `unit` ('serve' counts servings). */
+export type Portion = { amount: number; unit: AmountUnit }
+
 export type Meal = {
   id: string
   name: string
   kind: MealKind
   macros: Macros
   components?: MealComponent[]
+  /**
+   * The basis `macros` are counted on. Absent: one serving. Set (e.g. { amount: 100, unit: 'g' }):
+   * the numbers are per 100 g, as printed on a label, and logging it asks how many grams were eaten.
+   */
+  per?: Portion
+  /** The amount usually eaten, in `per.unit` (or servings when `per` is absent). One-tap logs use it. */
+  usual?: number
   favourite: boolean
   createdAt: number
   updatedAt: number
@@ -68,9 +78,12 @@ export type LogEntry = {
   /** reference to the library meal, if it was logged from one (may no longer exist) */
   mealId?: string
   name: string
+  /** multiplier on the meal's numbers (servings, or amount / per.amount for a per-100 g meal) */
   servings: number
   macros: Macros
   components?: MealComponent[]
+  /** What was eaten, for display (e.g. 180 g). Absent: `servings` servings. */
+  portion?: Portion
 }
 
 export type EnergyUnit = 'kcal' | 'kJ'
@@ -119,9 +132,10 @@ export type WeightEntry = {
 
 /**
  * v1 shipped without opening/hero/tilt/hiddenRecents. v2 added them with defaults.
- * v3 adds weights and targetWeightKg.
+ * v3 added weights and targetWeightKg. v4 adds Meal.per, Meal.usual and LogEntry.portion
+ * (custom portion amounts, per-100 g meals); all optional, so older backups read unchanged.
  */
-export const SCHEMA_VERSION = 3 as const
+export const SCHEMA_VERSION = 4 as const
 
 /** The on-disk / export shape. Progress photos are not part of it (they live in IndexedDB). */
 export type ExportFile = {

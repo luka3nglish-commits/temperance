@@ -71,7 +71,8 @@ export function LibraryScreen() {
 
   const logOne = useCallback(
     (id: string) => {
-      const entry = useStore.getState().logMeal(id, 1)
+      // one tap logs the meal's usual amount (the last one chosen)
+      const entry = useStore.getState().logMeal(id)
       if (!entry) return
       vibrate(8)
       useToast.getState().show({

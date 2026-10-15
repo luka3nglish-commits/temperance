@@ -73,7 +73,7 @@ describe('weights', () => {
     s.addWeight(84, '2026-10-13', T0)
     s.setTargetWeight(78)
     const file = s.exportData(T0)
-    expect(file.version).toBe(3)
+    expect(file.version).toBe(4)
     expect(file.weights).toHaveLength(1)
     expect(file.settings.targetWeightKg).toBe(78)
     s.resetAll()

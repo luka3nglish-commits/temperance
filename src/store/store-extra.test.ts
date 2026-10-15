@@ -256,9 +256,10 @@ describe('logQuick and logMeal', () => {
     expect(a.name).toBe('Meal')
     expect(a.servings).toBe(1)
     expect(a.macros.kcal).toBe(100)
-    const b = s.logQuick({ name: 'X', macros: macros(100), servings: 1.555 }, T0 + 1)
-    expect(b.servings).toBe(1.56)
-    expect(b.macros.kcal).toBe(156)
+    // servings keep 4 decimals so typed portions and gram ratios stay exact
+    const b = s.logQuick({ name: 'X', macros: macros(100), servings: 1.55555 }, T0 + 1)
+    expect(b.servings).toBe(1.5556)
+    expect(b.macros.kcal).toBe(155.6)
   })
 
   it('logMeal returns null for a missing meal and leaves the log alone', () => {
@@ -348,8 +349,8 @@ describe('export and import extras', () => {
     const m = s.addQuickMeal({ name: 'X', macros: macros(100) }, T0)
     s.logMeal(m.id, 1, T0)
     const file = s.exportData(T0)
-    expect(SCHEMA_VERSION).toBe(3)
-    expect(file.version).toBe(3)
+    expect(SCHEMA_VERSION).toBe(4)
+    expect(file.version).toBe(4)
     expect(file.app).toBe('temperance')
     expect(file.exportedAt).toBe(T0)
     expect(Object.keys(file).sort()).toEqual(['app', 'entries', 'exportedAt', 'ingredients', 'meals', 'settings', 'version', 'weights'])
