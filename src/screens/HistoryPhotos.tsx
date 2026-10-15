@@ -4,7 +4,8 @@
  * tiles and lays them side by side.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { Button, EmptyLine, SectionHeading, useToast } from '../components/ui'
+import { ImagePlus } from 'lucide-react'
+import { Button, EmptyLine, EmptyState, SectionHeading, useToast } from '../components/ui'
 import { formatDayLabel, formatDayLong } from '../lib/day'
 import { addPhoto, listPhotos, photosSupported, type PhotoMeta } from '../lib/photos'
 import { useStore } from '../store/useStore'
@@ -45,22 +46,23 @@ function PhotoTile({ photo, today, selecting, mark, onTap }: TileProps) {
         aria-label={`Photo, ${formatDayLong(photo.day)}`}
         aria-pressed={selecting ? mark > 0 : undefined}
         onClick={() => onTap(photo)}
-        className="relative block aspect-square w-full cursor-pointer overflow-hidden rounded-[2px] bg-obsidian-800 transition-transform duration-150 active:scale-[0.97]"
+        className="press relative block aspect-square w-full cursor-pointer overflow-hidden rounded-[2px] bg-obsidian-800"
+        style={{ boxShadow: '0 0 0 1px #2A2A33, 0 0 0 2px rgba(0,0,0,0.8)' }}
       >
         {url ? <img src={url} alt="" draggable={false} decoding="async" className="absolute inset-0 h-full w-full object-cover" /> : null}
-        <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-10 bg-[linear-gradient(to_top,rgba(5,5,7,0.85),rgba(5,5,7,0))]" />
-        <span aria-hidden="true" className="font-display absolute bottom-1.5 left-2 text-[9px] tracking-[0.2em] text-bone">
+        <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-12 bg-[linear-gradient(to_top,rgba(5,5,7,0.9),rgba(5,5,7,0.55)_45%,rgba(5,5,7,0))]" />
+        <span aria-hidden="true" className="font-display num absolute inset-x-2 bottom-2 truncate text-[12px] font-bold uppercase leading-none tracking-[0.08em] text-bone">
           {formatDayLabel(photo.day, today)}
         </span>
         {mark ? (
           <>
-            <span aria-hidden="true" className="absolute inset-0 rounded-[2px] shadow-[inset_0_0_0_2px_#D8B45A]" />
-            <span aria-hidden="true" className="font-display gold-fill absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-[2px] text-[10px] font-bold">
+            <span aria-hidden="true" className="absolute inset-0 rounded-[2px] shadow-[inset_0_0_0_2px_#E6CB78]" />
+            <span aria-hidden="true" className="font-display gold-fill engraved absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-[2px] text-[12px] font-bold leading-none">
               {mark}
             </span>
           </>
         ) : selecting ? (
-          <span aria-hidden="true" className="absolute top-1.5 right-1.5 h-5 w-5 rounded-[2px] border border-[var(--gold-line-strong)] bg-[rgba(5,5,7,0.4)]" />
+          <span aria-hidden="true" className="absolute top-1.5 right-1.5 h-6 w-6 rounded-[2px] border border-[var(--gold-edge)] bg-[rgba(5,5,7,0.55)]" />
         ) : null}
       </button>
     </li>
@@ -194,9 +196,7 @@ export function HistoryPhotos({ today }: { today: string }) {
 
   return (
     <section data-testid="tp-photos" aria-label="Progress photos">
-      <SectionHeading rule="strong" right={count ? String(count) : undefined}>
-        Progress photos
-      </SectionHeading>
+      <SectionHeading right={count ? String(count) : undefined}>Progress photos</SectionHeading>
 
       {!supported ? (
         <EmptyLine className="pt-4">Photos are not available in this browser.</EmptyLine>
@@ -213,30 +213,45 @@ export function HistoryPhotos({ today }: { today: string }) {
             aria-hidden="true"
             onChange={(e) => void onPick(e)}
           />
-          <div className="grid grid-cols-2 gap-3 pt-3">
-            {canCompare ? (
-              <Button variant="hairline" size="sm" data-testid="tp-photo-compare" aria-pressed={inSelect} onClick={toggleSelecting}>
-                {inSelect ? 'Cancel' : 'Compare'}
-              </Button>
-            ) : (
-              <span aria-hidden="true" />
-            )}
-            <Button variant="hairline" size="sm" data-testid="tp-photo-add-button" disabled={busy} aria-busy={busy || undefined} onClick={() => fileInput.current?.click()}>
-              {busy ? 'Saving...' : 'Add photo'}
-            </Button>
-          </div>
 
-          {inSelect ? <p className="pt-3 font-body text-[14px] italic leading-[1.4] text-bone-dim">{selected.length ? 'Choose one more.' : 'Choose two photos.'}</p> : null}
+          {photos !== null && !failed && count === 0 ? (
+            <div className="pt-4">
+              <EmptyState
+                action={
+                  <Button variant="hairline" size="sm" icon={<ImagePlus size={16} strokeWidth={1.5} />} data-testid="tp-photo-add-button" disabled={busy} aria-busy={busy || undefined} onClick={() => fileInput.current?.click()}>
+                    {busy ? 'Saving...' : 'Add photo'}
+                  </Button>
+                }
+              >
+                No photos yet.
+              </EmptyState>
+              <p className="hint pt-3 text-center">Photos stay on this device and are not in the backup.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 pt-4">
+              {canCompare ? (
+                <Button variant="hairline" size="sm" className="!px-2" data-testid="tp-photo-compare" aria-pressed={inSelect} onClick={toggleSelecting}>
+                  {inSelect ? 'Cancel' : 'Compare'}
+                </Button>
+              ) : (
+                <span aria-hidden="true" />
+              )}
+              <Button variant="hairline" size="sm" className="!px-2" data-testid="tp-photo-add-button" disabled={busy} aria-busy={busy || undefined} onClick={() => fileInput.current?.click()}>
+                {busy ? 'Saving...' : 'Add photo'}
+              </Button>
+            </div>
+          )}
+
+          {inSelect ? (
+            <p className="hint pt-3" aria-live="polite">
+              {selected.length ? 'Choose one more.' : 'Choose two photos.'}
+            </p>
+          ) : null}
 
           {photos === null ? null : failed ? (
             <EmptyLine className="pt-4">Photos could not be opened.</EmptyLine>
-          ) : count === 0 ? (
-            <div className="pt-4">
-              <EmptyLine>No photos yet. Add the first one.</EmptyLine>
-              <p className="pt-1 font-body text-[14px] italic leading-[1.4] text-bone-dim">Photos stay on this device and are not in the backup.</p>
-            </div>
-          ) : (
-            <ul data-testid="tp-photo-grid" className="grid grid-cols-3 gap-1 pt-3">
+          ) : count === 0 ? null : (
+            <ul data-testid="tp-photo-grid" className="grid grid-cols-3 gap-2 pt-4">
               {photos.map((p) => (
                 <PhotoTile key={p.id} photo={p} today={today} selecting={inSelect} mark={inSelect ? selected.indexOf(p.id) + 1 : 0} onTap={tapTile} />
               ))}

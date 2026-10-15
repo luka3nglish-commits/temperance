@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Trash2 } from 'lucide-react'
-import { EmptyLine, IconButton, Sheet, useToast } from '../components/ui'
+import { EmptyLine, IconButton, Sheet, ValueUnit, useStaggerOnce, useToast } from '../components/ui'
 import type { EnergyUnit, LogEntry } from '../lib/types'
-import { formatDayLabel, formatTime } from '../lib/day'
+import { formatDayLabel } from '../lib/day'
+import { formatEnergy, unitLabel } from '../lib/units'
 import { sumMacros } from '../lib/macros'
 import { useStore } from '../store/useStore'
 import { entriesForDay } from '../store/selectors'
-import { Delta, EnergyFigure, MacroReadouts, MiniRing, dayStampLong, energyText } from './HistoryWeek'
+import { Delta, EntryName, MacroReadouts, MiniRing, dayStampLong, energyText, entryAria, entryMeta } from './HistoryWeek'
 
 type Props = {
   day: string
@@ -18,8 +19,10 @@ type Props = {
 }
 
 /**
- * One day's entries (snapshots, with their time). Swipe a row left, or tap its trash, to delete it;
- * the toast offers UNDO which puts the exact snapshot back. Only this day's numbers change.
+ * One day's entries (snapshots, with their time), polish-spec 6.4: the day's ring at 56 px with its
+ * readouts and the delta, then list rows per 4.11 with the portion rule (`Greek yoghurt · 180 g`).
+ * Swipe a row left, or tap its trash, to delete it; the toast offers UNDO which puts the exact snapshot
+ * back. Only this day's numbers change.
  */
 export function HistoryDaySheet({ day, open, onClose, today, unit, goalKcal }: Props) {
   const entries = useStore((s) => s.entries)
@@ -44,33 +47,44 @@ export function HistoryDaySheet({ day, open, onClose, today, unit, goalKcal }: P
   const title = label === 'Today' || label === 'Yesterday' ? label : dayStampLong(day)
 
   return (
-    <Sheet open={open} onClose={onClose} title={title} height="auto" contentId="tp-history-day-sheet" headerRight={list.length ? <EnergyFigure kcal={totals.kcal} unit={unit} size={15} /> : null}>
-      {list.length ? (
-        <>
-          <div className="flex items-center justify-between gap-4 border-b border-[var(--gold-line-strong)] pb-3">
-            <div className="flex items-center gap-4">
-              <MiniRing macros={totals} />
-              <MacroReadouts macros={totals} />
-            </div>
-            <Delta kcal={totals.kcal} goalKcal={goalKcal} unit={unit} />
-          </div>
-          <ul className="mt-1">
-            {list.map((e) => (
-              <SwipeRow key={e.id} entry={e} unit={unit} onDelete={() => remove(e)} />
-            ))}
-          </ul>
-        </>
-      ) : (
-        <EmptyLine className="py-6 text-center">Nothing logged yet.</EmptyLine>
-      )}
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={title}
+      height="auto"
+      contentId="tp-history-day-sheet"
+      headerRight={list.length ? <ValueUnit value={formatEnergy(totals.kcal, unit)} unit={unitLabel(unit)} size={17} tone="gold" testId="tp-history-day-total" /> : null}
+    >
+      <DayBody list={list} totals={totals} unit={unit} goalKcal={goalKcal} onDelete={remove} />
     </Sheet>
+  )
+}
+
+function DayBody({ list, totals, unit, goalKcal, onDelete }: { list: LogEntry[]; totals: ReturnType<typeof sumMacros>; unit: EnergyUnit; goalKcal: number; onDelete(e: LogEntry): void }) {
+  const stagger = useStaggerOnce()
+  if (!list.length) return <EmptyLine className="py-6 text-center">Nothing logged yet.</EmptyLine>
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 pb-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <MiniRing macros={totals} />
+          <MacroReadouts macros={totals} />
+        </div>
+        <Delta kcal={totals.kcal} goalKcal={goalKcal} unit={unit} />
+      </div>
+      <ul className={`border-t border-[var(--gold-line)] ${stagger}`}>
+        {list.map((e) => (
+          <SwipeRow key={e.id} entry={e} unit={unit} onDelete={() => onDelete(e)} />
+        ))}
+      </ul>
+    </>
   )
 }
 
 const REVEAL = 96
 const COMMIT = 72
 
-/** A 52 px entry row that slides left over an ember field; past 72 px it deletes on release. */
+/** A 56 px entry row (polish-spec 4.11) that slides left over an ember field; past 72 px it deletes on release. */
 function SwipeRow({ entry, unit, onDelete }: { entry: LogEntry; unit: EnergyUnit; onDelete(): void }) {
   const [dx, setDx] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -122,40 +136,42 @@ function SwipeRow({ entry, unit, onDelete }: { entry: LogEntry; unit: EnergyUnit
   }
 
   const armed = dx <= -COMMIT
-  const m = entry.macros
+  const moved = dx !== 0
 
   return (
-    <li data-testid={`tp-history-entry-${entry.id}`} className="relative overflow-hidden border-b border-[var(--gold-line)]">
+    <li data-testid={`tp-history-entry-${entry.id}`} className="row-rule relative overflow-hidden">
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 right-0 flex items-center justify-end pr-5 transition-opacity duration-150"
-        style={{ width: REVEAL + 24, background: 'linear-gradient(90deg, transparent, rgba(255,90,31,0.18))', opacity: dx < 0 ? 1 : 0 }}
+        className="absolute inset-y-0 right-0 flex items-center justify-end pr-3"
+        style={{ width: REVEAL + 24, background: 'linear-gradient(90deg, transparent, rgba(255,90,31,0.22))', opacity: moved ? 1 : 0 }}
       >
-        <Trash2 size={18} strokeWidth={1.5} className={armed ? 'text-ember' : 'text-ember-text'} />
+        <Trash2 size={22} strokeWidth={1.5} className={armed ? 'text-ember' : 'text-ember-text'} />
       </div>
       <div
-        className="relative flex min-h-[52px] items-center gap-3 bg-obsidian-900 select-none"
+        className="relative grid h-14 select-none grid-cols-[14px_minmax(0,1fr)_auto_44px] items-center"
         style={{
           transform: `translateX(${dx}px)`,
           transition: dragging ? 'none' : 'transform var(--t-sheet-out) var(--ease-stone)',
           touchAction: 'pan-y',
+          // opaque only while it slides, so at rest it shows the sheet's own lit gradient
+          background: moved ? '#0B0B0F' : 'transparent',
         }}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onCancel}
       >
-        <span className="num w-[60px] shrink-0 font-body text-[14px] text-bone-dim">{formatTime(entry.at)}</span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-body text-[18px] font-medium leading-[1.3] text-bone">{entry.name}</span>
-          <span className="num font-body text-[14px] text-bone-dim">
-            P {Math.round(m.protein)} · C {Math.round(m.carbs)} · F {Math.round(m.fat)}
-            {entry.servings !== 1 ? ` · x ${entry.servings}` : ''}
-          </span>
+        <span />
+        <span className="sr-only">{entryAria(entry, unit)}</span>
+        <span className="flex min-w-0 flex-col justify-center" aria-hidden="true">
+          <EntryName entry={entry} />
+          <span className="meta truncate">{entryMeta(entry)}</span>
         </span>
-        <EnergyFigure kcal={m.kcal} unit={unit} size={15} />
-        <IconButton label={`Delete ${entry.name}`} onClick={onDelete} className="-mr-2 hover:text-ember-text">
-          <Trash2 size={18} strokeWidth={1.5} />
+        <span aria-hidden="true" className="pl-3">
+          <ValueUnit value={formatEnergy(entry.macros.kcal, unit)} unit={unitLabel(unit)} />
+        </span>
+        <IconButton label={`Delete ${entry.name}`} onClick={onDelete} className="hover:text-ember-text active:!text-ember-text">
+          <Trash2 size={22} strokeWidth={1.5} />
         </IconButton>
       </div>
     </li>

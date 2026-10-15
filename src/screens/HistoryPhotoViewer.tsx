@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Columns2, Download, Share2, Trash2 } from 'lucide-react'
-import { Input, Sheet, useToast } from '../components/ui'
+import { Button, Input, Sheet, useToast } from '../components/ui'
 import { formatDayLong } from '../lib/day'
 import { deletePhoto, getPhotoBlob, photoObjectURL, updatePhotoNote, type PhotoMeta } from '../lib/photos'
 
@@ -112,32 +112,30 @@ type ActionProps = {
   confirmTestId?: string
 }
 
-/** One of the three 56 px hairline actions: icon over a Cinzel 10 px label. */
+/**
+ * One of the three 56 px actions (polish-spec 6.5: hairline; DELETE is the danger variant with its armed
+ * second tap): the 18 px icon over a Cinzel 700 12 px label, so three fit a 350 px row.
+ */
 function Action({ icon, label, onClick, tone = 'gold', armed = false, busy = false, disabled = false, testId, confirmTestId }: ActionProps) {
   const ember = tone === 'ember'
   return (
-    <button
-      type="button"
+    <Button
+      variant={ember ? 'danger' : 'hairline'}
+      size="lg"
+      full
+      armed={ember && armed}
       data-testid={testId}
       data-armed={armed ? '' : undefined}
       aria-busy={busy || undefined}
       disabled={disabled}
       onClick={onClick}
-      className={`flex h-14 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-[4px] border transition-[transform,background-color,border-color] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40 ${
-        ember
-          ? armed
-            ? 'border-ember bg-[rgba(255,90,31,0.08)] text-ember'
-            : 'border-[rgba(255,90,31,0.35)] text-ember-text'
-          : 'border-[var(--gold-line-strong)] text-gold-400 hover:bg-[var(--gold-line)]'
-      }`}
+      icon={<span aria-hidden="true" className="flex h-[18px] items-center justify-center">{icon}</span>}
+      className="!flex-col !gap-1.5 !px-1"
     >
-      <span aria-hidden="true" className="flex h-[18px] items-center">
-        {icon}
-      </span>
-      <span data-testid={armed ? confirmTestId : undefined} className={`font-display inscribed text-[10px] ${armed ? 'tracking-[0.4em]' : 'tracking-[0.3em]'}`}>
+      <span data-testid={armed ? confirmTestId : undefined} className="block text-[12px] tracking-[0.12em]">
         {armed ? 'Delete?' : label}
       </span>
-    </button>
+    </Button>
   )
 }
 
@@ -248,12 +246,22 @@ function ViewerBody({ photo, canCompare, flush, onCompare, onDeleted, onNoteSave
         if (armed && !(e.target as HTMLElement).closest('[data-delete]')) disarm()
       }}
     >
+      {/* the frame: a 6 px raised stone mount with large gold brackets */}
       <div
-        data-testid="tp-photo-viewer-image"
-        className={`relative mx-auto mt-1 overflow-hidden rounded-[2px] ${url ? '' : 'bg-obsidian-800'}`}
-        style={{ aspectRatio: `${ratio}`, width: `min(100%, calc(60svh * ${ratio.toFixed(4)}))` }}
+        className="bracketed lg mx-auto mt-1 rounded-[4px] p-1.5"
+        style={{
+          width: `min(100%, calc(58svh * ${ratio.toFixed(4)} + 12px))`,
+          background: 'linear-gradient(180deg, #17171E, #0D0D12)',
+          boxShadow: '0 0 0 1px #2A2A33, 0 0 0 2px rgba(0,0,0,0.8), 0 20px 40px -20px rgba(0,0,0,0.9)',
+        }}
       >
-        {url ? <img src={url} alt={`Progress photo, ${long}`} className="absolute inset-0 h-full w-full object-contain" /> : null}
+        <div
+          data-testid="tp-photo-viewer-image"
+          className={`relative w-full overflow-hidden rounded-[2px] ${url ? '' : 'bg-obsidian-800'}`}
+          style={{ aspectRatio: `${ratio}` }}
+        >
+          {url ? <img src={url} alt={`Progress photo, ${long}`} className="absolute inset-0 h-full w-full object-contain" /> : null}
+        </div>
       </div>
 
       <Input

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { arcPath, EMPTY_SHARES, layoutArcs, progressArcs, readoutAside, RING_GAP, RING_START, ringShares, TodayRingRow } from './TodayRing'
+import { arcPath, EMPTY_ARC, EMPTY_SHARES, layoutArcs, letterUnits, progressArcs, readoutAside, RING_GAP, RING_START, ringShares, TodayRingRow } from './TodayRing'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -146,5 +146,47 @@ describe('readout rows in the DOM', () => {
     click($('tp-readout-carbs'))
     expect($('tp-readout-carbs')?.getAttribute('aria-pressed')).toBe('false')
     expect(aside('tp-readout-carbs')?.textContent).toBe('35%')
+  })
+
+  it('an empty day draws three placeholder arcs in #2A2A33 inside the grooved track, and 0 g in bone-dim', () => {
+    act(() => root.render(<TodayRingRow totals={{ kcal: 0, protein: 0, carbs: 0, fat: 0 }} targets={{ protein: 180, carbs: 0, fat: 80 }} onOpen={() => {}} />))
+    const ring = $('tp-ring')!
+    const arcs = ring.querySelectorAll('[data-arc]')
+    expect(arcs).toHaveLength(3)
+    arcs.forEach((a) => expect(a.getAttribute('stroke')).toBe(EMPTY_ARC))
+    expect(EMPTY_ARC).toBe('#2A2A33')
+    expect(ring.dataset.proteinDeg).toBe('0.0')
+    expect(ring.querySelectorAll('[data-groove]')).toHaveLength(2)
+    expect(ring.querySelectorAll('text')).toHaveLength(0)
+    const centre = $('tp-ring-centre')!
+    expect(centre.dataset.grams).toBe('0')
+    expect(centre.querySelector('.text-bone-dim')?.textContent).toBe('0')
+  })
+
+  it('logged arcs use the macro gradients and 12 px letters', () => {
+    act(() => root.render(<TodayRingRow totals={{ kcal: 1148, protein: 142, carbs: 100, fat: 20 }} targets={{ protein: 180, carbs: 0, fat: 80 }} onOpen={() => {}} />))
+    const ring = $('tp-ring')!
+    expect(ring.getAttribute('width')).toBe('120')
+    ring.querySelectorAll('[data-arc]').forEach((a) => expect(a.getAttribute('stroke')).toMatch(/^url\(#/))
+    ring.querySelectorAll('text').forEach((t) => expect(t.getAttribute('font-size')).toBe('12'))
+    expect(container.querySelector('[data-underline]')).toBeNull()
+  })
+
+  it('compact mode: a 96 px ring with 15 unit letters (12 px), no visible right column, progress underlines', () => {
+    expect(letterUnits(96)).toBe(15)
+    expect(letterUnits(120)).toBe(12)
+    act(() =>
+      root.render(<TodayRingRow compact totals={{ kcal: 1148, protein: 142, carbs: 100, fat: 20 }} targets={{ protein: 180, carbs: 0, fat: 80 }} onOpen={() => {}} />),
+    )
+    const ring = $('tp-ring')!
+    expect(ring.getAttribute('width')).toBe('96')
+    ring.querySelectorAll('text').forEach((t) => expect(t.getAttribute('font-size')).toBe('15'))
+    // the right column stays for screen readers and tests, hidden from sight
+    expect(aside('tp-readout-protein')?.textContent).toBe('of 180 g')
+    expect(aside('tp-readout-protein')?.className).toContain('sr-only')
+    // underlines only where a target is set: protein 142 of 180 is 78.9 percent
+    const u = container.querySelector<HTMLElement>('[data-underline="protein"] > span')
+    expect(u?.style.width).toBe('78.9%')
+    expect(container.querySelector('[data-underline="carbs"]')).toBeNull()
   })
 })

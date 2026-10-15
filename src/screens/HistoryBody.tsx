@@ -1,15 +1,15 @@
 /**
- * HISTORY · BODY: WEIGHT, then PROGRESS PHOTOS. Scrolls inside <main> like the ledger, same 20 px
- * gutters, and the same mount-only entrance stagger (the weight blocks take 60 to 240 ms, photos 300 ms).
+ * HISTORY · BODY: WEIGHT, then PROGRESS PHOTOS (polish-spec 6.5). Scrolls inside <main> like the ledger,
+ * same 20 px gutters. WEIGHT carries the screen's one strong gold rule; PROGRESS PHOTOS a quiet one.
  */
 import { HistoryWeight } from './HistoryWeight'
 import { HistoryPhotos } from './HistoryPhotos'
 
 export function HistoryBody({ today }: { today: string }) {
   return (
-    <div data-testid="tp-body" className="px-5 pt-5">
+    <div data-testid="tp-body" className="px-5 pt-1">
       <HistoryWeight today={today} />
-      <div className="rise-in rise-in-4 pt-8">
+      <div className="pt-10">
         <HistoryPhotos today={today} />
       </div>
     </div>

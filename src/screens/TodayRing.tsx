@@ -1,24 +1,43 @@
 /**
- * MACRO RING (spec section 9). SVG viewBox 0 0 120 120 at 112 px. Centre (60, 60), radius 50,
- * stroke 7, butt caps. Three explicit path arcs by angle (never dashoffset) starting at -90 deg plus
- * a 3 deg half gap, clockwise, protein then carbs then fat, 6 deg gaps (342 deg shared).
- * Split by calorie contribution (macroEnergySplit) so the ring matches the big number.
- * A zero macro draws no arc but keeps its gap. Empty day: three equal 114 deg arcs in the track colour.
- * Ghost target arcs at radius 44 when targets are set. Angles tween 520 ms --ease-stone in rAF.
- * Readouts show each macro's goal (`of 180 g`) when its target is set, else its energy share.
- * Tapping a readout row flips the ring into single-macro progress mode for 6 s.
+ * MACRO RING (polish-spec 6.1). SVG viewBox 0 0 120 120 at 120 px (96 px compact). Centre (60, 60).
+ *
+ *   1. Track: r 50, width 7, #0A0A0D, with groove hairlines at r 46.5 and 53.5 (bone 0.36, 0.75 wide),
+ *      so an empty track still reads as a track.
+ *   2. Arcs: three explicit path arcs by angle (never dashoffset) starting at -90 deg plus a 3 deg half
+ *      gap, clockwise, protein then carbs then fat, 6 deg gaps (342 deg shared), butt caps, each a
+ *      userSpaceOnUse linear gradient (protein #FFF1C4 to #E6C670, carbs #D2AE55 to #9C7B33, fat
+ *      #A88A55 to #8E7243). Split by calorie contribution (macroEnergySplit) so the ring matches the
+ *      big number. A zero macro draws no arc but keeps its gap. Empty day: three 114 deg arcs in #2A2A33.
+ *   3. Inner bezel: r 41, a radial #121218 to #0B0B0F, a gold 0.35 hairline.
+ *   4. Centre (DOM): protein grams Cinzel 700 22 px gold-300 plus `g`, caption PROTEIN.
+ *   5. Letters P C F: Cinzel 700 12 px bone-dim (15 units in compact, so still 12 px), 5 unit ticks.
+ *   8. Tip glint: while the angles tween (520 ms --ease-stone) a 3 px #FFF7DA dot rides each moving arc
+ *      end, fading out over 300 ms after; a soft drop-shadow on the high tier only; none when reduced.
+ *
+ * Readouts (x 160 to 370, three 36 px rows): swatch, label, grams, and the right column: the macro's
+ * goal (`of 180 g`) when its target is set, else its energy share. Compact (under 372 px wide): the
+ * right column is hidden (kept for screen readers and tests) and a 2 px progress underline runs under
+ * each value instead; ring 96 px, readouts from x 132. Tapping a readout row flips the ring into
+ * single-macro progress mode for 6 s.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState, type CSSProperties } from 'react'
 import type { Macros, MacroTargets } from '../lib/types'
 import { macroEnergySplit } from '../lib/macros'
 import { macroProgress } from '../store/selectors'
 import { useReducedMotion } from '../lib/motion'
+import { useTier } from '../scene/tier'
 import { easeStone, useTweened } from './TodayMotion'
 
 export const MACRO_KEYS = ['protein', 'carbs', 'fat'] as const
 export type MacroKey = (typeof MACRO_KEYS)[number]
 
-export const MACRO_COLOUR: Record<MacroKey, string> = { protein: '#F2D98A', carbs: '#B8923E', fat: '#6E5324' }
+/** swatches and ticks (the arcs use the gradients below) */
+export const MACRO_COLOUR: Record<MacroKey, string> = { protein: '#F2D98A', carbs: '#B8923E', fat: '#8E7243' }
+export const MACRO_GRADIENT: Record<MacroKey, readonly [string, string]> = {
+  protein: ['#FFF1C4', '#E6C670'],
+  carbs: ['#D2AE55', '#9C7B33'],
+  fat: ['#A88A55', '#8E7243'],
+}
 export const MACRO_LETTER: Record<MacroKey, string> = { protein: 'P', carbs: 'C', fat: 'F' }
 export const MACRO_LABEL: Record<MacroKey, string> = { protein: 'Protein', carbs: 'Carbs', fat: 'Fat' }
 
@@ -26,9 +45,13 @@ export const RING_START = -87
 export const RING_SPAN = 342
 export const RING_GAP = 6
 export const RING_R = 50
-export const GHOST_R = 44
-export const TRACK = '#1A1A21'
-export const GHOST = '#26262E'
+export const TRACK = '#0A0A0D'
+/** the empty-day placeholder arcs */
+export const EMPTY_ARC = '#2A2A33'
+export const GROOVE = 'rgba(231, 225, 210, 0.36)'
+const BONE_DIM = '#D3CDC2'
+const BONE_MUTE = '#9C9791'
+const GLINT = '#FFF7DA'
 
 export type ArcSpan = { start: number; end: number }
 export type Shares = readonly [number, number, number]
@@ -78,38 +101,38 @@ export function arcPath(cx: number, cy: number, r: number, a0: number, a1: numbe
   return `M ${f(x0)} ${f(y0)} A ${r} ${r} 0 ${len > 180 ? 1 : 0} 1 ${f(x1)} ${f(y1)}`
 }
 
+/** The SVG letter size in viewBox units: 12 px at any render size (15 units at the 96 px compact ring). */
+export function letterUnits(size: number): number {
+  return Math.round(((12 * 120) / size) * 100) / 100
+}
+
 type RingProps = {
   totals: Macros
+  /** kept for callers; the ring itself no longer draws target ghosts (the readouts carry the goals) */
   targets: MacroTargets
   /** single-macro progress mode */
   focus: MacroKey | null
-  /** render size in px (112 on the home screen, 56 in history) */
+  /** render size in px (120 on the home screen, 96 compact) */
   size?: number
 }
 
 /** The SVG only. Centre text is DOM, drawn by the caller. */
-export function TodayRing({ totals, targets, focus, size = 112 }: RingProps) {
+export function TodayRing({ totals, targets, focus, size = 120 }: RingProps) {
   const reduced = useReducedMotion()
+  const tier = useTier()
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const { shares, empty } = ringShares(totals)
   const progress = macroProgress(totals, targets)
   const focusIndex = focus ? MACRO_KEYS.indexOf(focus) : -1
   const spans = focus ? progressArcs(focusIndex, progress[focus]) : layoutArcs(shares)
   const flat = spans.flatMap((s) => [s.start, s.end])
   const tw = useTweened(flat, 520, easeStone, reduced)
+  const placeholder = empty && !focus
+  const letterSize = letterUnits(size)
 
-  // ghost arcs once any target is set; a zero target draws no ghost arc but keeps its gap (same rule as the macros)
-  const hasTargets = targets.protein > 0 || targets.carbs > 0 || targets.fat > 0
-  const ghost = hasTargets
-    ? layoutArcs(
-        (() => {
-          const s = macroEnergySplit({ kcal: 0, protein: targets.protein, carbs: targets.carbs, fat: targets.fat })
-          return [s.protein, s.carbs, s.fat] as const
-        })(),
-      )
-    : null
-
-  // test hooks: the drawn arc lengths to 1 dp; the empty-day placeholder arcs are track colour, not macros, so they read 0.0
-  const deg = (i: number) => (empty && !focus ? '0.0' : Math.max(0, tw[i * 2 + 1] - tw[i * 2]).toFixed(1))
+  // test hooks: the drawn arc lengths to 1 dp; the empty-day placeholder arcs are not macros, so they read 0.0
+  const deg = (i: number) => (placeholder ? '0.0' : Math.max(0, tw[i * 2 + 1] - tw[i * 2]).toFixed(1))
+  const moving = (i: number) => Math.abs(tw[i * 2 + 1] - flat[i * 2 + 1]) > 0.05 || Math.abs(tw[i * 2] - flat[i * 2]) > 0.05
 
   return (
     <svg
@@ -123,45 +146,53 @@ export function TodayRing({ totals, targets, focus, size = 112 }: RingProps) {
       data-carbs-deg={deg(1)}
       data-fat-deg={deg(2)}
       data-focus={focus ?? undefined}
+      data-empty={placeholder ? 'true' : undefined}
       className="block overflow-visible"
       style={{ overflow: 'visible' }}
     >
-      {!empty && !focus ? <circle cx={60} cy={60} r={RING_R} fill="none" stroke={TRACK} strokeWidth={7} /> : null}
-      {focus ? <circle cx={60} cy={60} r={RING_R} fill="none" stroke={TRACK} strokeWidth={7} opacity={0.6} /> : null}
-      {ghost
-        ? ghost.map((g, i) => {
-            const d = arcPath(60, 60, GHOST_R, g.start, g.end)
-            return d ? <path key={`g${i}`} d={d} fill="none" stroke={GHOST} strokeWidth={2} strokeLinecap="butt" data-ghost={MACRO_KEYS[i]} /> : null
-          })
-        : null}
+      <defs>
+        {MACRO_KEYS.map((k) => (
+          <linearGradient key={k} id={`${uid}-${k}`} gradientUnits="userSpaceOnUse" x1={10} y1={10} x2={110} y2={110}>
+            <stop offset="0" stopColor={MACRO_GRADIENT[k][0]} />
+            <stop offset="1" stopColor={MACRO_GRADIENT[k][1]} />
+          </linearGradient>
+        ))}
+        <radialGradient id={`${uid}-bezel`} cx="50%" cy="50%" r="50%">
+          <stop offset="0" stopColor="#121218" />
+          <stop offset="1" stopColor="#0B0B0F" />
+        </radialGradient>
+      </defs>
+
+      <circle cx={60} cy={60} r={41} fill={`url(#${uid}-bezel)`} stroke="rgba(216, 180, 90, 0.35)" strokeWidth={0.6} />
+      <circle cx={60} cy={60} r={RING_R} fill="none" stroke={TRACK} strokeWidth={7} />
+      <circle cx={60} cy={60} r={46.5} fill="none" stroke={GROOVE} strokeWidth={0.75} data-groove="inner" />
+      <circle cx={60} cy={60} r={53.5} fill="none" stroke={GROOVE} strokeWidth={0.75} data-groove="outer" />
+
       {MACRO_KEYS.map((k, i) => {
-        const a0 = tw[i * 2]
-        const a1 = tw[i * 2 + 1]
-        const d = arcPath(60, 60, RING_R, a0, a1)
+        const d = arcPath(60, 60, RING_R, tw[i * 2], tw[i * 2 + 1])
         if (!d) return null
         return (
           <path
             key={k}
             d={d}
-            pathLength={1}
             fill="none"
-            stroke={empty && !focus ? TRACK : MACRO_COLOUR[k]}
+            stroke={placeholder ? EMPTY_ARC : `url(#${uid}-${k})`}
             strokeWidth={7}
             strokeLinecap="butt"
             data-arc={k}
           />
         )
       })}
+
       {MACRO_KEYS.map((k, i) => {
-        if (empty) return null
+        if (placeholder) return null
         if (focus && k !== focus) return null
         const a0 = tw[i * 2]
         const a1 = tw[i * 2 + 1]
-        const len = a1 - a0
         const mid = (a0 + a1) / 2
-        const live = len > 0.5
-        const [tx0, ty0] = pt(60, 60, 55.5, mid)
-        const [tx1, ty1] = pt(60, 60, 59.8, mid)
+        const live = a1 - a0 > 0.5
+        const [tx0, ty0] = pt(60, 60, 54.5, mid)
+        const [tx1, ty1] = pt(60, 60, 59.5, mid)
         const [lx, ly] = pt(60, 60, 66.5, mid)
         return (
           <g key={`t${k}`} data-tick={k}>
@@ -171,9 +202,10 @@ export function TodayRing({ totals, targets, focus, size = 112 }: RingProps) {
               y={f(ly)}
               textAnchor="middle"
               dominantBaseline="central"
-              fill={live ? MACRO_COLOUR[k] : '#5E5A54'}
-              fontSize={9.6}
-              letterSpacing="0.2em"
+              fill={live ? BONE_DIM : BONE_MUTE}
+              fontSize={letterSize}
+              fontWeight={700}
+              letterSpacing="0.04em"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {MACRO_LETTER[k]}
@@ -181,6 +213,22 @@ export function TodayRing({ totals, targets, focus, size = 112 }: RingProps) {
           </g>
         )
       })}
+
+      {!reduced && !placeholder
+        ? MACRO_KEYS.map((k, i) => {
+            if (focus && k !== focus) return null
+            const a1 = tw[i * 2 + 1]
+            if (a1 - tw[i * 2] <= 0.5) return null
+            const on = moving(i)
+            const [gx, gy] = pt(60, 60, RING_R, a1)
+            const style: CSSProperties = {
+              opacity: on ? 1 : 0,
+              transition: `opacity ${on ? 120 : 300}ms ease-out`,
+              filter: tier === 'high' ? 'drop-shadow(0 0 4px rgba(246, 227, 161, 0.6))' : undefined,
+            }
+            return <circle key={`g${k}`} data-glint={k} cx={f(gx)} cy={f(gy)} r={1.5} fill={GLINT} style={style} />
+          })
+        : null}
     </svg>
   )
 }
@@ -199,11 +247,13 @@ export function readoutAside({ active, target, ratio, share, empty }: { active: 
 type RowProps = {
   totals: Macros
   targets: MacroTargets
+  /** under 372 px wide: 96 px ring, no right column, progress underlines */
+  compact?: boolean
   onOpen(): void
 }
 
-/** The MACRO RING ROW (y 547 to 671): ring at x 24 y 553, readouts x 160 to the right gutter. */
-export function TodayRingRow({ totals, targets, onOpen }: RowProps) {
+/** The MACRO RING ROW (y 547 to 679): ring at x 20, readouts x 160 to the right gutter. */
+export function TodayRingRow({ totals, targets, compact = false, onOpen }: RowProps) {
   const [focus, setFocus] = useState<MacroKey | null>(null)
   useEffect(() => {
     if (!focus) return
@@ -217,37 +267,44 @@ export function TodayRingRow({ totals, targets, onOpen }: RowProps) {
   const split = macroEnergySplit(totals)
   const progress = macroProgress(totals, targets)
   const grams = (k: MacroKey) => Math.round(totals[k])
+  const ringSize = compact ? 96 : 120
 
-  const centreValue = focus ? grams(focus) : grams('protein')
+  const placeholder = empty && !focus
+  const centreValue = focus ? grams(focus) : placeholder ? 0 : grams('protein')
   const centreLabel = focus ? `of ${Math.round(targets[focus])}` : 'Protein'
 
   return (
-    <div className="relative h-[124px] shrink-0">
+    <div className="relative h-[132px] shrink-0" data-compact={compact ? 'true' : undefined}>
       <button
         type="button"
         data-intro="ring"
         onClick={onOpen}
         aria-label={`Today's entries. Protein ${grams('protein')} grams, carbs ${grams('carbs')} grams, fat ${grams('fat')} grams.`}
-        className="absolute left-6 top-[6px] h-28 w-28 cursor-pointer rounded-full active:scale-[0.98] transition-transform duration-150"
+        className="absolute left-5 cursor-pointer rounded-full transition-transform duration-150 active:scale-[0.98]"
+        style={{ width: ringSize, height: ringSize, top: (132 - ringSize) / 2 }}
       >
-        <TodayRing totals={totals} targets={targets} focus={focus} />
+        <TodayRing totals={totals} targets={targets} focus={focus} size={ringSize} />
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span data-testid="tp-ring-centre" data-grams={empty && !focus ? 0 : centreValue} className="font-display gold-text num text-[20px] font-bold leading-none">
-            {empty && !focus ? 0 : centreValue}
-            <span className="normal-case"> g</span>
+          <span data-testid="tp-ring-centre" data-grams={centreValue} className="num inline-flex items-baseline whitespace-nowrap">
+            <span className={`font-display inscribed text-[22px] font-bold leading-none ${placeholder ? 'text-bone-dim' : 'text-gold-300'}`}>{centreValue}</span>
+            <span className="unit">{' '}g</span>
           </span>
-          <span className="font-display num mt-1 text-[9px] leading-none tracking-[0.3em] text-bone-dim" style={{ marginRight: '-0.3em' }}>
+          <span
+            className="label mt-[6px] whitespace-nowrap"
+            style={{ letterSpacing: compact ? '0.04em' : '0.1em', marginRight: compact ? '-0.04em' : '-0.1em' }}
+          >
             {centreLabel}
           </span>
         </span>
       </button>
 
-      <div data-intro="ring-readouts" className="absolute right-6 top-[14px] left-40">
+      <div data-intro="ring-readouts" className={`absolute right-5 top-3 ${compact ? 'left-[132px]' : 'left-40'}`}>
         {MACRO_KEYS.map((k) => {
           const active = focus === k
           const target = Math.round(targets[k])
           const share = Math.round(split[k] * 100)
           const ratio = Math.round(progress[k] * 100)
+          const fill = target > 0 ? Math.max(0, Math.min(1, totals[k] / target)) : 0
           return (
             <button
               key={k}
@@ -258,18 +315,35 @@ export function TodayRingRow({ totals, targets, onOpen }: RowProps) {
               data-target={target}
               aria-pressed={active}
               aria-label={`${MACRO_LABEL[k]} ${grams(k)} grams${target > 0 ? ` of ${target}, ${ratio} percent of target` : ''}`}
-              className="relative flex h-8 w-full cursor-pointer items-center gap-2.5 text-left before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-['']"
+              className="relative flex h-9 w-full cursor-pointer items-center gap-2.5 text-left"
             >
-              <span aria-hidden="true" className="h-0.5 w-2.5 shrink-0" style={{ background: MACRO_COLOUR[k] }} />
-              <span className={`font-display inscribed w-[62px] shrink-0 text-[10px] leading-none tracking-[0.3em] ${active ? 'text-gold-300' : 'text-bone-dim'}`}>
+              <span
+                aria-hidden="true"
+                className="h-0.5 w-3 shrink-0"
+                style={{ background: `linear-gradient(180deg, rgba(255, 247, 218, 0.3) 0 1px, ${MACRO_COLOUR[k]} 1px)` }}
+              />
+              <span
+                className={`label inscribed shrink-0 ${compact ? 'w-[64px]' : 'w-[70px]'} ${active ? 'text-gold-300' : ''}`}
+                style={{ letterSpacing: '0.1em' }}
+              >
                 {MACRO_LABEL[k]}
               </span>
-              <span className="num font-body shrink-0 whitespace-nowrap text-[18px] font-medium leading-none text-bone">
-                {grams(k)} <span className="text-[15px] text-bone-dim">g</span>
+              <span className={`relative flex min-w-0 items-baseline ${compact ? 'flex-1' : 'shrink-0'}`}>
+                <span className="num font-body whitespace-nowrap text-[20px] font-semibold leading-none text-bone">{grams(k)}</span>
+                <span className="unit">{' '}g</span>
+                {compact && target > 0 ? (
+                  <span aria-hidden="true" data-underline={k} className="absolute inset-x-0 -bottom-[7px] h-0.5 bg-[var(--rule)]">
+                    <span className="block h-full" style={{ width: `${(fill * 100).toFixed(1)}%`, background: 'rgba(216, 180, 90, 0.6)' }} />
+                  </span>
+                ) : null}
               </span>
               <span
                 data-aside={active ? 'progress' : target > 0 ? 'target' : 'share'}
-                className={`num font-body ml-auto shrink-0 whitespace-nowrap text-[15px] leading-none ${active ? 'text-gold-300' : 'text-bone-dim'}`}
+                className={
+                  compact
+                    ? 'sr-only'
+                    : `num font-body ml-auto shrink-0 whitespace-nowrap text-[16px] font-semibold leading-none ${active ? 'text-gold-300' : 'text-bone-soft'}`
+                }
               >
                 {readoutAside({ active, target, ratio, share, empty })}
               </span>

@@ -1,70 +1,84 @@
 /**
- * The gold goal line (docs/design-spec.md section 7, Goal line): a slab wider than the frustum at
- * Y 2.0 (the column occludes it where it passes through), an additive glow slab, a flat ring and
- * a glow sprite. The opening draws the slab from the left edge (`mon.goalX`) while ring and sprite
- * fade in (`mon.goalFade`); a crossing flashes slab and ring to #FFF7DA and the sprite to 0.9
- * (`mon.flash`), decaying to rest.
+ * The gold goal line (docs/polish-spec.md section 5.3), all on the tpFx program: one 6.0 x 0.10
+ * plane at Y 2.0 whose shader draws a Gaussian core and glow with a travelling glint (following the
+ * tilt when it is live, else the 9 s gold sweep) and, high tier only, a sparkle; a collar ring at the
+ * column; a glow billboard in front. The opening draws the line from the left with a hot tip
+ * (`mon.goalX`) while collar and glow fade in (`mon.goalFade`); a crossing flashes everything to
+ * #FFF7DA (`mon.flash`), decaying to rest. Reduced motion freezes the glint at the centre.
  */
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, Color, DoubleSide, type Mesh, type MeshBasicMaterial, type Sprite, type SpriteMaterial } from 'three'
+import { type Mesh, PlaneGeometry, RingGeometry } from 'three'
 import { useBus } from './bus'
+import { createFxMaterial } from './fxMaterial'
+import { isReducedMotion } from '../lib/motion'
+import type { TierSettings } from './tier'
 import { COL, GOAL_Y } from './tokens'
-import { radialTexture } from './textures'
 
-const HALF = 3.0
+/** the line plane spans 6 units; at rest the frustum shows about uv 0.23 to 0.77 of it */
+const DRAW_FROM = 0.2
+const DRAW_SPAN = 0.6
 
-export function GoalLine() {
+export function GoalLine({ settings }: { settings: TierSettings }) {
   const bus = useBus()
-  const slab = useRef<Mesh>(null)
   const glow = useRef<Mesh>(null)
-  const slabMat = useRef<MeshBasicMaterial>(null)
-  const ringMat = useRef<MeshBasicMaterial>(null)
-  const glowMat = useRef<MeshBasicMaterial>(null)
-  const sprite = useRef<Sprite>(null)
-  const spriteMat = useRef<SpriteMaterial>(null)
-  const tex = useMemo(() => radialTexture('glow'), [])
-  const colours = useMemo(() => ({ line: new Color(COL.goalLine), flash: new Color(COL.goalFlash), tmp: new Color() }), [])
+  const collar = useRef<Mesh>(null)
+  const lineMat = useMemo(() => createFxMaterial({ mode: 1 }), [])
+  const collarMat = useMemo(() => createFxMaterial({ mode: 1, ring: true, ringR: [0.5075, 0.006] }), [])
+  const glowMat = useMemo(() => createFxMaterial({ mode: 2, billboard: true, billScale: [2.4, 0.22], color: COL.goalGlow, alpha: 0 }), [])
+  const ringGeo = useMemo(() => {
+    // built flat (XZ) so the shader's object-space xz is the ring plane
+    const g = new RingGeometry(0.47, 0.545, 96)
+    g.rotateX(-Math.PI / 2)
+    return g
+  }, [])
+  const lineGeo = useMemo(() => new PlaneGeometry(6.0, 0.1), [])
+  useEffect(
+    () => () => {
+      lineMat.dispose()
+      collarMat.dispose()
+      glowMat.dispose()
+      ringGeo.dispose()
+      lineGeo.dispose()
+    },
+    [lineMat, collarMat, glowMat, ringGeo, lineGeo],
+  )
 
   useFrame(() => {
     const mon = bus.monument.mon
     const x = Math.max(0, Math.min(1, mon.goalX))
     const fade = Math.max(0, Math.min(1, mon.goalFade))
     const flash = Math.max(0, Math.min(1, mon.flash))
-    for (const m of [slab.current, glow.current]) {
-      if (!m) continue
-      m.visible = x > 0.001
-      m.scale.x = Math.max(0.0001, x)
-      m.position.x = -HALF + HALF * x
-    }
-    colours.tmp.copy(colours.line).lerp(colours.flash, flash)
-    if (slabMat.current) slabMat.current.color.copy(colours.tmp)
-    if (ringMat.current) {
-      ringMat.current.color.copy(colours.tmp)
-      ringMat.current.opacity = fade
-    }
-    if (glowMat.current) glowMat.current.opacity = 0.16 + 0.14 * flash
-    if (sprite.current) sprite.current.visible = fade > 0.001
-    if (spriteMat.current) spriteMat.current.opacity = (0.35 + 0.55 * flash) * fade
+    const reduced = isReducedMotion()
+    const t = reduced ? 0 : performance.now() / 1000
+    // mon.tiltX is the live tilt, or the 9 s gold sweep relayed by tilt.ts while tilt is not live;
+    // a removal runs one shimmer right to left (mon.shimmerX) after the sink
+    const sweep = reduced ? 0 : (mon.shimmerX ?? 2.4 * mon.tiltX)
+
+    const lu = lineMat.uniforms
+    lu.uDraw.value = x >= 0.999 ? 1 : DRAW_FROM + DRAW_SPAN * x
+    lu.uFlash.value = flash
+    lu.uSweepX.value = sweep
+    lu.uTime.value = t
+    lu.uSparkle.value = settings.sparkle
+    lu.uAlpha.value = x > 0.001 ? 1 : 0
+
+    const cu = collarMat.uniforms
+    cu.uFlash.value = flash
+    cu.uAlpha.value = fade
+    if (collar.current) collar.current.visible = fade > 0.001
+
+    glowMat.uniforms.uAlpha.value = (0.36 + 0.5 * flash) * fade
+    if (glow.current) glow.current.visible = fade > 0.001
   })
 
   return (
     <group>
-      <mesh ref={slab} position={[0, GOAL_Y, 0]} renderOrder={1}>
-        <boxGeometry args={[6.0, 0.012, 0.012]} />
-        <meshBasicMaterial ref={slabMat} color={COL.goalLine} toneMapped={false} />
+      <mesh geometry={lineGeo} material={lineMat} position={[0, GOAL_Y, 0]} renderOrder={1} frustumCulled={false} />
+      <mesh ref={collar} geometry={ringGeo} material={collarMat} position={[0, GOAL_Y, 0]} renderOrder={1} visible={false} />
+      <mesh ref={glow} material={glowMat} position={[0, GOAL_Y, 0.5]} renderOrder={2} visible={false} frustumCulled={false}>
+        <planeGeometry args={[1, 1]} />
       </mesh>
-      <mesh ref={glow} position={[0, GOAL_Y, 0]} renderOrder={1}>
-        <boxGeometry args={[6.0, 0.06, 0.06]} />
-        <meshBasicMaterial ref={glowMat} color={COL.goalGlow} transparent opacity={0.16} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, GOAL_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
-        <ringGeometry args={[0.56, 0.575, 96]} />
-        <meshBasicMaterial ref={ringMat} color={COL.goalLine} side={DoubleSide} transparent opacity={0} toneMapped={false} />
-      </mesh>
-      <sprite ref={sprite} position={[0, GOAL_Y, 0.5]} scale={[1.6, 0.28, 1]} visible={false} renderOrder={2}>
-        <spriteMaterial ref={spriteMat} map={tex} color={COL.goalGlow} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </sprite>
     </group>
   )
 }

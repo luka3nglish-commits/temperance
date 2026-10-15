@@ -32,6 +32,9 @@ export const FONTS_CAP_MS = 300
 /** S4: the rise is called at 420 so the column lands at 1000 inside a 680 ms dolly (spec S4). */
 export const RISE_AT_MS = 420
 export const RISE_MS = 680
+/** the ghost reveal (polish-spec 5.5): 420 to 860 */
+export const GHOST_AT_MS = 420
+export const GHOST_MS = 440
 
 export type Overlay = {
   wordmark: HTMLElement | null
@@ -168,7 +171,7 @@ const land = (stage: HTMLElement | null, trauma: number) => {
 
 /**
  * The wordmark FLIP: measure the overlay wordmark and the header slot, translate and scale the
- * overlay copy into the slot while its tracking closes from 0.5em to the header's 0.34em, then
+ * overlay copy into the slot while its tracking closes from 0.42em to the header's 0.3em, then
  * swap (overlay hidden, header shown) in the same frame.
  */
 const flipWordmark = (tl: gsap.core.Timeline, overlay: HTMLElement | null, header: HTMLElement | undefined, at: number, dur: number) => {
@@ -187,7 +190,7 @@ const flipWordmark = (tl: gsap.core.Timeline, overlay: HTMLElement | null, heade
   }
   tl.to(
     overlay,
-    { x, y, scale, letterSpacing: '0.34em', paddingLeft: '0.34em', transformOrigin: '50% 50%', duration: ms(dur), ease: EASE.stone },
+    { x, y, scale, letterSpacing: '0.3em', paddingLeft: '0.3em', transformOrigin: '50% 50%', duration: ms(dur), ease: EASE.stone },
     ms(at),
   )
   tl.set(overlay, { opacity: 0 }, ms(at + dur))
@@ -195,12 +198,33 @@ const flipWordmark = (tl: gsap.core.Timeline, overlay: HTMLElement | null, heade
 }
 
 /**
- * The full opening, 1900 ms. The wordmark cut (S1) waits for the fonts gate (300 ms cap) and is
- * added to the running timeline at the moment the gate opens; the FLIP follows its last letter.
+ * The wordmark's gold runs continuously across its letters: each letter carries the word-sized
+ * gradient (and the sheen) offset by its own position, measured here once the font is in.
+ */
+const measureWordmark = (wordmark: HTMLElement | null, letters: HTMLElement[]) => {
+  if (!wordmark || !letters.length) return
+  const first = letters[0]
+  const last = letters[letters.length - 1]
+  const ww = last.offsetLeft + last.offsetWidth - first.offsetLeft
+  if (!(ww > 0)) return
+  wordmark.style.setProperty('--ww', `${ww}px`)
+  for (const l of letters) l.style.setProperty('--lx', `${l.offsetLeft - first.offsetLeft}px`)
+}
+
+/**
+ * The full opening, 1900 ms (polish-spec 5.5). Light enters first: the colonnade fades up from 0
+ * and the shaft of light from 120 ms, so 250 ms is never a void. The wordmark cut (S1) starts at
+ * once when Cinzel is already in, else at the fonts gate (300 ms cap); one sheen crosses it and the
+ * FLIP follows its last letter. The goal line draws 300 to 1020, the glass ghost rises 420 to 860
+ * and the stone rises inside it, landing at 1000.
  */
 export function buildFull(input: BuildInput): gsap.core.Timeline {
   const { targets, overlay, stage, ctx, isLive, onTilt } = input
   const tl = gsap.timeline({ paused: true, onComplete: input.onComplete })
+
+  // S0 the temple: the colonnade from the dark, then the shaft of light
+  riseIn(tl, targets.colonnade, 0, 900, 6)
+  fadeIn(tl, targets.shaft, 120, 700)
 
   // S2 the shards: fade 120 to 420, glint sweep 120 to 720, then the tilt loop takes the light back
   revealShards(tl, targets.shards, 120, 300, 600, onTilt)
@@ -210,6 +234,9 @@ export function buildFull(input: BuildInput): gsap.core.Timeline {
   tl.call(() => getMonumentHandle().playGoalLine(720), [], ms(300))
   fadeIn(tl, targets['goal-label'], 1020, 200)
 
+  // the glass ghost rises from the plinth to the line, 420 to 860, and the stone rises inside it
+  tl.call(() => getMonumentHandle().playGhostReveal(GHOST_MS), [], ms(GHOST_AT_MS))
+
   // S4 the rise. One call at 420 whatever the shader state: the scene routes it (3D when ready,
   // the SVG monument otherwise, handing over to the canvas when shaders resolve before 600 ms, or
   // crossfading at the first idle frame after 1900 when they resolve later). The column lands at
@@ -218,8 +245,9 @@ export function buildFull(input: BuildInput): gsap.core.Timeline {
   tl.call(() => getMonumentHandle().sweepOnce(400), [], ms(960))
   tl.call(() => land(stage, 0.75), [], ms(1000))
 
-  // the header date lands with the wordmark
+  // the header date and the streak land with the wordmark
   fadeIn(tl, targets.date, 1100, 160)
+  fadeIn(tl, targets.streak, 1100, 200)
 
   // S5 the cut
   fadeIn(tl, targets.label, 1060, 160)
@@ -238,12 +266,12 @@ export function buildFull(input: BuildInput): gsap.core.Timeline {
   // pin the end at 1900 whatever the gate did
   tl.call(() => {}, [], ms(FULL_MS))
 
-  // S1 the void: letters chiselled in once the fonts are ready, at most 300 ms in
-  const cap = new Promise<void>((r) => window.setTimeout(r, FONTS_CAP_MS))
-  void Promise.race([input.fontsReady.catch(() => undefined), cap]).then(() => {
-    if (!isLive() || tl.progress() >= 1) return
+  // S1 the letters chiselled in, with one sheen pass: at once when Cinzel is already in, else once
+  // the fonts are ready (at most 300 ms in)
+  const startLetters = () => {
     ctx.add(() => {
       const now = Math.min(tl.time(), ms(FONTS_CAP_MS))
+      measureWordmark(overlay.wordmark, overlay.letters)
       const letters = gsap.timeline()
       if (overlay.letters.length) {
         letters.to(overlay.letters, {
@@ -253,13 +281,28 @@ export function buildFull(input: BuildInput): gsap.core.Timeline {
           stagger: ms(40),
         })
       }
+      if (overlay.wordmark) letters.fromTo(overlay.wordmark, { '--sheen-p': 1.3 }, { '--sheen-p': -0.3, duration: ms(900), ease: 'power1.inOut' }, 0)
       // the FLIP starts at 680 or after the last letter, whichever is later
       const lastLetter = (overlay.letters.length ? (overlay.letters.length - 1) * 40 + 180 : 0) / 1000
       const flipAt = Math.max(ms(680) - now, lastLetter)
       flipWordmark(letters, overlay.wordmark, targets.wordmark, flipAt * 1000, 420)
       tl.add(letters, now)
     })
-  })
+  }
+  let fontIn = false
+  try {
+    fontIn = typeof document !== 'undefined' && !!document.fonts && document.fonts.check('700 30px Cinzel')
+  } catch {
+    fontIn = false
+  }
+  if (fontIn) startLetters()
+  else {
+    const cap = new Promise<void>((r) => window.setTimeout(r, FONTS_CAP_MS))
+    void Promise.race([input.fontsReady.catch(() => undefined), cap]).then(() => {
+      if (!isLive() || tl.progress() >= 1) return
+      startLetters()
+    })
+  }
 
   return tl
 }
@@ -274,14 +317,18 @@ export function buildShort(input: BuildInput): gsap.core.Timeline {
       const h = getMonumentHandle()
       h.setInstant()
       h.playGoalLine(300)
+      h.playGhostReveal(300)
     },
     [],
     0,
   )
   revealShards(tl, targets.shards, 0, 200, 500, onTilt)
   tl.call(() => input.releaseTilt(), [], ms(500))
+  riseIn(tl, targets.colonnade, 0, 400, 6)
+  fadeIn(tl, targets.shaft, 0, 400)
   fadeIn(tl, targets.wordmark, 0, 200)
   fadeIn(tl, targets.date, 0, 200)
+  fadeIn(tl, targets.streak, 0, 200)
   tl.call(() => getMonumentHandle().sweepOnce(400), [], ms(100))
 
   fadeIn(tl, targets.label, 150, 160)

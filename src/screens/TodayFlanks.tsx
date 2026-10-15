@@ -1,72 +1,107 @@
 /**
- * FLANK INSCRIPTIONS (spec section 6, y 400 to 452): EATEN left, GOAL right, cut either side of the
- * column 107 px above the plinth top. Anchored to --plinth-y (written by the scene in frame
- * coordinates; the stage starts 40 px under the top safe area) so they ride with the monument when
- * it scales on a short phone. EATEN opens the TODAY sheet. `compact` only tightens the type.
- * Also the DOM `GOAL 2 500` label that rides the gold goal line at --goal-y.
+ * FLANK PLAQUES (polish-spec 6.1, --plinth-y minus 64 to minus 12): EATEN left, GOAL right, cut either
+ * side of the column above the plinth. Anchored to --plinth-y (written by the scene in frame
+ * coordinates; the stage starts 40 px under the top safe area) so they ride with the monument when it
+ * scales on a short phone.
+ *
+ *   EATEN            Cinzel 700 12 px 0.12em bone-dim
+ *   1 328            Cinzel 700 24 px bone
+ *   ───────◆         6 px under the value: a 44 x 1 gold rule fading toward the column, a rhombus at its end
+ *
+ * Left x 20 to 124 left aligned, right x 266 to 370 right aligned (mirrored). With the hero swapped to
+ * EATEN the left plaque reads LEFT and the remaining figure, so each figure appears once. The left
+ * plaque opens the TODAY sheet.
+ *
+ * Also the goal marker: a 7 x 7 rhombus at the right gutter centred on the gold line at --goal-y. No
+ * text (the GOAL plaque carries the figure); it is named for screen readers.
  */
+import { Rhombus } from '../components/ornaments'
 import type { EnergyUnit } from '../lib/types'
-import { formatEnergy } from '../lib/units'
+import { formatEnergy, unitLabel } from '../lib/units'
 
 type Props = {
   eaten: number
+  /** kcal left (negative once over) */
+  remaining: number
   goal: number
   unit: EnergyUnit
-  /** short phones: smaller values, tighter block */
+  /** the hero shows EATEN, so the left plaque shows what is left */
+  swapped: boolean
+  /** short phones: a 20 px value, a tighter block */
   compact: boolean
   onEaten(): void
 }
 
-const labelCls = 'font-display inscribed block text-[9px] leading-none tracking-[0.35em] text-bone-dim'
-const valueCls = 'font-display inscribed num block leading-[1.1] tracking-[0.02em] text-bone'
-
 /** the plinth top in stage coordinates */
 export const PLINTH_IN_STAGE = 'calc(var(--plinth-y) - var(--safe-top) - 40px)'
 
-export function TodayFlanks({ eaten, goal, unit, compact, onEaten }: Props) {
-  const eatenText = formatEnergy(eaten, unit)
+const RULE_W = 44
+
+function PlaqueRule({ side }: { side: 'left' | 'right' }) {
+  const fromOuter = side === 'left' ? '90deg' : '270deg'
+  return (
+    <span aria-hidden="true" className={`flex items-center gap-[5px] ${side === 'right' ? 'flex-row-reverse' : ''}`}>
+      <span className="block h-px" style={{ width: RULE_W, background: `linear-gradient(${fromOuter}, rgba(216, 180, 90, 0.55), rgba(216, 180, 90, 0.08))` }} />
+      <Rhombus />
+    </span>
+  )
+}
+
+export function TodayFlanks({ eaten, remaining, goal, unit, swapped, compact, onEaten }: Props) {
+  const showLeft = swapped && remaining >= 0
+  const leftLabel = showLeft ? 'Left' : 'Eaten'
+  const leftKcal = showLeft ? remaining : eaten
+  const leftText = formatEnergy(leftKcal, unit)
   const goalText = formatEnergy(goal, unit)
-  const h = compact ? 44 : 52
-  const above = compact ? 84 : 107
-  const valueSize = compact ? 'text-[18px]' : 'text-[22px]'
+  const h = compact ? 46 : 52
+  const above = compact ? 56 : 64
+  const valueSize = compact ? 'text-[20px]' : 'text-[24px]'
+  const valueCls = `font-display inscribed num block font-bold leading-[1.1] tracking-[0.02em] text-bone ${valueSize}`
 
   return (
-    <div data-intro="flanks" className="pointer-events-none absolute inset-x-4" style={{ height: h, top: `calc(${PLINTH_IN_STAGE} - ${above}px)` }}>
+    <div data-intro="flanks" className="pointer-events-none absolute inset-x-5" style={{ height: h, top: `calc(${PLINTH_IN_STAGE} - ${above}px)` }}>
       <button
         type="button"
         onClick={onEaten}
-        aria-label="Today's entries"
-        className="pointer-events-auto absolute left-0 top-0 flex w-[104px] cursor-pointer flex-col items-start justify-center gap-1.5 rounded-[4px] text-left"
+        aria-label={`${leftLabel} ${leftText} ${unitLabel(unit)}. Today's entries.`}
+        className="press pointer-events-auto absolute left-0 top-0 flex w-[104px] cursor-pointer flex-col items-start justify-between rounded-[4px] text-left"
         style={{ height: h }}
       >
-        <span className={labelCls}>Eaten</span>
-        <span className={`${valueCls} ${valueSize}`} data-testid="tp-eaten-value" data-kcal={eaten}>
-          {eatenText}
+        <span className="label inscribed block">{leftLabel}</span>
+        <span
+          className={valueCls}
+          data-testid={showLeft ? 'tp-left-value' : 'tp-eaten-value'}
+          data-kcal={Math.round(leftKcal)}
+        >
+          {leftText}
         </span>
+        <PlaqueRule side="left" />
       </button>
-      <div className="absolute right-0 top-0 flex w-[104px] flex-col items-end justify-center gap-1.5 text-right" style={{ height: h }}>
-        <span className={labelCls} style={{ marginRight: '-0.35em' }}>
+      <div className="absolute right-0 top-0 flex w-[104px] flex-col items-end justify-between text-right" style={{ height: h }}>
+        <span className="label inscribed block" style={{ marginRight: '-0.12em' }}>
           Goal
         </span>
-        <span className={`${valueCls} ${valueSize}`} data-testid="tp-goal-value" data-kcal={goal} style={{ marginRight: '-0.02em' }}>
+        <span className={valueCls} data-testid="tp-goal-value" data-kcal={goal} style={{ marginRight: '-0.02em' }}>
           {goalText}
         </span>
+        <PlaqueRule side="right" />
       </div>
     </div>
   )
 }
 
-/** `GOAL 2 500` right aligned at the gutter, 6 px above the gold line. Follows --goal-y (written by the scene). */
+/** The goal marker: a 7 x 7 rhombus on the gold line at the right gutter. Follows --goal-y (written by the scene). */
 export function TodayGoalLabel({ goal, unit }: { goal: number; unit: EnergyUnit }) {
   return (
-    <div
+    <span
       data-intro="goal-label"
       data-testid="tp-goal-label"
-      aria-hidden="true"
-      className="font-display inscribed pointer-events-none absolute text-[9px] leading-none tracking-[0.3em] text-gold-400"
-      style={{ top: 'calc(var(--goal-y) - 15px)', right: 'calc(16px - 0.3em)' }}
+      role="img"
+      aria-label={`Goal ${formatEnergy(goal, unit)} ${unitLabel(unit)}`}
+      className="pointer-events-none absolute"
+      style={{ top: 'calc(var(--goal-y) - 3.5px)', right: 20, width: 7, height: 7 }}
     >
-      Goal <span className="num">{formatEnergy(goal, unit)}</span>
-    </div>
+      <Rhombus style={{ position: 'absolute', left: 1, top: 1 }} />
+    </span>
   )
 }

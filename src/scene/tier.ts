@@ -25,20 +25,63 @@ const TIER_TTL = 30 * 24 * 60 * 60 * 1000
 export type TierSettings = {
   dprMax: number
   dust: number
-  /** MeshPhysicalMaterial with clearcoat (high) or MeshStandardMaterial (low) */
+  /** MeshPhysicalMaterial with clearcoat; off on both tiers (docs/polish-spec.md section 5) */
   physical: boolean
   envRes: number
   uDepth: 0 | 1
   uFlute: number
+  /** radial segments of the column shaft */
+  segments: number
+  /** radial segments of the Attic base and capital lathes */
+  lathe: number
+  /** TEMPERANTIA texture width in px (height is an eighth) */
+  inscription: number
+  /** goal line sparkle (1 on, 0 off) */
+  sparkle: number
+  /** motes drifting in the shaft of light, and smoke puffs per strike (instances in the dust mesh) */
+  motes: number
+  smoke: number
   antialias: boolean
   tickerFps: number
   tiltHz: number
 }
 
 // physical (clearcoat) is off on both tiers: its program compiles about twice as slowly and the
-// polish now comes from the painted reflection, which looks the same on either material
-const HIGH: TierSettings = { dprMax: 1.5, dust: 220, physical: false, envRes: 64, uDepth: 1, uFlute: 0.012, antialias: true, tickerFps: 24, tiltHz: 30 }
-const LOW: TierSettings = { dprMax: 1.0, dust: 90, physical: false, envRes: 32, uDepth: 0, uFlute: 0.012, antialias: false, tickerFps: 12, tiltHz: 15 }
+// polish comes from the painted reflection, which looks the same on either material
+const HIGH: TierSettings = {
+  dprMax: 1.5,
+  dust: 220,
+  physical: false,
+  envRes: 64,
+  uDepth: 1,
+  uFlute: 0.014,
+  segments: 160,
+  lathe: 64,
+  inscription: 1024,
+  sparkle: 1,
+  motes: 40,
+  smoke: 12,
+  antialias: true,
+  tickerFps: 24,
+  tiltHz: 30,
+}
+const LOW: TierSettings = {
+  dprMax: 1.0,
+  dust: 90,
+  physical: false,
+  envRes: 32,
+  uDepth: 0,
+  uFlute: 0.014,
+  segments: 80,
+  lathe: 32,
+  inscription: 512,
+  sparkle: 0,
+  motes: 16,
+  smoke: 6,
+  antialias: false,
+  tickerFps: 12,
+  tiltHz: 15,
+}
 
 export function tierSettings(t: Tier): TierSettings {
   return t === 'high' ? HIGH : LOW

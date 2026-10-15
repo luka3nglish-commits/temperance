@@ -10,11 +10,13 @@ import { useStore } from '../store/useStore'
 import { importedText } from './SettingsData'
 import { parseTargetWeight, SettingsScreen, weightDraftFor } from './SettingsScreen'
 import { formatBytes, photoCountLine, PHOTOS_NOTE, SettingsFooter } from './SettingsFooter'
+import { canInstall, INSTALL_TEXT, IOS_INSTALL_TEXT, isSnoozed } from './SettingsInstall'
 
 vi.mock('../lib/photos', () => ({
   photosSupported: vi.fn(() => true),
   listPhotos: vi.fn(async () => []),
   photoStorageBytes: vi.fn(async () => 0),
+  clearPhotos: vi.fn(async () => {}),
 }))
 
 declare global {
@@ -79,6 +81,30 @@ describe('photos line helpers', () => {
   it('the note is one plain sentence', () => {
     expect(PHOTOS_NOTE).toBe('Photos stay on this device and are not in the backup.')
     expect(PHOTOS_NOTE).not.toMatch(/[–—!]/)
+  })
+})
+
+describe('install', () => {
+  it('installable with a captured prompt or on iOS, never once installed', () => {
+    const ev = {} as never
+    expect(canInstall({ deferred: null, installed: false, ios: false })).toBe(false)
+    expect(canInstall({ deferred: ev, installed: false, ios: false })).toBe(true)
+    expect(canInstall({ deferred: null, installed: false, ios: true })).toBe(true)
+    expect(canInstall({ deferred: ev, installed: true, ios: true })).toBe(false)
+  })
+
+  it('the snooze lasts 14 days from when the prompt was shown', () => {
+    const at = 1_800_000_000_000
+    localStorage.setItem('temperance.install.snoozed', String(at))
+    expect(isSnoozed(at + 13 * 86_400_000)).toBe(true)
+    expect(isSnoozed(at + 15 * 86_400_000)).toBe(false)
+    localStorage.removeItem('temperance.install.snoozed')
+    expect(isSnoozed(at)).toBe(false)
+  })
+
+  it('the toast copy is one plain sentence, no dashes', () => {
+    expect(INSTALL_TEXT).toBe('Keep it on the home screen.')
+    expect(`${INSTALL_TEXT}${IOS_INSTALL_TEXT}`).not.toMatch(/[–—!]/)
   })
 })
 
@@ -156,6 +182,35 @@ describe('settings in the DOM', () => {
     blur(input)
     expect(useStore.getState().settings.targetWeightKg).toBeUndefined()
     expect(input.value).toBe('')
+  })
+
+  it('three titled tablets in order, each row inside its group', async () => {
+    act(() => root.render(createElement(SettingsScreen)))
+    await flush()
+    const groups = ['goals', 'display', 'data'].map((g) => $(`tp-settings-group-${g}`))
+    expect(groups.every(Boolean)).toBe(true)
+    expect(groups.map((g) => g?.querySelector('h2')?.textContent)).toEqual(['I · Goals', 'II · Display', 'III · Data'])
+    expect(groups[0]?.querySelector('[data-testid="tp-settings-target-fat"]')).not.toBeNull()
+    expect(groups[1]?.querySelector('[data-testid="tp-settings-opening"]')).not.toBeNull()
+    expect(groups[2]?.querySelector('[data-testid="tp-settings-erase"]')).not.toBeNull()
+    // the DAYS row moved to the footer
+    expect([...container.querySelectorAll('.label')].map((l) => l.textContent)).not.toContain('Days')
+    expect($('tp-settings-footer')?.textContent).toContain('Days reset at local midnight.')
+    // no install row where the app cannot be installed (jsdom has no prompt event)
+    expect($('tp-settings-install')).toBeNull()
+  })
+
+  it('ERASE asks a second time before it erases', async () => {
+    useStore.getState().setGoalKcal(2100)
+    act(() => root.render(createElement(SettingsScreen)))
+    await flush()
+    act(() => $('tp-settings-erase')!.click())
+    expect($('tp-settings-erase')).toBeNull()
+    expect($('tp-settings-erase-confirm')?.textContent).toBe('Erase everything')
+    expect(useStore.getState().settings.goalKcal).toBe(2100)
+    act(() => $('tp-settings-erase-confirm')!.click())
+    expect(useStore.getState().settings.goalKcal).not.toBe(2100)
+    expect($('tp-settings-erase')).not.toBeNull()
   })
 
   it('the footer counts the photos and says they stay on the device', async () => {

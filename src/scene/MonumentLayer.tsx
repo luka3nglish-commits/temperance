@@ -23,6 +23,11 @@ import { crackFor, heightFor, GOAL_Y, PX_PER_UNIT, STAGE_H, STAGE_PLINTH_Y } fro
 import { SafeCanvas } from './SafeCanvas'
 import { ColumnScene } from './ColumnScene'
 import { FallbackMonument } from './FallbackMonument'
+import { TempleBack, TempleFront } from './Temple'
+import { DEBUG } from './debugFlags'
+
+/** the stage fades out over its bottom 28 px instead of cutting the plinth (polish-spec C22) */
+const STAGE_MASK = 'linear-gradient(180deg, #000 0, #000 calc(100% - 28px), transparent 100%)'
 
 /** shaders ready inside this many ms of mount: the 3D column takes the rise and the SVG cuts away */
 const EARLY_JOIN_MS = 600
@@ -73,7 +78,15 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
   }, [bus])
 
   useEffect(() => {
-    const t = createTicker(() => bus.sceneInvalidate?.(), mountSettings.tickerFps)
+    const t = createTicker(
+      () => bus.sceneInvalidate?.(),
+      mountSettings.tickerFps,
+      (running) => {
+        // the shaft breathes (and the motes drift) only while live idle runs
+        if (running) root.current?.setAttribute('data-live', '')
+        else root.current?.removeAttribute('data-live')
+      },
+    )
     tickerRef.current = t
     t.observe(root.current)
     t.setVisible(bus.visible)
@@ -83,6 +96,31 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       if (tickerRef.current === t) tickerRef.current = null
     }
   }, [bus, mountSettings.tickerFps, applyIdle])
+
+  // every landing flares the DOM shaft of light: 0 to 0.5 over 60 ms, back to 0 over 320 ms (compositor
+  // opacity only). Both renderers land through the same choreography, so the SVG path gets it too.
+  useEffect(() => {
+    bus.monument.setHooks({
+      onLanding: () => {
+        if (!bus.visible || isReducedMotion()) return
+        const el = root.current?.querySelector<HTMLElement>('[data-tp-flare]')
+        if (!el || typeof el.animate !== 'function') return
+        try {
+          el.animate(
+            [
+              { opacity: 0, offset: 0 },
+              { opacity: 0.5, offset: 60 / 380, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+              { opacity: 0, offset: 1 },
+            ],
+            { duration: 380, easing: 'linear' },
+          )
+        } catch {
+          /* no WAAPI: the flare is decoration */
+        }
+      },
+    })
+    return () => bus.monument.setHooks({ onLanding: undefined })
+  }, [bus])
 
   useEffect(() => {
     bus.layerTop = () => root.current?.offsetTop ?? 0
@@ -138,6 +176,9 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       bus.monument.setTargets(h, crackFor(eaten, goal))
       // test hook: the target height on the layer root (tp-column carries the rendered height)
       root.current?.setAttribute('data-h-target', h.toFixed(3))
+      // the temple's arch haze turns ember on an over day
+      if (eaten > goal && goal > 0) root.current?.setAttribute('data-over', '')
+      else root.current?.removeAttribute('data-over')
     },
     [bus],
   )
@@ -352,6 +393,7 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       setInstant: () => m.setInstant(),
       playOpeningRise: (ms) => detached(() => m.playOpeningRise(ms))(),
       playGoalLine: (ms) => detached(() => m.playGoalLine(ms))(),
+      playGhostReveal: (ms) => detached(() => m.playGhostReveal(ms))(),
       sweepOnce: (ms) => detached(() => m.sweepOnce(ms))(),
       shake: (trauma) => detached(() => m.shake(trauma))(),
       startIdle: () => {
@@ -369,6 +411,7 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
   }, [mode, bus, applyIdle, joinNow])
 
   const showCanvas = mode === 'webgl'
+  const parallax = tier === 'high' && !reduced
   return (
     <BusContext.Provider value={bus}>
       <div
@@ -384,8 +427,11 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
           visibility: visible ? 'visible' : 'hidden',
           transform: scale === 1 ? undefined : `scale(${scale})`,
           transformOrigin: '50% 0',
+          maskImage: DEBUG.nomask ? undefined : STAGE_MASK,
+          WebkitMaskImage: DEBUG.nomask ? undefined : STAGE_MASK,
         }}
       >
+        {DEBUG.notemple ? null : <TempleBack parallax={parallax} />}
         {showCanvas ? (
           <div
             className="absolute inset-0"
@@ -397,6 +443,7 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
           </div>
         ) : null}
         <FallbackMonument hidden={showCanvas && joined} crossfade={lateJoin} />
+        {DEBUG.notemple ? null : <TempleFront />}
       </div>
     </BusContext.Provider>
   )

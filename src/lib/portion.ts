@@ -64,11 +64,24 @@ export function formatAmountNumber(amount: number): string {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
 }
 
-/** "180 g", "250 ml", "1 serve", "1.5 serves" */
+/** "serve" at 1 or less ("0.5 serve", "1 serve"), "serves" above ("1.5 serves"). */
+export function serveWord(amount: number): string {
+  return amount <= 1 ? 'serve' : 'serves'
+}
+
+/** "180 g", "250 ml", "1 serve", "0.5 serve", "1.5 serves" (singular at 1 or less) */
 export function formatAmount(amount: number, unit: AmountUnit): string {
   const n = formatAmountNumber(amount)
-  if (unit === 'serve') return `${n} ${amount === 1 ? 'serve' : 'serves'}`
+  if (unit === 'serve') return `${n} ${serveWord(amount)}`
   return `${n} ${unit}`
+}
+
+/** Spoken form for aria labels: "180 grams", "250 millilitres", "1 serve", "1.5 serves". */
+export function formatAmountLong(amount: number, unit: AmountUnit): string {
+  const n = formatAmountNumber(amount)
+  if (unit === 'g') return `${n} ${amount === 1 ? 'gram' : 'grams'}`
+  if (unit === 'ml') return `${n} ${amount === 1 ? 'millilitre' : 'millilitres'}`
+  return `${n} ${serveWord(amount)}`
 }
 
 /** "per 100 g", "per 250 ml", "per serve" */
@@ -77,11 +90,31 @@ export function basisLabel(per: Portion | undefined): string {
   return `per ${formatAmountNumber(per.amount)} ${per.unit}`
 }
 
-/** What a logged entry shows next to its name: "180 g", "× 1.5", or "" for exactly one serving. */
+const isOne = (n: number) => Math.abs(n - 1) < 1e-9
+
+/**
+ * The portion label rule (polish-spec 6.2): what a logged entry shows after its name, rendered as
+ * ` · 180 g`. "" for exactly one serve; "180 g"; "250 ml"; "1.5 serves"; "0.5 serve" (singular at 1
+ * or less); never a multiplication sign. Every list of entries uses it (recents, suggestions, the
+ * TODAY sheet, the HISTORY day sheet).
+ */
 export function portionLabel(e: Pick<LogEntry, 'portion' | 'servings'>): string {
-  if (e.portion) return formatAmount(e.portion.amount, e.portion.unit)
-  if (Math.abs(e.servings - 1) < 1e-9) return ''
-  return `× ${formatAmountNumber(e.servings)}`
+  if (e.portion) {
+    if (e.portion.unit === 'serve' && isOne(e.portion.amount)) return ''
+    return formatAmount(e.portion.amount, e.portion.unit)
+  }
+  if (isOne(e.servings)) return ''
+  return formatAmount(e.servings, 'serve')
+}
+
+/** The same rule for screen readers: "180 grams", "1.5 serves", "" for one serve. */
+export function portionAria(e: Pick<LogEntry, 'portion' | 'servings'>): string {
+  if (e.portion) {
+    if (e.portion.unit === 'serve' && isOne(e.portion.amount)) return ''
+    return formatAmountLong(e.portion.amount, e.portion.unit)
+  }
+  if (isOne(e.servings)) return ''
+  return formatAmountLong(e.servings, 'serve')
 }
 
 /** The +/- step for a portion control: quarter servings, 5 g under 50 g, 10 g under 500 g, then 25 g. */

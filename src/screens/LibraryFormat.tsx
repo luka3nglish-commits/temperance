@@ -2,8 +2,9 @@
  * Pure helpers for the LIBRARY screen: sub-line copy, basis labels, favourites merge, sorting.
  * Kept free of React so they can be unit tested.
  */
-import type { EnergyUnit, Ingredient, Macros, Meal } from '../lib/types'
+import type { EnergyUnit, Ingredient, LogEntry, Macros, Meal } from '../lib/types'
 import { formatEnergy, unitLabel } from '../lib/units'
+import { portionLabel } from '../lib/portion'
 
 /** Grams: whole when stored whole, one decimal otherwise (spec section 18). */
 export function fmtGrams(g: number): string {
@@ -12,23 +13,22 @@ export function fmtGrams(g: number): string {
   return Number.isInteger(r) ? String(r) : r.toFixed(1)
 }
 
+/** A whole number of grams for list meta lines (polish-spec 4.11: macros rounded to integers). */
+const whole = (g: number) => String(Number.isFinite(g) ? Math.round(g) : 0)
+
 /** `612 kcal` or `2 561 kJ`, always the display unit. */
 export function energyText(kcal: number, unit: EnergyUnit): string {
   return `${formatEnergy(kcal, unit)} ${unitLabel(unit)}`
 }
 
-/** `P 32 C 48 F 12` */
-export function macroText(m: Macros): string {
-  return `P ${fmtGrams(m.protein)} C ${fmtGrams(m.carbs)} F ${fmtGrams(m.fat)}`
-}
-
-/** Meal row sub-line: `612 kcal · P 32 C 48 F 12` */
-export function mealSubline(m: Macros, unit: EnergyUnit): string {
-  return `${energyText(m.kcal, unit)} · ${macroText(m)}`
+/** `P 32 · C 48 · F 12`, whole grams. */
+export function macroText(m: Pick<Macros, 'protein' | 'carbs' | 'fat'>): string {
+  return `P ${whole(m.protein)} · C ${whole(m.carbs)} · F ${whole(m.fat)}`
 }
 
 /** `per 100 g`, `per 250 ml`, `per serve`, `per 2 serves` */
-export function basisLabel(per: Ingredient['per']): string {
+export function basisLabel(per: Ingredient['per'] | undefined): string {
+  if (!per) return 'per serve'
   const amount = per.amount > 0 ? per.amount : 1
   if (per.unit === 'serve') {
     if (amount === 1) return 'per serve'
@@ -37,15 +37,35 @@ export function basisLabel(per: Ingredient['per']): string {
   return `per ${fmtGrams(amount)} ${per.unit}`
 }
 
-/** `100 g`, `1 serve`, `2 serves` for a component amount. */
+/** `100 g`, `1 serve`, `2 serves` for a component amount (singular at 1 or less). */
 export function amountLabel(amount: number, unit: Ingredient['per']['unit']): string {
-  if (unit === 'serve') return `${fmtGrams(amount)} ${amount === 1 ? 'serve' : 'serves'}`
+  if (unit === 'serve') return `${fmtGrams(amount)} ${amount <= 1 ? 'serve' : 'serves'}`
   return `${fmtGrams(amount)} ${unit}`
 }
 
-/** Ingredient row sub-line: `per 100 g · 165 kcal · P 31 C 0 F 3.6` */
-export function ingredientSubline(ing: Pick<Ingredient, 'per' | 'macros'>, unit: EnergyUnit): string {
-  return `${basisLabel(ing.per)} · ${mealSubline(ing.macros, unit)}`
+/** True when a meal is counted per an amount (per 100 g, per 100 ml) rather than per serve. */
+export function hasBasis(per: Meal['per']): per is NonNullable<Meal['per']> {
+  return !!per && !(per.unit === 'serve' && per.amount === 1)
+}
+
+/**
+ * Meal row meta line: `P 32 · C 48 · F 12`. A meal counted per an amount says so first:
+ * `per 100 g · P 9 · C 4 · F 5`. The energy sits in the row's value column.
+ */
+export function mealSubline(meal: Pick<Meal, 'macros' | 'per'>): string {
+  const macros = macroText(meal.macros)
+  return hasBasis(meal.per) ? `${basisLabel(meal.per)} · ${macros}` : macros
+}
+
+/** Ingredient row meta line: `per 100 g · P 31 · C 0 · F 4` (the basis always comes first). */
+export function ingredientSubline(ing: Pick<Ingredient, 'per' | 'macros'>): string {
+  return `${basisLabel(ing.per)} · ${macroText(ing.macros)}`
+}
+
+/** Toast copy after a log: `Logged · 180 g · 175 kcal`, or `Logged · 612 kcal` for one serve. */
+export function loggedText(entry: Pick<LogEntry, 'portion' | 'servings' | 'macros'>, unit: EnergyUnit): string {
+  const label = portionLabel(entry)
+  return `Logged · ${label ? `${label} · ` : ''}${energyText(entry.macros.kcal, unit)}`
 }
 
 export type FavouriteItem = { kind: 'meal'; item: Meal } | { kind: 'ingredient'; item: Ingredient }
@@ -64,24 +84,6 @@ export function favouriteItems(meals: Record<string, Meal>, ingredients: Record<
 /** Most logged first; ties alphabetical. */
 export function mostLogged<T extends { useCount: number; name: string }>(list: readonly T[]): T[] {
   return list.slice().sort((a, b) => b.useCount - a.useCount || a.name.localeCompare(b.name))
-}
-
-/** Roman numerals for the inscribed counts beside section headings. 0 and anything over 3999 fall back to digits. */
-export function roman(n: number): string {
-  if (!Number.isInteger(n) || n <= 0 || n >= 4000) return String(n)
-  const table: [number, string][] = [
-    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
-    [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
-  ]
-  let out = ''
-  let rest = n
-  for (const [v, s] of table) {
-    while (rest >= v) {
-      out += s
-      rest -= v
-    }
-  }
-  return out
 }
 
 /** localStorage key for the collapsed favourites folder. */

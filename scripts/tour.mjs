@@ -121,6 +121,23 @@ const clickText = (page, text, within = 'body') =>
     within,
   )
 
+/** click a row: the element itself when it is pressable, else its first button inside */
+const clickRow = (page, sel) =>
+  page.evaluate((sel) => {
+    const row = document.querySelector(sel)
+    if (!row) return false
+    const target = row.matches('button, [role=button]') ? row : row.querySelector('button, [role=button]') || row
+    target.click()
+    return true
+  }, sel)
+
+/** wait for a selector, false on timeout instead of throwing */
+const waitFor = (page, sel, timeout = 3000) =>
+  page
+    .waitForSelector(sel, { timeout })
+    .then(() => true)
+    .catch(() => false)
+
 const tab = (page, name) => page.evaluate((name) => window.__tp.ui.getState().setTab(name), name)
 
 /** Realistic data: a library, two weeks of meals, three weeks of weigh-ins. Runs in the page. */
@@ -282,8 +299,24 @@ try {
       await page.evaluate(() => document.querySelector('[data-testid=tp-log-sheet] .overflow-y-auto, #log-sheet-content')?.scrollTo({ top: 9999 }))
       await sleep(350)
       await shot(page, 'log-recents')
+      // back to the top of the sheet so BUILD is shot from its first row, not mid-scroll
+      await page.evaluate(() => {
+        const sheet = document.querySelector('[data-testid=tp-log-sheet]')
+        sheet?.querySelectorAll('*').forEach((el) => {
+          if (el.scrollTop > 0) el.scrollTop = 0
+        })
+        document.querySelector('#log-sheet-content')?.scrollTo({ top: 0 })
+      })
+      await sleep(200)
       if (await clickText(page, 'build', '[data-testid=tp-log-sheet]')) {
         await sleep(400)
+        await page.evaluate(() => {
+          const sheet = document.querySelector('[data-testid=tp-log-sheet]')
+          sheet?.querySelectorAll('*').forEach((el) => {
+            if (el.scrollTop > 0) el.scrollTop = 0
+          })
+        })
+        await sleep(150)
         await shot(page, 'log-build')
       }
       await page.evaluate(() => window.__tp.ui.getState().closeLog())
@@ -296,7 +329,8 @@ try {
       await tab(page, 'library')
       await sleep(800)
       await shot(page, 'library')
-      if (await click(page, '[data-testid^=tp-meal-row-]')) {
+      if (await clickRow(page, '[data-testid^=tp-meal-row-]')) {
+        if (!(await waitFor(page, '[data-testid=tp-meal-detail]'))) throw new Error('meal detail sheet did not open')
         await sleep(600)
         await shot(page, 'library-detail')
         if (await click(page, '[data-testid=tp-meal-detail-edit]')) {
@@ -322,12 +356,28 @@ try {
       await page.evaluate(() => document.querySelector('main')?.scrollTo({ top: 520 }))
       await sleep(400)
       await shot(page, 'history-ledger-scrolled')
-      if (await click(page, '[data-testid^=tp-history-day-]')) {
-        await sleep(600)
-        await shot(page, 'history-day-sheet')
-        await page.keyboard.press('Escape')
-        await sleep(450)
+      const daySheet = '#tp-history-day-sheet, [data-testid=tp-history-day-sheet]'
+      // a tracked colonnade day opens the day sheet directly
+      let opened = await page.evaluate(() => {
+        const days = [...document.querySelectorAll('[data-testid=tp-history] button[data-day]')]
+        const tracked = days.filter((b) => !/untracked/i.test(b.getAttribute('aria-label') || ''))
+        const el = tracked[tracked.length - 1]
+        if (!el) return false
+        el.click()
+        return true
+      })
+      if (opened) opened = await waitFor(page, daySheet)
+      // else a tracked week row expands, and its OPEN DAY opens the sheet
+      if (!opened && (await clickRow(page, '[data-testid^=tp-history-day-][data-tracked=true]'))) {
+        await sleep(400)
+        if (!(await clickText(page, 'open day', '[data-testid=tp-history]'))) await clickRow(page, '[data-testid^=tp-history-day-][data-tracked=true]')
+        opened = await waitFor(page, daySheet)
       }
+      if (!opened) throw new Error('history day sheet did not open')
+      await sleep(600)
+      await shot(page, 'history-day-sheet')
+      await page.keyboard.press('Escape')
+      await sleep(450)
       await page.evaluate(() => document.querySelector('main')?.scrollTo({ top: 0 }))
     })
   }

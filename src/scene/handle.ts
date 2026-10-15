@@ -20,6 +20,8 @@ export interface MonumentHandle {
   playOpeningRise(ms: number): void
   /** draw the gold goal line across the stage (opening S3). */
   playGoalLine(ms: number): void
+  /** the glass ghost rises from the plinth to the line (opening, 440 ms at full speed). */
+  playGhostReveal(ms: number): void
   /** one fast pass of the sweep light (opening S4 landing, strike). */
   sweepOnce(ms: number): void
   /** camera / stage shake. trauma 0..1 */
@@ -37,6 +39,7 @@ const noop: MonumentHandle = {
   setInstant: () => {},
   playOpeningRise: () => {},
   playGoalLine: () => {},
+  playGhostReveal: () => {},
   sweepOnce: () => {},
   shake: () => {},
   startIdle: () => {},

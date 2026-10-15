@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decideVariant, readSeen, SEEN_KEY, SEEN_TTL_MS, writeSeen } from './useOpening'
-import { FADE_MS, FULL_MS, RISE_AT_MS, RISE_MS, SHORT_MS } from './timeline'
+import { FADE_MS, FULL_MS, GHOST_AT_MS, GHOST_MS, RISE_AT_MS, RISE_MS, SHORT_MS } from './timeline'
 import { CLIP_TARGETS, hiddenVars, OPACITY_TARGETS, TARGET_NAMES } from './targets'
 
 const NOW = 1_700_000_000_000
@@ -65,6 +65,17 @@ describe('timeline budget', () => {
     expect(FADE_MS).toBe(240)
     // the column lands at 1000 inside the 680 ms dolly that starts at 420
     expect(RISE_AT_MS + RISE_MS).toBe(1100)
+    // polish-spec 5.5: the glass ghost rises 420 to 860
+    expect(GHOST_AT_MS).toBe(420)
+    expect(GHOST_AT_MS + GHOST_MS).toBe(860)
+  })
+
+  it('the temple and the streak take part (polish-spec 5.5), all faded, never clipped', () => {
+    for (const name of ['colonnade', 'shaft', 'streak'] as const) {
+      expect(TARGET_NAMES).toContain(name)
+      expect(OPACITY_TARGETS).toContain(name)
+      expect(hiddenVars(name, 'cut')).toEqual({ opacity: 0 })
+    }
   })
 
   it('hides every target before the first frame, the number by clip in the cut variants', () => {

@@ -4,7 +4,7 @@
  * proportion to its aspect ratio from a zero basis, so width / ratio comes out the same for both.
  */
 import { createPortal } from 'react-dom'
-import { Sheet } from '../components/ui'
+import { Sheet, ValueUnit } from '../components/ui'
 import { formatDayLabel, formatDayLong } from '../lib/day'
 import type { PhotoMeta } from '../lib/photos'
 import { formatKg } from './HistoryWeightChart'
@@ -27,15 +27,17 @@ function CompareFigure({ photo, ratio, today, kg }: { photo: PhotoMeta; ratio: n
   const url = usePhotoURL(photo.id, 'full')
   return (
     <figure data-testid={`tp-photo-compare-${photo.id}`} className="m-0 min-w-0" style={{ flex: `${ratio.toFixed(4)} 1 0px` }}>
-      <div className={`relative w-full overflow-hidden rounded-[2px] ${url ? '' : 'bg-obsidian-800'}`} style={{ aspectRatio: `${ratio}` }}>
+      <div
+        className={`relative w-full overflow-hidden rounded-[2px] ${url ? '' : 'bg-obsidian-800'}`}
+        style={{ aspectRatio: `${ratio}`, boxShadow: '0 0 0 1px #2A2A33, 0 0 0 2px rgba(0,0,0,0.8)' }}
+      >
         {url ? <img src={url} alt={`Progress photo, ${formatDayLong(photo.day)}`} className="absolute inset-0 h-full w-full object-cover" /> : null}
       </div>
-      <figcaption className="mt-2 flex flex-col gap-1">
-        <span className="font-display text-[10px] tracking-[0.28em] text-bone-dim">{formatDayLabel(photo.day, today)}</span>
+      <figcaption className="mt-2.5 flex flex-col gap-1.5">
+        <span className="label truncate">{formatDayLabel(photo.day, today)}</span>
         {kg !== undefined ? (
-          <span data-kg={kg} className="font-display inscribed num whitespace-nowrap text-[14px] tracking-[0.02em] text-gold-400">
-            {formatKg(kg)}
-            <span className="normal-case text-[10px]"> kg</span>
+          <span data-kg={kg}>
+            <ValueUnit value={formatKg(kg)} unit="kg" size={17} />
           </span>
         ) : null}
       </figcaption>

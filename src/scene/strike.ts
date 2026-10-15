@@ -7,8 +7,17 @@
  * No React, no three imports beyond types: this file is unit-testable.
  */
 import gsap from 'gsap'
-import { vibrate } from '../lib/motion'
+import { isReducedMotion, vibrate } from '../lib/motion'
 import { CAMERA_OPEN, CAMERA_REST, GOAL_Y } from './tokens'
+
+/** a vibration pattern (vibrate in lib/motion takes one duration); never under reduced motion */
+function buzz(pattern: number[]): void {
+  try {
+    if (!isReducedMotion() && typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(pattern)
+  } catch {
+    /* ignore */
+  }
+}
 
 /** CSS cubic-bezier(x1, y1, x2, y2) as a gsap ease function. */
 export function bezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number {
@@ -58,14 +67,23 @@ export const MS = {
   shake: 140,
   dust: 1100,
   capital: 300,
+  capScale: 220,
+  ghost: 440,
   flash: 90,
   flashDecay: 500,
   crack: 700,
   crackOut: 600,
   sink: 600,
+  shimmer: 300,
   coalesce: 600,
-  always: 1200,
+  /** the scene strike window: long enough for the smoke tail (polish-spec 5.4) */
+  always: 1600,
   lightSweep: 14000,
+  glintOff: 200,
+  fovPunch: 260,
+  reflectUp: 60,
+  reflectDown: 200,
+  shockwave: 480,
 }
 
 /** The animated state. World units, seconds, radians. */
@@ -82,6 +100,23 @@ export type Mon = {
   rotY: number
   /** capital emissiveIntensity */
   capital: number
+  /** capital scale on a strike (1 at rest) */
+  capScale: number
+  /** the glass ghost's reveal, 0 to 1 rising from the plinth (0 until the opening or setInstant) */
+  ghost: number
+  /** the charge glint: a band of light riding the shaft top while the stone rises (0 off, 1 on) */
+  glintOn: number
+  /** 1 when the glint is ember (the strike crosses the line) */
+  glintEmber: number
+  /** reflection strength factor (1 at rest, 1.5 at the impact flare) */
+  reflectK: number
+  /** the impact's fov punch, added to fov (0 at rest, -0.5 at the hit) */
+  fovPunch: number
+  /** shockwave progress 0 to 1, or -1 when idle */
+  shock: number
+  shockEmber: number
+  /** the removal shimmer: the line's glint position while it runs, or null */
+  shimmerX: number | null
   /** goal line flash 0..1 (1 = #FFF7DA, sprite opacity 0.9) */
   flash: number
   /** goal slab scale.x */
@@ -112,6 +147,15 @@ export function createMon(): Mon {
     theta: 0.6,
     rotY: 0,
     capital: 0,
+    capScale: 1,
+    ghost: 0,
+    glintOn: 0,
+    glintEmber: 0,
+    reflectK: 1,
+    fovPunch: 0,
+    shock: -1,
+    shockEmber: 0,
+    shimmerX: null,
     flash: 0,
     goalX: 0,
     goalFade: 0,
@@ -174,6 +218,9 @@ export class Monument {
   private riseTl: gsap.core.Timeline | null = null
   private goalTl: gsap.core.Timeline | null = null
   private sweepTl: gsap.core.Tween | null = null
+  private ghostTl: gsap.core.Tween | null = null
+  private impactTl: gsap.core.Timeline | null = null
+  private shimmerTl: gsap.core.Tween | null = null
 
   constructor(hooks: MonumentHooks) {
     this.hooks = hooks
@@ -192,8 +239,8 @@ export class Monument {
   }
 
   killAll(): void {
-    for (const t of [this.strikeTl, this.crackTl, this.flashTl, this.capitalTl, this.cameraTl, this.riseTl, this.goalTl, this.sweepTl]) t?.kill()
-    this.strikeTl = this.crackTl = this.flashTl = this.capitalTl = this.cameraTl = this.riseTl = this.goalTl = this.sweepTl = null
+    for (const t of [this.strikeTl, this.crackTl, this.flashTl, this.capitalTl, this.cameraTl, this.riseTl, this.goalTl, this.sweepTl, this.ghostTl, this.impactTl, this.shimmerTl]) t?.kill()
+    this.strikeTl = this.crackTl = this.flashTl = this.capitalTl = this.cameraTl = this.riseTl = this.goalTl = this.sweepTl = this.ghostTl = this.impactTl = this.shimmerTl = null
   }
 
   /** Jump every visual to the store state. No motion. */
@@ -204,6 +251,13 @@ export class Monument {
     m.crack = this.crackTarget
     m.trauma = 0
     m.capital = 0
+    m.capScale = 1
+    m.ghost = 1
+    m.glintOn = 0
+    m.reflectK = 1
+    m.fovPunch = 0
+    m.shock = -1
+    m.shimmerX = null
     m.flash = 0
     m.goalX = 1
     m.goalFade = 1
@@ -253,17 +307,54 @@ export class Monument {
     m.burstTop = top
     m.burstEmber = ember ? 1 : 0
     m.dustVisible = true
+    this.impact(ember)
     this.hooks.holdAlways(MS.always)
     this.hooks.onLanding?.()
     this.inv()
   }
 
+  /**
+   * The impact (polish-spec 5.4 items 2 and 3): the camera fov punches 28 to 27.5 and back, the
+   * stone's reflection flares 1.6 to 2.4 and back, the glint fades, and a shockwave ring runs across
+   * the die. Reduced motion skips all of it (the reflection stays at rest).
+   */
+  private impact(ember: boolean): void {
+    const m = this.mon
+    this.impactTl?.kill()
+    if (this.hooks.reduced()) {
+      m.glintOn = 0
+      m.reflectK = 1
+      m.shock = -1
+      return
+    }
+    m.shockEmber = ember ? 1 : 0
+    const tl = gsap.timeline()
+    tl.to(m, { fovPunch: -0.5, duration: MS.fovPunch / 2000, ease: 'power2.out', onUpdate: this.inv }, 0)
+    tl.to(m, { fovPunch: 0, duration: MS.fovPunch / 2000, ease: EASE.settle, onUpdate: this.inv }, MS.fovPunch / 2000)
+    tl.to(m, { reflectK: 1.5, duration: MS.reflectUp / 1000, ease: 'power1.out', onUpdate: this.inv }, 0)
+    tl.to(m, { reflectK: 1, duration: MS.reflectDown / 1000, ease: 'power2.in', onUpdate: this.inv }, MS.reflectUp / 1000)
+    tl.to(m, { glintOn: 0, duration: MS.glintOff / 1000, ease: 'power1.out', onUpdate: this.inv }, 0)
+    tl.fromTo(m, { shock: 0 }, { shock: 1, duration: MS.shockwave / 1000, ease: 'power3.out', onUpdate: this.inv }, 0)
+    tl.set(m, { shock: -1 }, MS.shockwave / 1000)
+    this.impactTl = tl
+  }
+
+  /** the charge glint switches on as the stone starts to move (it rides the shaft top) */
+  private chargeGlint(ember: boolean): void {
+    if (this.hooks.reduced()) return
+    this.mon.glintOn = 1
+    this.mon.glintEmber = ember ? 1 : 0
+  }
+
+  /** the capital flares: emissive 0 to 0.8 to 0 over 300 ms, scale 1 to 1.06 to 1 over 220 ms */
   private pulseCapital(): void {
     this.capitalTl?.kill()
-    this.capitalTl = gsap
-      .timeline()
-      .to(this.mon, { capital: 0.6, duration: MS.capital / 2000, ease: 'power2.out', onUpdate: this.inv })
-      .to(this.mon, { capital: 0, duration: MS.capital / 2000, ease: 'power2.in', onUpdate: this.inv })
+    const tl = gsap.timeline()
+    tl.to(this.mon, { capital: 0.8, duration: MS.capital / 2000, ease: 'power2.out', onUpdate: this.inv }, 0)
+    tl.to(this.mon, { capital: 0, duration: MS.capital / 2000, ease: 'power2.in', onUpdate: this.inv }, MS.capital / 2000)
+    tl.fromTo(this.mon, { capScale: 1 }, { capScale: 1.06, duration: MS.capScale / 2000, ease: 'power2.out', onUpdate: this.inv }, 0)
+    tl.to(this.mon, { capScale: 1, duration: MS.capScale / 2000, ease: EASE.settle, onUpdate: this.inv }, MS.capScale / 2000)
+    this.capitalTl = tl
   }
 
   private goalFlash(): void {
@@ -314,6 +405,7 @@ export class Monument {
     const coalesce = this.strikeTl !== null && now - this.strikeStartedAt < MS.coalesce
     this.strikeTl?.kill()
     const tl = gsap.timeline()
+    this.chargeGlint(crossed)
     tl.to(m, { h: 1.015 * h1, duration: MS.hit / 1000, ease: EASE.hit, onUpdate: this.inv })
     tl.to(m, { h: h1, duration: MS.settle / 1000, ease: EASE.settle, onUpdate: this.inv })
     if (!coalesce) {
@@ -324,7 +416,8 @@ export class Monument {
           this.burst(h1, crossed)
           this.pulseCapital()
           shakeStage()
-          vibrate(18)
+          if (crossed) buzz([12, 40, 24])
+          else vibrate(18)
           if (crossed) this.goalFlash()
         },
         [],
@@ -355,7 +448,27 @@ export class Monument {
       return
     }
     this.strikeTl = gsap.timeline().to(m, { h: h1, duration: MS.sink / 1000, ease: EASE.stone, onUpdate: this.inv })
-    this.hooks.holdAlways(MS.sink + 100)
+    // then one shimmer runs along the gold line, right to left
+    this.shimmerTl?.kill()
+    const sh = { x: 3 }
+    this.shimmerTl = gsap.to(sh, {
+      x: -3,
+      duration: MS.shimmer / 1000,
+      delay: MS.sink / 1000,
+      ease: 'power1.inOut',
+      onStart: () => {
+        m.shimmerX = 3
+      },
+      onUpdate: () => {
+        m.shimmerX = sh.x
+        this.inv()
+      },
+      onComplete: () => {
+        m.shimmerX = null
+        this.inv()
+      },
+    })
+    this.hooks.holdAlways(MS.sink + MS.shimmer + 100)
     if (h1 < GOAL_Y) {
       if (m.crack > 0) this.tweenCrack(0, MS.crackOut)
     } else if (this.crackTarget !== m.crack) this.tweenCrack(this.crackTarget, MS.crackOut)
@@ -399,6 +512,7 @@ export class Monument {
     const settle = (120 * k) / 1000
     const tl = gsap.timeline()
     tl.set(m, { h: 0 })
+    tl.call(() => this.chargeGlint(H > GOAL_Y), [], delay)
     tl.to(m, { h: 1.015 * H, duration: rise, ease: EASE.hit, onUpdate: this.inv }, delay)
     tl.to(m, { h: H, duration: settle, ease: EASE.settle, onUpdate: this.inv }, delay + rise)
     tl.call(
@@ -434,6 +548,21 @@ export class Monument {
     tl.to(m, { goalFade: 1, duration: (300 * k) / 1000, ease: 'power1.inOut', onUpdate: this.inv }, (120 * k) / 1000)
     this.goalTl = tl
     this.hooks.holdAlways(ms + 100)
+    this.inv()
+  }
+
+  /** Opening: the glass ghost rises from the plinth to the line over `ms` (440 at full speed). */
+  playGhostReveal(ms: number): void {
+    const m = this.mon
+    this.ghostTl?.kill()
+    if (this.hooks.reduced() || ms <= 0) {
+      m.ghost = 1
+      this.inv()
+      return
+    }
+    m.ghost = 0
+    this.ghostTl = gsap.to(m, { ghost: 1, duration: ms / 1000, ease: EASE.stone, onUpdate: this.inv })
+    this.hooks.holdAlways(ms + 50)
     this.inv()
   }
 

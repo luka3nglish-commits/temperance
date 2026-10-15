@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { SectionHeading } from '../components/ui'
+import { SectionHeading, ValueUnit } from '../components/ui'
 import type { EnergyUnit, LogEntry } from '../lib/types'
 import { dayKeyOffset, parseDayKey } from '../lib/day'
+import { formatEnergy, unitLabel } from '../lib/units'
 import { loggedDays, type DaySummary } from '../store/selectors'
-import { DayRow, EnergyFigure } from './HistoryWeek'
+import { DayRow } from './HistoryWeek'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -45,8 +46,8 @@ function MonthBar({ avgKcal, goalKcal }: { avgKcal: number; goalKcal: number }) 
   const over = avgKcal > goalKcal
   return (
     <svg width={W} height="6" viewBox={`0 0 ${W} 6`} aria-hidden="true" className="shrink-0">
-      <rect x="0" y="1" width={W} height="4" fill="#1A1A21" />
-      <rect x="0" y="1" width={over ? GOAL_X : x} height="4" fill="#9C7B33" />
+      <rect x="0" y="1" width={W} height="4" fill="#22222A" />
+      <rect x="0" y="1" width={over ? GOAL_X : x} height="4" fill="#B8902E" />
       {over ? <rect x={GOAL_X} y="1" width={x - GOAL_X} height="4" fill="#FF5A1F" /> : null}
       <rect x={GOAL_X} y="0" width="1" height="6" fill="#D8B45A" />
     </svg>
@@ -62,7 +63,7 @@ type Props = {
 }
 
 /**
- * Days older than 90 collapse into month rows: the month, its average per logged day in gold,
+ * Days older than 90 collapse into month rows: the month, its average per logged day in bone,
  * the goal bar, and how many days were logged and under the line. Tap a month to open its days.
  */
 export function HistoryMonths({ entries, today, goalKcal, unit, onOpenDay }: Props) {
@@ -81,29 +82,28 @@ export function HistoryMonths({ entries, today, goalKcal, unit, onOpenDay }: Pro
 
   return (
     <div>
-      <SectionHeading rule="strong" right="Before 90 days">
-        Months
-      </SectionHeading>
+      <SectionHeading right="Before 90 days">Months</SectionHeading>
       <ul>
         {months.map((m) => {
           const open = openMonth === m.key
           const panelId = `hmonth-${m.key}`
           return (
-            <li key={m.key} className="border-b border-[var(--gold-line)]">
+            <li key={m.key} className="row-rule">
               <button
                 type="button"
                 aria-expanded={open}
                 aria-controls={panelId}
+                aria-label={`${m.label}, average ${formatEnergy(m.avgKcal, unit)} ${unitLabel(unit)} a day, ${m.under} of ${m.days.length} days under the line`}
                 onClick={() => setOpenMonth((cur) => (cur === m.key ? null : m.key))}
-                className="flex min-h-14 w-full cursor-pointer items-center gap-3 text-left transition-colors duration-150 hover:bg-[var(--gold-line)] active:bg-[var(--gold-line)]"
+                className="row-press grid h-14 w-full cursor-pointer grid-cols-[14px_84px_minmax(0,1fr)_auto] items-center text-left"
               >
-                <span className="font-display w-[60px] shrink-0 text-[10px] tracking-[0.28em] text-bone-dim">{m.label}</span>
-                <span className="flex min-w-0 flex-1 items-center gap-3">
-                  <EnergyFigure kcal={m.avgKcal} unit={unit} />
-                  <span className="font-display text-[9px] tracking-[0.3em] text-bone-dim">avg</span>
+                <span />
+                <span className="font-display num truncate text-[12px] font-bold uppercase leading-none tracking-[0.08em] text-bone-dim">{m.label}</span>
+                <span className="flex min-w-0 items-center gap-3" aria-hidden="true">
+                  <ValueUnit value={formatEnergy(m.avgKcal, unit)} unit={unitLabel(unit)} size={17} />
                   <MonthBar avgKcal={m.avgKcal} goalKcal={goalKcal} />
                 </span>
-                <span className="font-display num whitespace-nowrap text-[10px] tracking-[0.2em] text-bone-dim">
+                <span className="hint num whitespace-nowrap" aria-hidden="true">
                   {m.under} of {m.days.length} under
                 </span>
               </button>
@@ -115,7 +115,7 @@ export function HistoryMonths({ entries, today, goalKcal, unit, onOpenDay }: Pro
               >
                 <div className="min-h-0 overflow-hidden">
                   {open ? (
-                    <ul className="mb-2 border-t border-[var(--bone-08)] pl-3">
+                    <ul className="mb-2 pl-3">
                       {m.days.map((d) => (
                         <DayRow key={d.day} d={d} entries={entries} today={today} goalKcal={goalKcal} unit={unit} open={openDay === d.day} onToggle={toggleDay} onOpenDay={onOpenDay} />
                       ))}

@@ -1,4 +1,5 @@
-// Copy the five latin woff2 files we preload from @fontsource into public/fonts.
+// Copy the latin woff2 files from @fontsource into public/fonts. Five are preloaded from index.html;
+// Cormorant 600 (data, inputs, meta lines) loads with font-display swap and is never preloaded.
 // Run: node scripts/copy-fonts.mjs  (also runs on `npm run build` via the prebuild script)
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -13,6 +14,7 @@ const files = [
   ['@fontsource/cinzel/files/cinzel-latin-700-normal.woff2', 'cinzel-700.woff2'],
   ['@fontsource/cormorant-garamond/files/cormorant-garamond-latin-400-normal.woff2', 'cormorant-400.woff2'],
   ['@fontsource/cormorant-garamond/files/cormorant-garamond-latin-500-normal.woff2', 'cormorant-500.woff2'],
+  ['@fontsource/cormorant-garamond/files/cormorant-garamond-latin-600-normal.woff2', 'cormorant-600.woff2'],
   ['@fontsource/cormorant-garamond/files/cormorant-garamond-latin-400-italic.woff2', 'cormorant-400-italic.woff2'],
 ]
 

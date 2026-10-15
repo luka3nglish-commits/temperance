@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { basisLabel, cleanAmount, cleanServings, formatAmount, formatAmountNumber, portionLabel, portionStep, resolvePortion, stepAmount } from './portion'
+import { basisLabel, cleanAmount, cleanServings, formatAmount, formatAmountLong, formatAmountNumber, portionAria, portionLabel, portionStep, resolvePortion, stepAmount } from './portion'
 
 describe('portion helpers', () => {
   it('cleans amounts by unit', () => {
@@ -44,10 +44,22 @@ describe('portion helpers', () => {
     expect(basisLabel({ amount: 2, unit: 'serve' })).toBe('per 2 serves')
   })
 
-  it('labels entries', () => {
+  it('labels entries by the portion rule: nothing for one serve, singular at 1 or less, never a times sign', () => {
     expect(portionLabel({ servings: 1 })).toBe('')
-    expect(portionLabel({ servings: 1.5 })).toBe('× 1.5')
+    expect(portionLabel({ servings: 1.5 })).toBe('1.5 serves')
+    expect(portionLabel({ servings: 0.5 })).toBe('0.5 serve')
+    expect(portionLabel({ servings: 2 })).toBe('2 serves')
     expect(portionLabel({ servings: 1.8, portion: { amount: 180, unit: 'g' } })).toBe('180 g')
+    expect(portionLabel({ servings: 2.5, portion: { amount: 250, unit: 'ml' } })).toBe('250 ml')
+    // a per-serve basis meal logged as one serve carries a serve portion: still nothing
+    expect(portionLabel({ servings: 1, portion: { amount: 1, unit: 'serve' } })).toBe('')
+    expect(portionLabel({ servings: 2, portion: { amount: 2, unit: 'serve' } })).toBe('2 serves')
+    for (const s of [0.25, 0.5, 1.5, 3]) expect(portionLabel({ servings: s })).not.toMatch(/×/)
+    expect(portionAria({ servings: 1.8, portion: { amount: 180, unit: 'g' } })).toBe('180 grams')
+    expect(portionAria({ servings: 1 })).toBe('')
+    expect(portionAria({ servings: 0.5 })).toBe('0.5 serve')
+    expect(formatAmountLong(250, 'ml')).toBe('250 millilitres')
+    expect(formatAmount(0.5, 'serve')).toBe('0.5 serve')
   })
 
   it('steps on a grid', () => {

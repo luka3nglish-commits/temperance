@@ -5,6 +5,14 @@
  */
 import { CanvasTexture, LinearFilter, NoColorSpace, Texture } from 'three'
 
+/**
+ * Every scene texture canvas is CPU backed. The first GPU-accelerated 2D canvas on the page spins up
+ * Chrome's shared raster context and its draws flush synchronously behind whatever the GPU process
+ * is rastering (a 400 ms stall inside the opening, measured). These canvases are tiny and only
+ * uploaded once, so the CPU path costs nothing.
+ */
+export const CPU_2D: CanvasRenderingContext2DSettings = { willReadFrequently: true }
+
 export type RadialShape = 'soft' | 'glow' | 'shadow'
 
 const cache = new Map<RadialShape, Texture>()
@@ -31,7 +39,7 @@ export function radialTexture(shape: RadialShape, size = 64): Texture {
     const c = document.createElement('canvas')
     c.width = size
     c.height = size
-    const ctx = c.getContext('2d')
+    const ctx = c.getContext('2d', CPU_2D)
     if (!ctx) throw new Error('no 2d')
     const img = ctx.createImageData(size, size)
     const half = size / 2

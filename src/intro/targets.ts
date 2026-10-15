@@ -1,13 +1,18 @@
 /**
  * The DOM the opening animates. Every element that takes part carries a `data-intro` attribute
- * (CLAUDE.md "Opening DOM targets"). TodayScreen owns wordmark, date, label, number, subline,
- * flanks, goal-label, ring, ring-readouts and stoic; TabBar owns tabbar and keystone; Shards owns
- * shards. A missing target is skipped, never an error: the opening degrades shot by shot.
+ * (CLAUDE.md "Opening DOM targets"). TodayScreen owns wordmark, date, streak, label, number,
+ * subline, flanks, goal-label, ring, ring-readouts and stoic; TabBar owns tabbar and keystone; Shards
+ * owns shards; the scene's temple owns colonnade and shaft (src/scene/Temple.tsx). A missing target
+ * is skipped, never an error, and an unknown element is never hidden: the opening degrades shot by
+ * shot.
  */
 
 export const TARGET_NAMES = [
+  'colonnade',
+  'shaft',
   'wordmark',
   'date',
+  'streak',
   'label',
   'number',
   'subline',
@@ -25,8 +30,11 @@ export type Targets = Partial<Record<TargetName, HTMLElement>>
 
 /** Targets hidden with opacity before the timeline; the rest hide with clip-path. */
 export const OPACITY_TARGETS: readonly TargetName[] = [
+  'colonnade',
+  'shaft',
   'wordmark',
   'date',
+  'streak',
   'label',
   'subline',
   'flanks',

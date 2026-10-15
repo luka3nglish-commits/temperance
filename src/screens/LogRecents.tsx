@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { SquarePlus } from 'lucide-react'
 import type { EnergyUnit, LogEntry } from '../lib/types'
 import { recentKey } from '../store/selectors'
 import { useReducedMotion, vibrate } from '../lib/motion'
-import { EmptyLine, SectionHeading } from '../components/ui'
+import { formatEnergy, unitLabel } from '../lib/units'
+import { portionAria, portionLabel } from '../lib/portion'
+import { EmptyLine, SectionHeading, ValueUnit, useStaggerOnce } from '../components/ui'
+import { Rhombus } from '../components/ornaments'
 import { energyLine, macroLine } from '../components/MealForm'
 
 type Props = {
@@ -27,17 +30,17 @@ const LONG_PRESS_MS = 450
 const SWIPE_HIDE_PX = 72
 const MOVE_CANCEL_PX = 8
 const STONE_EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'
-/** the sheet takes --t-sheet-in to rise; the new row lands after it */
-const RISE_DELAY_MS = 320
-const RISE_MS = 240
 
 /**
- * RECENT: the last 12 distinct things logged. 52 px rows with a 3 x 30 px gold bar, the name
- * over its P C F line, kcal in Cinzel gold and a square-plus ghost. Every number on a row is the
- * snapshot as it was logged (portions included), because a tap re-logs exactly that.
+ * RECENT (polish-spec 6.2 and 4.11): the last 12 distinct things logged, 56 px rows: a 14 px mark
+ * gutter (a solid rhombus on the newest row only), the name with its portion (`Greek yoghurt · 180 g`,
+ * the portion never truncates), the P C F line, the energy in bone Cinzel (gold-300 on the newest) and
+ * a SquarePlus. Every number on a row is the snapshot as it was logged, because a tap re-logs exactly
+ * that (`relogEntry`). The list rises in on open; a row logged since the last open washes gold.
  */
 export function LogRecents({ entries, unit, onRelog, onEditFirst, onHide, limit = 12, risingKey = null }: Props) {
   const reduced = useReducedMotion()
+  const stagger = useStaggerOnce()
   const [menuFor, setMenuFor] = useState<string | null>(null)
   // captured at mount; the sheet mounts this fresh on every open
   const [rising] = useState(() => risingKey)
@@ -48,15 +51,16 @@ export function LogRecents({ entries, unit, onRelog, onEditFirst, onHide, limit 
         Recent
       </SectionHeading>
       {entries.length ? (
-        <ul data-testid="tp-recents" className="flex flex-col">
-          {entries.map((e) => {
+        <ul data-testid="tp-recents" className={`flex flex-col ${stagger}`}>
+          {entries.map((e, i) => {
             const key = recentKey(e)
             return (
               <RecentRow
                 key={key}
                 entry={e}
                 unit={unit}
-                rising={rising === key && !reduced}
+                newest={i === 0}
+                rising={rising === key}
                 reduced={reduced}
                 menuOpen={menuFor === key}
                 onMenu={(open) => setMenuFor(open ? key : null)}
@@ -69,7 +73,7 @@ export function LogRecents({ entries, unit, onRelog, onEditFirst, onHide, limit 
         </ul>
       ) : (
         <div data-testid="tp-recent-empty">
-          <EmptyLine className="pt-3">Nothing logged yet.</EmptyLine>
+          <EmptyLine className="pt-4">Nothing logged yet.</EmptyLine>
         </div>
       )}
     </section>
@@ -79,6 +83,9 @@ export function LogRecents({ entries, unit, onRelog, onEditFirst, onHide, limit 
 type RowProps = {
   entry: LogEntry
   unit: EnergyUnit
+  /** the newest row carries the mark and a gold value */
+  newest: boolean
+  /** logged since the sheet was last open: a 900 ms gold wash and the mark scales in */
   rising: boolean
   reduced: boolean
   menuOpen: boolean
@@ -88,31 +95,17 @@ type RowProps = {
   onHide(): void
 }
 
-function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, onEditFirst, onHide }: RowProps) {
+function RecentRow({ entry, unit, newest, rising, reduced, menuOpen, onMenu, onRelog, onEditFirst, onHide }: RowProps) {
   const rowRef = useRef<HTMLLIElement>(null)
   const faceRef = useRef<HTMLButtonElement>(null)
-  const ruleRef = useRef<HTMLSpanElement>(null)
   const revealRef = useRef<HTMLDivElement>(null)
-  const servings = entry.servings
+  const label = portionLabel(entry)
+  const spoken = portionAria(entry)
 
   // gesture state (refs: no re-render while a finger is down)
   const press = useRef<{ x: number; y: number; id: number; timer: number; long: boolean; swiping: boolean; dx: number } | null>(null)
   const suppressClick = useRef(false)
   const [leaving, setLeaving] = useState(false)
-
-  useEffect(() => {
-    if (!rising) return
-    const li = rowRef.current
-    const rule = ruleRef.current
-    if (!li || typeof li.animate !== 'function') return
-    const timing = { duration: RISE_MS, delay: RISE_DELAY_MS, easing: STONE_EASE, fill: 'backwards' as const }
-    const a = li.animate([{ transform: 'translateY(-14px)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }], timing)
-    const b = rule?.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], timing)
-    return () => {
-      a.cancel()
-      b?.cancel()
-    }
-  }, [rising])
 
   const setShift = (dx: number, animate = false) => {
     const el = faceRef.current
@@ -134,7 +127,7 @@ function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, on
       return
     }
     const h = li.getBoundingClientRect().height
-    const a = li.animate([{ height: `${h}px`, opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 200, easing: STONE_EASE, fill: 'forwards' })
+    const a = li.animate([{ height: `${h}px`, opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 220, easing: STONE_EASE, fill: 'forwards' })
     a.onfinish = () => onHide()
     a.oncancel = () => onHide()
   }
@@ -194,10 +187,10 @@ function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, on
   const rowWidth = () => faceRef.current?.getBoundingClientRect().width ?? 390
 
   return (
-    <li ref={rowRef} className={`relative overflow-hidden ${leaving ? 'pointer-events-none' : ''}`}>
+    <li ref={rowRef} className={`row-rule relative overflow-hidden ${leaving ? 'pointer-events-none' : ''}`}>
       {/* what the swipe reveals */}
       <div ref={revealRef} aria-hidden="true" className="absolute inset-0 flex items-center justify-end pr-5 opacity-0 transition-opacity duration-150">
-        <span className="font-display text-[10px] tracking-[0.4em] text-bone-dim">Hide</span>
+        <span className="label">Hide</span>
       </div>
       <button
         ref={faceRef}
@@ -232,33 +225,36 @@ function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, on
           }
           onRelog()
         }}
-        aria-label={`Log ${entry.name}, ${energyLine(entry.macros.kcal, unit)}${servings !== 1 ? `, ${servings} portions` : ''}`}
-        className="relative flex h-[52px] w-full items-center gap-3 bg-obsidian-900 text-left transition-colors duration-150 hover:bg-[var(--gold-line)] active:bg-[var(--gold-line)] cursor-pointer select-none"
+        aria-label={`Log ${entry.name}${spoken ? `, ${spoken}` : ''}, ${energyLine(entry.macros.kcal, unit)}`}
+        className={`group row-press relative grid h-14 w-full grid-cols-[14px_minmax(0,1fr)_auto_44px] items-center bg-obsidian-900 text-left cursor-pointer select-none [@media(hover:hover)]:hover:bg-obsidian-800 ${
+          rising ? 'row-new' : ''
+        }`}
         style={{ touchAction: 'pan-y', WebkitTouchCallout: 'none' }}
       >
-        <span aria-hidden="true" className="h-[30px] w-[3px] shrink-0 rounded-[2px] bg-gold-400" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-body text-[18px] font-medium leading-[1.2] text-bone">
-            {entry.name}
-            {servings !== 1 ? <span className="num text-bone-dim"> {'×'} {servings}</span> : null}
+        <span aria-hidden="true" className="flex items-center">
+          {newest ? <Rhombus solid className={rising && !reduced ? 'is-new' : ''} /> : null}
+        </span>
+        <span className="min-w-0 pr-3">
+          <span className="flex min-w-0 items-baseline leading-[1.25]">
+            <span className="truncate font-body text-[19px] font-medium text-bone">{entry.name}</span>
+            {label ? <span className="num shrink-0 font-body text-[16px] font-medium text-bone-soft">{` · ${label}`}</span> : null}
           </span>
-          <span className="num block truncate font-body text-[13px] leading-[1.2] text-bone-dim">{macroLine(entry.macros)}</span>
+          <span className="meta block truncate leading-[1.25]">{macroLine(entry.macros)}</span>
         </span>
-        <span className="num font-display inscribed shrink-0 text-[15px] tracking-[0.02em] text-gold-400">{energyLine(entry.macros.kcal, unit)}</span>
-        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center text-bone-dim">
-          <SquarePlus size={20} strokeWidth={1.5} />
+        <ValueUnit value={formatEnergy(entry.macros.kcal, unit)} unit={unitLabel(unit)} tone={newest ? 'gold' : 'bone'} />
+        <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center text-bone-dim transition-colors duration-200 group-active:text-gold-300">
+          <SquarePlus size={22} strokeWidth={1.5} className="transition-[rotate] duration-200 group-active:rotate-90" />
         </span>
-        <span ref={ruleRef} aria-hidden="true" className="absolute inset-x-0 bottom-0 h-px origin-left bg-[var(--gold-line)]" />
       </button>
       {menuOpen ? (
-        <div role="group" aria-label={`${entry.name} actions`} className="flex h-11 items-center justify-end gap-2 border-b border-[var(--gold-line)] bg-obsidian-800 px-2">
+        <div role="group" aria-label={`${entry.name} actions`} className="flex h-11 items-center justify-end gap-2 bg-obsidian-800 px-2">
           <button
             type="button"
             onClick={() => {
               onMenu(false)
               onEditFirst()
             }}
-            className="font-display h-9 px-3 text-[10px] tracking-[0.3em] text-gold-300 hover:text-gold-200 cursor-pointer"
+            className="label press h-11 px-3 text-gold-300 cursor-pointer"
           >
             Edit first
           </button>
@@ -268,7 +264,7 @@ function RecentRow({ entry, unit, rising, reduced, menuOpen, onMenu, onRelog, on
               onMenu(false)
               hide()
             }}
-            className="font-display h-9 px-3 text-[10px] tracking-[0.3em] text-bone-dim hover:text-bone cursor-pointer"
+            className="label press h-11 px-3 cursor-pointer"
           >
             Hide
           </button>

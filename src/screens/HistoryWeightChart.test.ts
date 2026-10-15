@@ -12,7 +12,7 @@ import type { WeightEntry } from '../lib/types'
 import { dayKeyOffset, localDayKey } from '../lib/day'
 import { useStore } from '../store/useStore'
 import { useToast } from '../components/ui'
-import { CHART_HEIGHT, CHART_PAD, areaPath, buildWeightChart, daysBetween, formatKg, linePath, scaleLinear, xDays, yDomain } from './HistoryWeightChart'
+import { CHART_HEIGHT, CHART_PAD, areaPath, buildWeightChart, daysBetween, formatKg, gridTicks, linePath, scaleLinear, xDays, yDomain } from './HistoryWeightChart'
 import { changeText, kgChange, loggedText, recentWeighIns, trendText } from './HistoryWeight'
 import { addedText, photoErrorText } from './HistoryPhotos'
 import { chronological, photoRatio } from './HistoryPhotoCompare'
@@ -117,13 +117,13 @@ describe('buildWeightChart', () => {
     expect(c.points.map((p) => p.day)).toEqual(['2026-10-01', '2026-10-08', '2026-10-14'])
     expect(c.points[0].x).toBe(c.plot.left)
     expect(c.points[2].x).toBe(c.plot.right)
-    expect(c.points[1].x).toBeCloseTo(26 + (7 / 13) * 326, 6)
+    expect(c.points[1].x).toBeCloseTo(30 + (7 / 13) * 322, 6)
     // heavier is higher (smaller y)
-    expect(c.points[0].y).toBe(37)
-    expect(c.points[1].y).toBe(64)
-    expect(c.points[2].y).toBe(91)
-    expect(c.line).toBe('M 26 37 L 201.54 64 L 352 91')
-    expect(c.area).toBe('M 26 37 L 201.54 64 L 352 91 L 352 118 L 26 118 Z')
+    expect(c.points[0].y).toBe(42.5)
+    expect(c.points[1].y).toBe(73)
+    expect(c.points[2].y).toBe(103.5)
+    expect(c.line).toBe('M 30 42.5 L 203.38 73 L 352 103.5')
+    expect(c.area).toBe('M 30 42.5 L 203.38 73 L 352 103.5 L 352 134 L 30 134 Z')
     expect(c.target).toBeNull()
   })
 
@@ -157,19 +157,36 @@ describe('buildWeightChart', () => {
   it('keeps the y range to the data and shows a far target as an edge label', () => {
     const below = buildWeightChart(three, { today: TODAY, targetKg: 75 })
     expect(below.domain).toEqual({ min: 83, max: 87 })
-    expect(below.target).toEqual({ kg: 75, position: 'below', labelY: below.plot.bottom - 5 })
+    expect(below.target).toEqual({ kg: 75, position: 'below', labelY: below.plot.bottom - 6 })
     const above = buildWeightChart(three, { today: TODAY, targetKg: 95 })
-    expect(above.target).toEqual({ kg: 95, position: 'above', labelY: above.plot.top + 7 })
+    expect(above.target).toEqual({ kg: 95, position: 'above', labelY: above.plot.top + 15 })
   })
 
   it('draws a target inside the range, labelled on the side away from the latest weigh-in', () => {
     // latest 84 kg sits under an 85 kg line, so the label goes above it
     const c = buildWeightChart(three, { today: TODAY, targetKg: 85 })
-    expect(c.target).toEqual({ kg: 85, position: 'inside', y: 64, labelY: 59 })
+    expect(c.target).toEqual({ kg: 85, position: 'inside', y: 73, labelY: 67 })
     // a lighter target with the latest weigh-in above it: the label goes under the line
     const d = buildWeightChart([w('2026-10-01', 84), w('2026-10-14', 86)], { today: TODAY, targetKg: 85 })
     expect(d.target?.position).toBe('inside')
-    if (d.target?.position === 'inside') expect(d.target.labelY).toBe(d.target.y + 11)
+    if (d.target?.position === 'inside') expect(d.target.labelY).toBe(d.target.y + 15)
+  })
+})
+
+describe('gridTicks', () => {
+  it('draws a line and a label at every kilogram when they sit far enough apart', () => {
+    expect(gridTicks({ min: 83, max: 87 }, 122)).toEqual({ lines: [83, 84, 85, 86, 87], labels: [83, 84, 85, 86, 87] })
+  })
+  it('thins the labels so 12 px numbers never touch, and the lines when a kilogram is tiny', () => {
+    const t = gridTicks({ min: 70, max: 95 }, 122) // 4.9 px per kg
+    expect(t.lines).toHaveLength(26)
+    expect(t.labels).toEqual([70, 75, 80, 85, 90, 95])
+    const wide = gridTicks({ min: 40, max: 140 }, 122) // 1.2 px per kg
+    expect(wide.lines[1] - wide.lines[0]).toBe(5)
+    for (let i = 1; i < wide.labels.length; i++) expect(((wide.labels[i] - wide.labels[i - 1]) * 122) / 100).toBeGreaterThanOrEqual(18)
+  })
+  it('draws nothing for an empty range', () => {
+    expect(gridTicks({ min: 80, max: 80 }, 122)).toEqual({ lines: [], labels: [] })
   })
 })
 
@@ -185,8 +202,8 @@ describe('weight copy', () => {
     expect(trendText(0.4)).toBe('up 0.4 kg')
     expect(trendText(0)).toBe('level')
     expect(trendText(null)).toBeNull()
-    expect(changeText(-0.4)).toBe('0.4 kg down')
-    expect(changeText(0.2)).toBe('0.2 kg up')
+    expect(changeText(-0.4)).toBe('0.4 down')
+    expect(changeText(0.2)).toBe('0.2 up')
     expect(changeText(0)).toBe('level')
     expect(changeText(null)).toBe('')
   })
@@ -332,12 +349,22 @@ describe('BODY · WEIGHT', () => {
   it('reads quietly before the first weigh-in', async () => {
     mount(createElement(HistoryBody, { today }))
     await settle()
+    // one empty-state tablet, then the input row; no stones and no chart until there is a weigh-in
     expect($('tp-weight-latest')?.textContent).toBe('No weigh-ins yet.')
+    expect($('tp-weight-trend')).toBeNull()
+    expect($('tp-weight-target')).toBeNull()
+    expect($('tp-weight-chart')).toBeNull()
+    expect(($('tp-weight-input') as HTMLInputElement).placeholder).toBe('80.0')
+  })
+
+  it('reads quietly after the first weigh-in', async () => {
+    useStore.getState().addWeight(84.3, today)
+    mount(createElement(HistoryBody, { today }))
+    await settle()
     expect($('tp-weight-trend')?.textContent).toContain('No trend yet.')
     expect($('tp-weight-target')?.textContent).toContain('Set a target in Settings.')
-    expect($('tp-weight-chart')?.dataset.points).toBe('0')
+    expect($('tp-weight-chart')?.dataset.points).toBe('1')
     expect($('tp-weight-chart')?.textContent).toContain('Two weigh-ins draw the line.')
-    expect(($('tp-weight-input') as HTMLInputElement).placeholder).toBe('80.0')
   })
 
   it('logs a weigh-in for today, then updates it, and ignores nonsense', async () => {
@@ -350,8 +377,10 @@ describe('BODY · WEIGHT', () => {
     expect(useToast.getState().current?.text).toBe('Logged · 84.3 kg')
     expect(useToast.getState().current?.action).toBeUndefined()
     expect(input.value).toBe('')
-    expect($('tp-weight-latest')?.textContent).toBe('84.3 kg')
+    // the gold foil draws its digits in three layers, so read the data and the spoken label
     expect($('tp-weight-latest')?.dataset.kg).toBe('84.3')
+    expect($('tp-weight-latest')?.getAttribute('aria-label')).toBe('84.3 kg')
+    expect($('tp-weight-latest')?.textContent).toContain('kg')
     expect(input.placeholder).toBe('84.3')
     const id = useStore.getState().weights[0].id
     expect($(`tp-weight-row-${id}`)).not.toBeNull()
@@ -391,7 +420,10 @@ describe('BODY · WEIGHT', () => {
     expect(rows).toHaveLength(10)
     expect((rows[0] as HTMLElement).dataset.day).toBe(today)
     expect(rows[0].textContent).toContain('level')
-    expect(rows[6].textContent).toContain('1.0 kg down') // six days back, against 86 the day before
+    expect(rows[6].textContent).toContain('1.0 down') // six days back, against 86 the day before
+    // every chart label is 12 px or more, tracked no wider than 0.06em
+    for (const t of chart.querySelectorAll('text')) expect(Number(t.getAttribute('font-size'))).toBeGreaterThanOrEqual(12)
+    expect(chart.querySelectorAll('[data-axis="y"] text').length).toBeGreaterThanOrEqual(2)
   })
 
   it('deletes a weigh-in with UNDO putting it back', async () => {
@@ -415,7 +447,8 @@ describe('BODY · PROGRESS PHOTOS', () => {
     mount(createElement(HistoryBody, { today }))
     await settle()
     const section = $('tp-photos')!
-    expect(section.textContent).toContain('No photos yet. Add the first one.')
+    expect(section.textContent).toContain('No photos yet.')
+    expect($('tp-photo-add-button')).not.toBeNull()
     expect(section.textContent).toContain('Photos stay on this device and are not in the backup.')
     expect($('tp-photo-compare')).toBeNull()
     const input = $('tp-photo-add') as HTMLInputElement

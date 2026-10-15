@@ -1,27 +1,54 @@
 /**
  * BODY · the weight chart: an SVG line over the last 90 days of weigh-ins. The geometry is pure
  * (`buildWeightChart` and the helpers above it, covered by HistoryWeightChart.test.ts). The component
- * measures its own width so the viewBox maps 1:1 to CSS pixels and the 9 px Cinzel labels never stretch.
+ * measures its own width so the viewBox maps 1:1 to CSS pixels and the 12 px Cinzel labels render at 12 px.
  */
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { WeightEntry } from '../lib/types'
 import { dayKeyOffset, formatDayLabel, parseDayKey } from '../lib/day'
 
 /** Chart height in px. */
-export const CHART_HEIGHT = 140
+export const CHART_HEIGHT = 160
 /** Width used until the container is measured: a 390 px phone less two 16 px gutters. */
 export const CHART_FALLBACK_WIDTH = 358
 /** The x axis reaches at least this many days back from today, so a first weigh-in sits on a week. */
 export const MIN_SPAN_DAYS = 6
 /** Plot insets inside the chart box: the y labels sit in the left inset, the day labels in the bottom one. */
-export const CHART_PAD = { left: 26, right: 6, top: 10, bottom: 22 } as const
+export const CHART_PAD = { left: 30, right: 6, top: 12, bottom: 26 } as const
+/** Every SVG label: Cinzel 700 at 12 px (the viewBox maps 1:1 to CSS px, so 12 units render at 12 px). */
+export const CHART_FONT_PX = 12
+/** Labelled gridlines sit at least this far apart, so 12 px labels never touch. */
+export const MIN_LABEL_GAP = 18
 
 const GOLD_400 = '#D8B45A'
 const GOLD_300 = '#E6CB78'
 const GOLD_200 = '#F6E3A1'
-const BONE_DIM = '#9A948A'
-const GOLD_LINE = 'rgba(216, 180, 90, 0.16)'
+const BONE_DIM = '#D3CDC2'
+const GOLD_LINE = 'rgba(216, 180, 90, 0.42)'
+const GRID = 'rgba(231, 225, 210, 0.06)'
 const DAY_MS = 86_400_000
+
+/**
+ * Whole-kg gridlines for the y range, and which of them carry a label. Lines every kilogram (every 2, 5
+ * or 10 when a kilogram is under 4 px); labels on the smallest step of 1, 2, 5, 10 or 20 kg that keeps
+ * them `MIN_LABEL_GAP` px apart, always including the bottom of the range.
+ */
+export function gridTicks(domain: { min: number; max: number }, plotHeight: number): { lines: number[]; labels: number[] } {
+  const span = domain.max - domain.min
+  if (!(span > 0) || !(plotHeight > 0)) return { lines: [], labels: [] }
+  const pxPerKg = plotHeight / span
+  const steps = [1, 2, 5, 10, 20, 50]
+  const lineStep = steps.find((s) => s * pxPerKg >= 4) ?? 50
+  const labelStep = steps.find((s) => s * pxPerKg >= MIN_LABEL_GAP) ?? 50
+  const lines: number[] = []
+  const labels: number[] = []
+  const first = Math.ceil(domain.min)
+  for (let kg = first; kg <= domain.max; kg++) {
+    if ((kg - first) % lineStep === 0) lines.push(kg)
+    if ((kg - first) % labelStep === 0) labels.push(kg)
+  }
+  return { lines, labels }
+}
 
 /** Kilograms to one decimal: `84.3`, `80.0`. */
 export function formatKg(kg: number): string {
@@ -145,15 +172,16 @@ export function buildWeightChart(
 
   let target: ChartTarget | null = null
   if (points.length && typeof targetKg === 'number' && Number.isFinite(targetKg) && targetKg > 0) {
-    if (targetKg < domain.min) target = { kg: targetKg, position: 'below', labelY: plot.bottom - 5 }
-    else if (targetKg > domain.max) target = { kg: targetKg, position: 'above', labelY: plot.top + 7 }
+    // baselines for 12 px Cinzel: 6 px clear of a line above the text, 15 px below a line under it
+    if (targetKg < domain.min) target = { kg: targetKg, position: 'below', labelY: plot.bottom - 6 }
+    else if (targetKg > domain.max) target = { kg: targetKg, position: 'above', labelY: plot.top + 15 }
     else {
       const ty = y(targetKg)
       // the label sits on the side of the line away from the latest weigh-in, and inside the plot
       const latestY = points[points.length - 1].y
-      let labelY = latestY <= ty ? ty + 11 : ty - 5
-      if (labelY > plot.bottom - 2) labelY = ty - 5
-      if (labelY < 9) labelY = ty + 11
+      let labelY = latestY <= ty ? ty + 15 : ty - 6
+      if (labelY > plot.bottom - 2) labelY = ty - 6
+      if (labelY < CHART_FONT_PX) labelY = ty + 15
       target = { kg: targetKg, position: 'inside', y: ty, labelY }
     }
   }
@@ -182,12 +210,15 @@ type Props = {
   targetKg?: number | null
 }
 
-const LABEL_FONT = { fontSize: 9, fill: BONE_DIM } as const
+/** Cinzel 700 12 px; letter-spacing stays at or under 0.06em (nothing under 13 px tracks past 0.2em). */
+const LABEL = { fontSize: CHART_FONT_PX, fontWeight: 700, fill: BONE_DIM } as const
 
 /**
- * 140 px tall, full width. A gold-400 line (1.5 px, butt caps) over a faint gold fill, 3 px dots on
- * weigh-in days (the latest one a little larger), a dashed gold-200 TARGET line, the y range at the
- * left edge and the first and last day underneath. Under two weigh-ins: the dots and one quiet line.
+ * 160 px tall, full width (polish-spec 6.5). Faint gridlines at each whole kilogram with their values at
+ * the left, a gold-400 line (1.5 px) over a gold fill fading down, 3 px dots on weigh-in days and the
+ * latest as a gold-200 dot in a soft halo, a dashed gold-400 target line labelled `TARGET 80.0` in
+ * gold-300, and the first and last day underneath. Every label is Cinzel 700 at 12 px.
+ * Under two weigh-ins: the dots and one quiet line.
  */
 export function HistoryWeightChart({ weights, today, targetKg = null }: Props) {
   const box = useRef<HTMLDivElement>(null)
@@ -213,6 +244,7 @@ export function HistoryWeightChart({ weights, today, targetKg = null }: Props) {
   const { plot, points, target } = chart
   const n = points.length
   const latest = n ? points[n - 1] : null
+  const ticks = useMemo(() => gridTicks(chart.domain, plot.bottom - plot.top), [chart.domain, plot.bottom, plot.top])
 
   const aria =
     n === 0
@@ -235,29 +267,40 @@ export function HistoryWeightChart({ weights, today, targetKg = null }: Props) {
       <svg width="100%" height={chart.height} viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label={aria} className="block overflow-visible">
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="rgb(216, 180, 90)" stopOpacity="0.14" />
+            <stop offset="0" stopColor="rgb(216, 180, 90)" stopOpacity="0.16" />
             <stop offset="1" stopColor="rgb(216, 180, 90)" stopOpacity="0" />
           </linearGradient>
         </defs>
 
+        {/* whole-kg gridlines, then the base rule */}
+        {n
+          ? ticks.lines.map((kg) => {
+              const gy = round2(plot.bottom - ((kg - chart.domain.min) / (chart.domain.max - chart.domain.min)) * (plot.bottom - plot.top))
+              return <line key={kg} x1={plot.left} x2={plot.right} y1={gy} y2={gy} stroke={GRID} strokeWidth={0.5} />
+            })
+          : null}
         <line x1={plot.left} x2={plot.right} y1={plot.bottom} y2={plot.bottom} stroke={GOLD_LINE} strokeWidth={1} />
 
         {n ? (
-          <g className="font-display" style={{ letterSpacing: '0.1em' }}>
-            <text x={0} y={plot.top} dominantBaseline="central" {...LABEL_FONT}>
-              {chart.domain.max}
-            </text>
-            <text x={0} y={plot.bottom} dominantBaseline="central" {...LABEL_FONT}>
-              {chart.domain.min}
-            </text>
+          <g data-axis="y" className="font-display" style={{ letterSpacing: '0.04em' }}>
+            {ticks.labels.map((kg) => {
+              const gy = plot.bottom - ((kg - chart.domain.min) / (chart.domain.max - chart.domain.min)) * (plot.bottom - plot.top)
+              return (
+                <text key={kg} x={plot.left - 6} y={gy} textAnchor="end" dominantBaseline="central" {...LABEL}>
+                  {kg}
+                </text>
+              )
+            })}
           </g>
         ) : null}
 
+        {chart.area ? <path d={chart.area} fill={`url(#${gradId})`} /> : null}
+
         {target && target.position === 'inside' ? (
           <g data-target="inside">
-            <line x1={plot.left} x2={plot.right} y1={target.y} y2={target.y} stroke={GOLD_200} strokeOpacity={0.75} strokeWidth={1} strokeDasharray="4 4" />
-            <text x={plot.right} y={target.labelY} textAnchor="end" className="font-display" style={{ letterSpacing: '0.2em' }} fontSize={9} fill={GOLD_200} fillOpacity={0.85}>
-              TARGET
+            <line x1={plot.left} x2={plot.right} y1={target.y} y2={target.y} stroke={GOLD_400} strokeOpacity={0.6} strokeWidth={1} strokeDasharray="4 4" />
+            <text x={plot.right} y={target.labelY} textAnchor="end" className="font-display" style={{ letterSpacing: '0.06em', paintOrder: 'stroke' }} stroke="#050507" strokeWidth={3} strokeOpacity={0.85} fontSize={CHART_FONT_PX} fontWeight={700} fill={GOLD_300}>
+              {`TARGET ${formatKg(target.kg)}`}
             </text>
           </g>
         ) : null}
@@ -266,43 +309,44 @@ export function HistoryWeightChart({ weights, today, targetKg = null }: Props) {
             <path
               d={
                 target.position === 'below'
-                  ? `M ${plot.left + 2} ${target.labelY - 5} L ${plot.left + 5} ${target.labelY - 2} L ${plot.left + 8} ${target.labelY - 5}`
-                  : `M ${plot.left + 2} ${target.labelY - 3} L ${plot.left + 5} ${target.labelY - 6} L ${plot.left + 8} ${target.labelY - 3}`
+                  ? `M ${plot.left + 2} ${target.labelY - 6} L ${plot.left + 6} ${target.labelY - 2} L ${plot.left + 10} ${target.labelY - 6}`
+                  : `M ${plot.left + 2} ${target.labelY - 4} L ${plot.left + 6} ${target.labelY - 8} L ${plot.left + 10} ${target.labelY - 4}`
               }
               fill="none"
-              stroke={GOLD_200}
-              strokeOpacity={0.85}
-              strokeWidth={1}
+              stroke={GOLD_300}
+              strokeWidth={1.5}
             />
-            <text x={plot.left + 13} y={target.labelY} className="font-display" style={{ letterSpacing: '0.2em' }} fontSize={9} fill={GOLD_200} fillOpacity={0.85}>
+            <text x={plot.left + 16} y={target.labelY} className="font-display" style={{ letterSpacing: '0.06em', paintOrder: 'stroke' }} stroke="#050507" strokeWidth={3} strokeOpacity={0.85} fontSize={CHART_FONT_PX} fontWeight={700} fill={GOLD_300}>
               {`TARGET ${formatKg(target.kg)}`}
             </text>
           </g>
         ) : null}
 
-        {chart.area ? <path d={chart.area} fill={`url(#${gradId})`} /> : null}
-        {chart.line ? <path d={chart.line} fill="none" stroke={GOLD_400} strokeWidth={1.5} strokeLinecap="butt" strokeLinejoin="round" /> : null}
+        {chart.line ? <path d={chart.line} fill="none" stroke={GOLD_400} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" /> : null}
         {points.map((p, i) =>
           i === n - 1 ? (
-            <circle key={p.day} cx={p.x} cy={p.y} r={2.5} fill={GOLD_200} />
+            <g key={p.day} data-latest="">
+              <circle cx={p.x} cy={p.y} r={4} fill="rgba(216, 180, 90, 0.25)" />
+              <circle cx={p.x} cy={p.y} r={2} fill={GOLD_200} />
+            </g>
           ) : (
             <circle key={p.day} cx={p.x} cy={p.y} r={1.5} fill={GOLD_300} />
           ),
         )}
 
         {n ? (
-          <g className="font-display" style={{ letterSpacing: '0.2em' }}>
-            <text x={plot.left} y={chart.height - 4} {...LABEL_FONT}>
+          <g data-axis="x" className="font-display" style={{ letterSpacing: '0.06em' }}>
+            <text x={plot.left} y={chart.height - 6} {...LABEL}>
               {chart.dayLabels.start.toUpperCase()}
             </text>
-            <text x={plot.right} y={chart.height - 4} textAnchor="end" {...LABEL_FONT}>
+            <text x={plot.right} y={chart.height - 6} textAnchor="end" {...LABEL}>
               {chart.dayLabels.end.toUpperCase()}
             </text>
           </g>
         ) : null}
       </svg>
       {n < 2 ? (
-        <p className="pointer-events-none absolute inset-x-0 text-center font-body text-[14px] italic leading-5 text-bone-dim" style={{ top: noteTop }}>
+        <p className="empty-line pointer-events-none absolute inset-x-0 text-center leading-5" style={{ top: noteTop }}>
           Two weigh-ins draw the line.
         </p>
       ) : null}

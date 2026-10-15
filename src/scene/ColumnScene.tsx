@@ -14,6 +14,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { type Material, type Object3D, PerspectiveCamera, Vector3 } from 'three'
 import { isReducedMotion } from '../lib/motion'
+import { DEBUG } from './debugFlags'
 import { BusContext, type SceneBus } from './bus'
 import { isFrameProbePending, reportFrameTimes, tierSettings, useTier, type TierSettings } from './tier'
 import { CAMERA_REST, COL, GOAL_Y, T } from './tokens'
@@ -31,6 +32,23 @@ export type ColumnSceneProps = {
 }
 
 const PROBE_FRAMES = 30
+
+/** a short name for the program a material compiles to (materials sharing a key share a program) */
+function programKey(m: Material): string {
+  const custom = (m as { customProgramCacheKey?: () => string }).customProgramCacheKey
+  const k = typeof custom === 'function' ? String(custom.call(m)) : ''
+  if (k.includes('tp-obsidian')) return 'obsidian'
+  if (k.includes('|gold')) return 'gold'
+  if (k.includes('tp-fx')) return 'fx'
+  if ((m as { isShaderMaterial?: boolean }).isShaderMaterial) return 'dust'
+  if ((m as { map?: unknown }).map) return 'basic-map'
+  return m.type
+}
+
+const RANK: Record<string, number> = { obsidian: 0, gold: 1, fx: 2, dust: 3, 'basic-map': 4 }
+function programRank(key: string): number {
+  return RANK[key] ?? 5
+}
 
 export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
   const gl = useThree((s) => s.gl)
@@ -116,7 +134,9 @@ export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
   const tier = useTier()
   useEffect(() => {
     const live = tierSettings(tier === 'none' ? 'low' : tier)
-    setDpr(live.dprMax)
+    // always the clamped form: a bare number ignores the device ratio, so R3F's own `dpr` prop and
+    // this effect disagreed and the drawing buffer was reallocated (a 300 ms GPU stall) on each flip
+    setDpr([1, live.dprMax])
     bus.dustCount = Math.min(settings.dust, live.dust)
   }, [tier, bus, setDpr, settings.dust])
 
@@ -139,29 +159,44 @@ export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
     const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
     const run = async () => {
       mark('tp:gl-compile-start')
-      // one material per frame: a desktop driver blocks inside compile even with parallel compile,
-      // so chunking keeps every task short and the opening timeline smooth
+      // one chunk per program (materials sharing a program cost a frame each for nothing once it is
+      // linked), largest first, by a key rather than traverse order (polish-spec 5.3)
       const seen = new Set<string>()
-      const chunks: Object3D[] = []
+      const chunks: { o: Object3D; rank: number; key: string }[] = []
       scene.traverse((o) => {
         const mat = (o as { material?: Material | Material[] }).material
         if (!mat) return
         const list = Array.isArray(mat) ? mat : [mat]
-        const key = list.map((m) => m.uuid).join('+')
-        if (seen.has(key)) return
-        seen.add(key)
-        chunks.push(o)
+        const pk = programKey(list[0])
+        if (seen.has(pk)) return
+        seen.add(pk)
+        chunks.push({ o, rank: programRank(pk), key: pk })
       })
-      for (const child of chunks) {
+      chunks.sort((a, b) => a.rank - b.rank)
+      // one program per frame: a desktop driver blocks inside compile even with parallel compile, so
+      // chunking keeps every task short and the opening timeline smooth
+      for (const chunk of chunks) {
         if (cancelled) return
         try {
-          await gl.compileAsync(child, camera, scene)
+          await gl.compileAsync(chunk.o, camera, scene)
         } catch {
           /* a failed precompile only costs a later hitch; the scene still renders */
         }
+        if (DEBUG.chunks) mark(`tp:gl-chunk-${chunk.key}`)
         await nextFrame()
       }
+      // every other material: its program is linked already, so this only binds it
+      if (cancelled) return
+      try {
+        await gl.compileAsync(scene, camera)
+      } catch {
+        /* as above */
+      }
+      if (cancelled) return
       mark('tp:gl-compile-done')
+      // test and console hook: the live program count (12 linked before the polish, 5 after S2)
+      const tp = (window as unknown as { __tp?: Record<string, unknown> }).__tp
+      if (tp) tp.programs = gl.info.programs?.length ?? null
       if (cancelled) return
       try {
         // one frame while still `never`, so the first visible frame is already on the canvas
@@ -219,9 +254,10 @@ export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
     cam.position.set(s * 0.033 * Math.sin(t * 97), mon.camY + s * 0.024 * Math.sin(t * 113 + 1.3), mon.camZ)
     cam.lookAt(0, mon.lookY, 0)
     if (s > 0) cam.rotation.z += s * 0.012 * Math.sin(t * 89)
-    if ((cam as PerspectiveCamera).isPerspectiveCamera && lastFov.current !== mon.fov) {
-      lastFov.current = mon.fov
-      ;(cam as PerspectiveCamera).fov = mon.fov
+    const fov = mon.fov + mon.fovPunch
+    if ((cam as PerspectiveCamera).isPerspectiveCamera && lastFov.current !== fov) {
+      lastFov.current = fov
+      ;(cam as PerspectiveCamera).fov = fov
       ;(cam as PerspectiveCamera).updateProjectionMatrix()
     }
     if (moving && loop.current === 'demand') invalidate()
@@ -230,22 +266,22 @@ export function ColumnScene({ bus, settings, onReady }: ColumnSceneProps) {
   // drei PerformanceMonitor, mounted only inside `always` windows: never below 1.0, never above the tier cap
   const onDecline = useCallback(() => {
     const cap = tierSettings(tier === 'none' ? 'low' : tier).dprMax
-    setDpr(Math.max(1, Math.min(1.25, cap)))
+    setDpr([1, Math.max(1, Math.min(1.25, cap))])
     bus.dustCount = Math.min(bus.dustCount, 90)
   }, [bus, tier, setDpr])
   const onIncline = useCallback(() => {
     const live = tierSettings(tier === 'none' ? 'low' : tier)
-    setDpr(live.dprMax)
+    setDpr([1, live.dprMax])
     bus.dustCount = Math.min(settings.dust, live.dust)
   }, [bus, tier, settings.dust, setDpr])
 
   return (
     <BusContext.Provider value={bus}>
-      <fogExp2 attach="fog" args={[COL.fog, 0.06]} />
+      <fogExp2 attach="fog" args={[COL.fog, 0.03]} />
       <Lights />
-      <Plinth />
+      <Plinth inscription={settings.inscription} />
       <Column settings={settings} />
-      <GoalLine />
+      <GoalLine settings={settings} />
       <Dust settings={settings} />
       {monitorOn ? <PerformanceMonitor ms={100} iterations={6} flipflops={3} onDecline={onDecline} onIncline={onIncline} /> : null}
     </BusContext.Provider>
