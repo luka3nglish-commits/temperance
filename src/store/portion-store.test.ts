@@ -23,6 +23,25 @@ describe('custom portions', () => {
     expect(meal.macros.kcal).toBe(165)
   })
 
+  it('logQuick with a one-serve basis treats the amount as servings', () => {
+    const s = useStore.getState()
+    const egg = { kcal: 78, protein: 6.3, carbs: 0.6, fat: 5.3 }
+    const e = s.logQuick({ name: 'Eggs', macros: egg, per: { amount: 1, unit: 'serve' }, amount: 3 }, T0)
+    expect(e.servings).toBe(3)
+    expect(e.macros.kcal).toBe(234)
+    expect(e.portion).toBeUndefined()
+    // a two-serve basis keeps the served amount for display
+    const t = s.logQuick({ name: 'Wraps', macros: { kcal: 300, protein: 10, carbs: 50, fat: 6 }, per: { amount: 2, unit: 'serve' }, amount: 3 }, T0)
+    expect(t.servings).toBe(1.5)
+    expect(t.macros.kcal).toBe(450)
+    expect(t.portion).toEqual({ amount: 3, unit: 'serve' })
+    // olive oil counted per 10 ml
+    const o = s.logQuick({ name: 'Olive oil', macros: { kcal: 88, protein: 0, carbs: 0, fat: 10 }, per: { amount: 10, unit: 'ml' }, amount: 15 }, T0)
+    expect(o.servings).toBe(1.5)
+    expect(o.portion).toEqual({ amount: 15, unit: 'ml' })
+    expect(o.macros.kcal).toBe(132)
+  })
+
   it('logMeal takes any amount, remembers it, and one-tap uses it', () => {
     const s = useStore.getState()
     const m = s.addQuickMeal({ name: 'Rice', macros: { kcal: 130, protein: 2.7, carbs: 28, fat: 0.3 }, per: per100, usual: 200 }, T0)

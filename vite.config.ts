@@ -18,6 +18,9 @@ try {
 
 export default defineConfig({
   base: BASE,
+  // Parallel dev servers each get their own pre-bundle cache (VITE_CACHE_DIR=node_modules/.vite-5181),
+  // so one server re-optimizing a dependency never invalidates another's. Unset: the default.
+  cacheDir: process.env.VITE_CACHE_DIR || undefined,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_HASH__: JSON.stringify(hash),

@@ -391,7 +391,9 @@ export const useStore = create<TemperanceStore>()(
         // a built meal is always per serve; a per-100 g basis needs an amount eaten
         const basis = built ? undefined : cleanPer(per)
         const resolved = basis && typeof amount === 'number' ? resolvePortion(basis, { amount, unit: basis.unit }) : null
-        const n = resolved ? resolved.servings : clampServings(servings)
+        // a one-serve basis (eggs, a banana) is no basis at all: the amount typed is the servings
+        const oneServe = !built && !basis && !!per && per.unit === 'serve' && typeof amount === 'number' ? cleanAmount(amount, 'serve') : null
+        const n = resolved ? resolved.servings : clampServings(oneServe ?? servings)
         const portion = resolved?.portion
         // a built meal's numbers are its components; never let a caller's total drift from them
         const macros = built ? sumMacros(components!.map((c) => roundMacros(c.macros))) : givenMacros
