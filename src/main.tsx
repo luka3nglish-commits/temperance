@@ -24,3 +24,19 @@ createRoot(document.getElementById('root')!).render(
 
 // the crash-loop guard (index.html): this boot is stable after 30 s, or as soon as the person leaves
 installStableMark()
+
+// Pick up a new release when the app comes back to the foreground. The browser's own service-worker
+// check can be deferred for several launches; this asks at most once a minute.
+if ('serviceWorker' in navigator) {
+  let lastCheck = 0
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || Date.now() - lastCheck < 60_000) return
+    lastCheck = Date.now()
+    navigator.serviceWorker
+      .getRegistration()
+      .then((r) => r?.update())
+      .catch(() => {
+        /* offline or no registration: the next launch checks again */
+      })
+  })
+}
