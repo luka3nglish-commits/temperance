@@ -12,7 +12,7 @@ Severe, dark, quiet. Obsidian and gold only, Roman inscription type, no greens, 
 
 ## 2 Colour tokens
 
-Tailwind 4 `@theme` tokens in `src/index.css`. Names match the existing file; values are updated to these. Dark only (`color-scheme: dark`). LOCKED: sync `index.html` `theme-color` and the `vite.config.ts` manifest `background_color` and `theme_color` to `#050507`.
+Tailwind 4 `@theme` tokens and `:root` variables in `src/index.css`. Dark only (`color-scheme: dark` on `:root` and `<meta name="color-scheme" content="dark">`). `index.html` `theme-color` and the `vite.config.ts` manifest `background_color` and `theme_color` are all `#050507`; no test checks that they agree. Contrast figures below are the comments carried in `index.css` (composites on `#0B0B0F`); the measured tables live in `docs/polish-spec.md` 2.1.
 
 ```css
 @theme {
@@ -20,112 +20,199 @@ Tailwind 4 `@theme` tokens in `src/index.css`. Names match the existing file; va
   --font-body: "Cormorant Garamond", "Cormorant Fallback", Georgia, serif;
 
   /* obsidian: the stone, deepest to lightest */
-  --color-obsidian-950: #050507; /* the void: page, canvas clear, shard fill */
-  --color-obsidian-900: #0B0B0F; /* bars, sheets, tab bar, 3D column colour */
-  --color-obsidian-800: #121218; /* raised slab, inputs, chips */
-  --color-obsidian-700: #1A1A21; /* ring track, ghost arcs, skeleton rows */
-  --color-obsidian-600: #26262E; /* neutral hairlines */
+  --color-obsidian-950: #050507; /* the void: page, canvas clear */
+  --color-obsidian-900: #0b0b0f; /* sheets, bars */
+  --color-obsidian-800: #121218; /* raised slab, disabled gold button */
+  --color-obsidian-700: #1a1a21; /* skeleton rows */
+  --color-obsidian-600: #26262e; /* neutral hairlines */
+
+  /* material system: raised tablet stops, carved inset stops, slab */
+  --color-tablet-hi: #17171e;
+  --color-tablet-mid: #111117;
+  --color-tablet-lo: #0d0d12;
+  --color-inset-hi: #08080b;
+  --color-inset-lo: #0e0e13;
+  --color-slab: #16161c; /* toast, chips */
 
   /* bone: the only neutrals for text */
-  --color-bone: #E7E1D2;      /* primary text */
-  --color-bone-dim: #9A948A;  /* labels, meta, sub-lines */
-  --color-bone-mute: #5E5A54; /* disabled, placeholders, SKIP */
+  --color-bone: #e7e1d2;      /* names, values, inputs: 15.06:1 */
+  --color-bone-dim: #d3cdc2;  /* every Cinzel label, inactive tabs, icons: 12.42:1 */
+  --color-bone-soft: #b9b3a9; /* Cormorant 15 px and up only: meta, subline, units, hints: 9.43:1 */
+  --color-bone-mute: #9c9791; /* placeholders, disabled, untracked, version line: 6.78:1 */
 
-  /* gold ladder: gradient stops and flat gold */
-  --color-gold-100: #FFF7DA; /* specular tip */
-  --color-gold-200: #F6E3A1; /* highlight, 3D goal line, ring flash */
-  --color-gold-300: #E6CB78; /* light body */
-  --color-gold-400: #D8B45A; /* body, flat gold for SVG strokes and fallback text */
-  --color-gold-500: #B8902E; /* mid */
-  --color-gold-600: #9C7B33; /* shadow */
-  --color-gold-700: #7A5E22; /* tail */
-  --color-gold-800: #5C4418; /* deep shadow */
+  /* gold ladder */
+  --color-gold-100: #fff7da;
+  --color-gold-200: #f6e3a1; /* active segment text, highlight */
+  --color-gold-300: #e6cb78; /* all gold text under 32 px, focus ring */
+  --color-gold-400: #d8b45a; /* strokes, fills, marks; text only 16 px bold and up */
+  --color-gold-500: #b8902e; /* text-gradient floor */
+  --color-gold-600: #9c7b33; /* ornaments only, never text */
+  --color-gold-700: #7a5e22;
+  --color-gold-800: #5c4418;
 
   /* ember: over the line */
-  --color-ember: #FF5A1F;      /* crack emissive, OVER number stop, delete */
-  --color-ember-deep: #B3300A; /* ember gradient tail */
-  --color-ember-text: #FF7A45; /* OVER labels and deltas in lists */
+  --color-ember: #ff5a1f;      /* number gradient, borders, icons, never small text */
+  --color-ember-deep: #b3300a;
+  --color-ember-text: #ff9972; /* OVER labels and deltas, always with the flame: 9.40:1 */
 
-  /* macro ring, monochrome gold by value */
-  --color-protein: #F2D98A;
-  --color-carbs: #B8923E;
-  --color-fat: #6E5324;
+  /* macro ring, monochrome gold by value (arc and swatch only, never text) */
+  --color-protein: #f2d98a;
+  --color-carbs: #b8923e;
+  --color-fat: #8e7243;
 
   /* scene and shard flats */
-  --color-dust: #9A8E7A;
-  --color-shard-a: #1A1A20;
-  --color-shard-b: #0A0A0D;
-  --color-shard-c: #26262E;
+  --color-dust: #9a8e7a;
+  --color-shard-a: #1c1c22;
+  --color-shard-b: #0a0a0d;
+  --color-shard-c: #2a2a31;
 }
+
+@property --tilt-x { syntax: "<number>"; inherits: true; initial-value: 0; }
 
 :root {
   /* alpha tokens (Tailwind theme colours cannot carry alpha) */
-  --gold-line: rgba(216, 180, 90, 0.16);        /* ledger rules, row rules, tab bar top edge */
-  --gold-line-strong: rgba(216, 180, 90, 0.55); /* sheet top edge, section rules */
-  --gold-focus: rgba(216, 180, 90, 0.70);       /* input focus hairline */
-  --ember-glow: rgba(255, 90, 31, 0.45);        /* fallback crack drop-shadow */
-  --bone-08: rgba(231, 225, 210, 0.08);         /* neutral hairline on obsidian-900 */
-  --scrim: rgba(5, 5, 7, 0.60);                 /* radial scrim behind the big number */
+  --gold-line: rgba(216, 180, 90, 0.42);        /* 2.58:1: section rules, tab bar top edge, dividers inside controls */
+  --gold-line-strong: rgba(216, 180, 90, 0.55); /* 3.64:1: one lead rule per screen, sheet top edge */
+  --gold-edge: rgba(216, 180, 90, 0.55);        /* 3.64:1: borders of gold controls */
+  --bone-edge: rgba(231, 225, 210, 0.4);        /* 3.18:1: borders of inputs and the PortionField at rest */
+  --rule: rgba(231, 225, 210, 0.16);            /* decorative: row rules between list rows */
+  --bone-rule: rgba(231, 225, 210, 0.36);       /* ring groove hairlines */
+  --ember-edge: rgba(255, 90, 31, 0.7);         /* 3.54:1: danger button border */
+  --ember-glow: rgba(255, 90, 31, 0.45);
+  --scrim: rgba(5, 5, 7, 0.74);                 /* sheet scrim and the hero number scrim */
+  --gold-focus: #e6cb78;                        /* DEPRECATED alias */
+  --bone-08: var(--rule);                       /* DEPRECATED alias */
 
-  /* tilt-driven light. Written by the tilt loop (section 8) or the goldSweep keyframe. */
-  --tilt-x: 0;            /* -1 to 1 */
-  --tilt-angle: 0deg;     /* = --tilt-x * 18deg */
+  /* tilt-driven light: -1 to 1, written by the tilt loop or the goldSweep keyframe */
+  --tilt-x: 0;
+  --tilt-angle: calc(var(--tilt-x) * 18deg);
 
+  /* text and fills: darkest stop #B8902E */
+  --gold-grad-text: linear-gradient(calc(100deg + var(--tilt-angle)),
+    #b8902e 0%, #c9a24a 20%, #d8b45a 38%, #ebd08a 46%, #fff3cf 50%, #f6e3a1 54%, #d8b45a 66%, #c29a42 82%, #b8902e 100%);
+  /* decoration only (goal line DOM fallback, gradient borders), never under text */
   --gold-grad: linear-gradient(calc(100deg + var(--tilt-angle)),
-    #5C4418 0%, #9C7B33 22%, #D8B45A 42%, #FFF7DA 50%, #F6E3A1 56%, #D8B45A 70%, #7A5E22 100%);
-  --gold-grain: repeating-linear-gradient(calc(90deg + var(--tilt-angle)),
-    rgba(0, 0, 0, 0) 0 1px, rgba(0, 0, 0, 0.18) 1px 2px);
+    #5c4418 0%, #9c7b33 22%, #d8b45a 42%, #fff7da 50%, #f6e3a1 56%, #d8b45a 70%, #7a5e22 100%);
   --gold-border: linear-gradient(calc(120deg + var(--tilt-angle)),
-    #7A5E22 0%, #D8B45A 45%, #FFF7DA 50%, #D8B45A 55%, #5C4418 100%);
+    #7a5e22 0%, #d8b45a 45%, #fff7da 50%, #d8b45a 55%, #5c4418 100%);
   --ember-grad: linear-gradient(calc(100deg + var(--tilt-angle)),
-    #B3300A 0%, #FF5A1F 45%, #FFB088 50%, #FF5A1F 55%, #7A2208 100%);
+    #b3300a 0%, #ff5a1f 45%, #ffb088 50%, #ff5a1f 55%, #7a2208 100%);
+  --gold-brush: url("data:image/svg+xml,..."); /* 256 x 64 feTurbulence 0.004 0.55, 3 octaves, seed 3, alpha -0.45 0.27 */
+  --grain-uri: url("data:image/svg+xml,...");  /* 160 x 160 feTurbulence 0.85, 2 octaves, seed 7, alpha 0.035 */
 }
 ```
 
-Three.js colours (hex strings in `src/scene/tokens.ts`): column `#0B0B0F`, plinth `#0D0D12`, key light `#FFE9B8`, rim light `#C8B07A`, sweep light `#FFF4D6`, ember light `#FF6A2B`, goal line `#F6E3A1`, goal flash `#FFF7DA`, goal glow `#D8B45A`, capital `#D8B45A`, dust `#9A8E7A`, spark `#FF8C42`, fog `#050507`, crack emissive `vec3(1.0, 0.35, 0.12) * 2.5`.
+`--gold-grain` is gone. `--gold-focus` and `--bone-08` remain only as aliases in `index.css`; nothing else in `src` reads them. `--bone-rule` is defined but unread: `TodayRing.tsx` hard-codes the same `rgba(231, 225, 210, 0.36)` as `GROOVE`. `--ember-glow` feeds the high-tier `drop-shadow` on the SVG monument crack and the colonnade over bars.
 
-Desktop field behind the 430 px slab: `#040406` with `radial-gradient(60% 50% at 50% 40%, rgba(216,180,90,0.05), transparent 70%)`.
+Gold usage. `--gold-grad-text` fills every gold surface and gold text. The CSS classes `.gold-num .gold-face` (with `--gold-brush` on top, `background-size: 256px 64px, 220% 100%`), `.gold-text`, `.gold-fill`, `.btn-gold`, the on toggle knob and `.sheet-grab` each set `background-size: 220% 100%; background-repeat: no-repeat; background-position: calc(50% + var(--tilt-x) * 50%) 0` (the seam fix; no `* 60%` remains in `src`). Two surfaces size the gradient to the whole figure instead: the odometer face strips (`calc(var(--num-w) * 2.2) 1.08em`, `repeat-y`, offset per cell by `--slot-x`, still following `--tilt-x`) and the opening wordmark letters (`calc(var(--ww) * 2.2) 100%`, offset per letter by `--lx`, a sheen layer on top, not tilt driven). Low tier (`html.no-grain`, set by `src/scene/tier.ts` when the tier is not high) drops the brush layer and hides `.gold-hi`. `.gold-fill` and `.btn-gold` text is `#17110a`; `.btn-gold` carries `text-shadow: 0 1px 0 rgba(255, 240, 200, 0.45)` itself, `.gold-fill` does not, and the keystone LOG label adds it with `.engraved`. `.gold-glow` is `radial-gradient(50% 50% at 50% 50%, rgba(216, 180, 90, 0.35), transparent 70%)` on a sibling element.
+
+Stone surfaces (raw hex in `index.css`, matching the tablet tokens):
+
+| Class | Fill | Edge | Shadow |
+| --- | --- | --- | --- |
+| `.tablet` (raised, informs) | `linear-gradient(180deg, #17171e 0%, #111117 55%, #0d0d12 100%)`, plus `--grain-uri` tiled 160 px unless `.no-grain` | 1 px `#2a2a33` | `inset 0 1px 0 rgba(231,225,210,0.07), inset 0 -1px 0 rgba(0,0,0,0.55), 0 1px 0 rgba(216,180,90,0.06), 0 14px 28px -14px rgba(0,0,0,0.85)` |
+| `.tablet-inset` (carved, you type into it) | `linear-gradient(180deg, #08080b 0%, #0e0e13 100%)` | 1 px `--bone-edge`; `#e6cb78` on `:focus-within`, `rgba(255,90,31,0.7)` `.is-invalid`, `rgba(231,225,210,0.16)` `.is-disabled` | `inset 0 2px 4px rgba(0,0,0,0.7), inset 0 -1px 0 rgba(231,225,210,0.04), 0 1px 0 rgba(231,225,210,0.05)`; on focus the shadow becomes `inset 0 2px 4px rgba(0,0,0,0.7), 0 0 0 1px #e6cb78` |
+| `.seg`, `.toggle-track` | the inset gradient | 1 px `--gold-edge` | `inset 0 2px 4px rgba(0,0,0,0.6)`; `.seg` adds `0 1px 0 rgba(231,225,210,0.05)` |
+| `.sheet-panel` | `linear-gradient(180deg, #15151b 0px, #0b0b0f 160px)` | `0 -1px 0 rgba(216,180,90,0.55)` | `inset 0 1px 0 rgba(255,247,218,0.1), 0 -30px 60px rgba(0,0,0,0.7)` |
+| `.tabbar` | `linear-gradient(180deg, #0e0e13, #0b0b0f)`, `backdrop-filter: blur(20px)` | top 1 px `--gold-line` | none |
+
+Three.js colours (`COL` in `src/scene/tokens.ts`): column `#121218`, plinth `#121217`, key light `#FFE9B8`, rim light `#C8B07A`, fresnel rim `#C9A961`, sweep light `#FFF4D6`, ember light `#FF6A2B`, goal line `#F6E3A1`, goal core `#EBD08A`, goal flash `#FFF7DA`, goal glow `#D8B45A`, capital `#D8B45A`, capital emissive `#F6E3A1`, dust `#9A8E7A`, smoke `#8E826E`, mote `#FFE3A8`, spark `#FF8C42`, fog `#050507`, ember `#FF5A1F`, ambient `#3A3428`, painted environment `#FFF1CC` / `#8C7A5A` / `#FF6A2B`; crack emissive `EMBER_EMISSIVE = [2.5, 0.875, 0.3]` (`vec3(1.0, 0.35, 0.12) * 2.5`). LOCKED by `src/scene/tokens.test.ts` ("three.js colours are the spec hexes"): column, plinth, ambient, goal line, goal flash, ember, dust, spark and fog, and every `COL` value is uppercase `#RRGGBB`.
+
+Desktop field behind the 430 px slab (`src/App.tsx`, 768 px and up): `#040406` with `radial-gradient(60% 50% at 50% 40%, rgba(216,180,90,0.06), transparent 70%)`.
 
 ## 3 Typography scale
 
-Fonts: Cinzel 400 and 700; Cormorant Garamond 400, 500 and 400 italic. Source `@fontsource/cinzel` and `@fontsource/cormorant-garamond` (remove the Cinzel 500 and 600 and Cormorant 600 imports from `src/main.tsx`). LOCKED: copy the five latin `woff2` files to `public/fonts/` (script `scripts/copy-fonts.mjs`), declare them with `@font-face` in `src/index.css` (`font-display: block` for Cinzel 700, `swap` for the rest), and preload all five in `index.html` with `<link rel="preload" as="font" type="font/woff2" crossorigin href="%BASE_URL%fonts/...">` so the opening cuts the real glyphs. Size-adjusted fallbacks so a late swap never moves layout: `@font-face { font-family: "Cinzel Fallback"; src: local("Georgia"); size-adjust: 92%; }` and `"Cormorant Fallback"` at `size-adjust: 104%`. `-webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility`.
+Fonts: Cinzel 400 and 700; Cormorant Garamond 400, 500, 600 and 400 italic. `scripts/copy-fonts.mjs` copies six latin `woff2` files from `@fontsource/cinzel` and `@fontsource/cormorant-garamond` into `public/fonts/` (`cinzel-400`, `cinzel-700`, `cormorant-400`, `cormorant-500`, `cormorant-600`, `cormorant-400-italic`); it runs as `prebuild` and exits 1 when a source file is missing. `src/index.css` declares each with `@font-face { src: url("/fonts/<name>.woff2") }`: `font-display: block` for Cinzel 700, `swap` for the rest. `index.html` preloads five with `<link rel="preload" as="font" type="font/woff2" crossorigin href="%BASE_URL%fonts/...">` (Cinzel 700 and 400, Cormorant 500, 400, 400 italic); Cormorant 600 is never preloaded. `src/main.tsx` imports no `@fontsource` CSS. Size-adjusted fallbacks: `"Cinzel Fallback"` and `"Cormorant Fallback"` are `local("Georgia")` at `size-adjust: 92%` and `104%`. Body: Cormorant 18 px, line 1.45, `-webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility`.
 
-Sizes at 390 px (desktop slab keeps them; the display number may go to 104 px at 430 px):
+Every UI Cinzel role is 700: `.font-display` sets the family and uppercase (unlayered) and `font-weight: 700` in `@layer components`, so a weight utility still wins. No element renders Cinzel at 400; the file is copied and preloaded but unused.
 
-| Role | Family | Weight | Size | Line | Tracking | Colour |
+Type classes (`index.css`, `@layer components`, so a utility on the same element wins):
+
+| Class | Family | Weight | Size | Line | Tracking | Colour |
 | --- | --- | --- | --- | --- | --- | --- |
-| Display number (REMAINING or EATEN) | Cinzel | 700 | 96 px | 1.08 | -0.01em | `--gold-grad` clipped |
-| Display number when over the line | Cinzel | 700 | 88 px | 1.08 | -0.01em | `--ember-grad` clipped |
-| Wordmark, opening | Cinzel | 700 | 28 px | 1 | 0.5em | gold |
-| Wordmark, header | Cinzel | 700 | 12 px | 1 | 0.34em | gold |
-| Flank values (EATEN, GOAL) | Cinzel | 400 | 22 px | 1.1 | 0.02em | bone |
-| Ring centre value | Cinzel | 700 | 20 px | 1 | 0 | gold |
-| Stat stones, history values | Cinzel | 400 | 20 px | 1.1 | 0.02em | bone |
-| Sheet and section titles | Cinzel | 400 | 14 px | 1 | 0.35em | bone |
-| Buttons (LOG, STRIKE rows) | Cinzel | 400 | 14 px | 1 | 0.30em | obsidian-900 on gold, gold on obsidian |
-| Row kcal (recents, library, history) | Cinzel | 400 | 15 px | 1 | 0.02em | gold-400 |
-| Labels and eyebrows | Cinzel | 400 | 10 px or 11 px | 1 | 0.40em | bone-dim |
-| Tab labels | Cinzel | 400 | 9 px | 1 | 0.30em | bone-dim, gold when active |
-| Ring letters P C F, author line | Cinzel | 400 | 9 px | 1 | 0.30em | arc colour, bone-dim |
-| Inputs | Cormorant | 500 | 20 px | 1.2 | 0 | bone |
-| List primary (names) | Cormorant | 500 | 19 px | 1.3 | 0 | bone |
-| Rows in recents and history | Cormorant | 500 | 18 px | 1.3 | 0 | bone |
-| Stoic line, sub-line under the number | Cormorant | 400 italic | 17 px | 1.35 | 0 | bone-dim |
-| Meta and secondary | Cormorant | 400 | 15 px | 1.4 | 0 | bone-dim |
-| Hints (floor) | Cormorant | 400 | 14 px | 1.4 | 0 | bone-dim |
-| Header date | Cormorant | 400 | 14 px | 1 | 0.08em | bone-dim |
+| `.label` | Cinzel | 700 | 12 px | 1 | 0.12em | bone-dim |
+| `.label-tab` | Cinzel | 700 | 12 px | 1 | 0.06em | inherits |
+| `.eyebrow` | Cinzel | 700 | 13 px | 1 | 0.22em | bone-dim |
+| `.title-screen` | Cinzel | 700 | 18 px | 1.1 | 0.2em | bone |
+| `.title-sheet` | Cinzel | 700 | 16 px | 1.1 | 0.2em | bone |
+| `.btn` (hairline, ghost, danger) | Cinzel | 700 | 14 px | 1 | 0.16em | gold-300 / bone-dim / ember-text |
+| `.btn-gold` | Cinzel | 700 | 15 px | 1 | 0.24em | `#17110a` engraved |
+| `.seg-option`, `.chip-label` | Cinzel | 700 | 12 px | 1 | 0.1em | bone-dim, active gold-200; chip gold-300 |
+| `.portion-pick-num` | Cinzel | 700 | 13 px | 1 | 0.04em | bone-dim, active gold-200 |
+| `.meta` | Cormorant | 600 | 16 px | 1.35 | 0 | bone-soft, tabular |
+| `.hint` | Cormorant | 600 | 15 px | 1.4 | 0 | bone-soft, tabular |
+| `.unit` | Cormorant | 500 | 15 px | 1 | 0 | bone-soft, `text-transform: none` |
+| `.empty-line` | Cormorant | 500 italic | 17 px | 1.35 | 0 | bone-soft |
+| `.chip-trail`, `.portion-pick-unit` | Cormorant | 500 | 15 px | 1 | 0 | bone-soft |
+| `.field-input` | Cormorant | 600 | 22 px (`fieldSize` lg 28 px) | 1.2 | 0 | bone, tabular; placeholder bone-mute |
+| `.field-suffix` | Cormorant | 500 | 16 px | | 0 | bone-soft |
+| `.portion-value` | Cormorant | 600 | 30 px | 1.2 | 0 | bone, tabular |
+| `.portion-unit` | Cormorant | 500 | 18 px | 1.2 | 0 | bone-soft, gold-300 on focus |
 
-Rules. Nothing in Cormorant under 14 px; nothing in Cinzel under 9 px. Every Cormorant numeral gets the `.num` utility (`font-variant-numeric: lining-nums tabular-nums`) because Cormorant defaults to oldstyle figures. Cinzel digits are proportional: the display number and every counting number lay digits in `inline-grid` cells of `0.62em` (thin space separator cell `0.28em`) so counts never jitter; verify `1111` against `8888` at 96 px in review. Thousands grouping is a thin space U+2009 (`formatInt` in `src/lib/units.ts` changes from a regular space to U+2009). Inscription cut on every Cinzel element except gradient text: `text-shadow: 0 1px 0 rgba(0,0,0,0.7), 0 -1px 0 rgba(255,247,218,0.06)`.
+Roles set in components and screens:
 
-Gradient text (`.gold-text`): LOCKED, no `filter` on the number. Markup `<span class="num"><span class="num-shadow" aria-hidden="true">N</span><span class="num-gold">N</span></span>`; `.num { position: relative; contain: paint; }`, `.num-shadow { position: absolute; inset: 0; transform: translateY(1px); color: rgba(0,0,0,0.55); }`, `.num-gold { position: relative; background: var(--gold-grain), var(--gold-grad); background-blend-mode: multiply, normal; background-size: 100% 100%, 220% 100%; background-position: 0 0, calc(50% + var(--tilt-x) * 60%) 0; -webkit-background-clip: text; background-clip: text; color: transparent; will-change: background-position; }`. Low tier and Safari without `background-blend-mode` on clipped text: drop the grain layer (`.num-gold { background: var(--gold-grad) }`).
+| Role | Family | Weight | Size | Tracking | Colour | Source |
+| --- | --- | --- | --- | --- | --- | --- |
+| Hero number | Cinzel | 700 | 96 px; 88 px over; short phone 72 px, 66 px over; `max(32px, min(base, fit))` | -0.01em, line 1.08 | `--gold-grad-text` + brush, `--ember-grad` over | `TodayNumber.tsx`, `TodayOdometer.tsx` |
+| Weight hero | Cinzel | 700 | 44 px, unit 22 px | -0.01em | `GoldNumber brush={false}` | `HistoryWeight.tsx` |
+| Wordmark, opening | Cinzel | 700 | 30 px | 0.42em | per-letter `--gold-grad-text` with a sheen | `intro/Wordmark.tsx` |
+| Wordmark, header | Cinzel | 700 | 14 px (0.2em under 372 px wide) | 0.3em | gold-300 flat, `.inscribed` | `TodayHeader.tsx` |
+| Header date, streak | Cinzel | 700 | 12 px `.label`; streak 14 px 0.02em gold-300 | | | `TodayHeader.tsx` |
+| Subline under the hero | Cormorant | 500 roman | 18 px | 0 | bone-soft, ember-text over | `TodayNumber.tsx` |
+| Flank values | Cinzel | 700 | 24 px (20 px on short phones) | 0.02em | bone | `TodayFlanks.tsx` |
+| Ring centre | Cinzel | 700 | 22 px | 0 | gold-300 flat | `TodayRing.tsx` |
+| Ring letters P C F (SVG), chart text | Cinzel | 700 | 12 px (`letterUnits`, `CHART_FONT_PX`) | 0.04em ring and chart y axis; chart x axis and target label 0.06em | bone-dim, gold-300 | `TodayRing.tsx`, `HistoryWeightChart.tsx` |
+| Ring readout value, share | Cormorant | 600 | 20 px, 16 px | 0 | bone, bone-soft (gold-300 active) | `TodayRing.tsx` |
+| Stone value | Cinzel | 700 | 24 px, unit `.unit` 15 px | 0.02em | bone, gold-300 `highlight` | `StatStone.tsx` |
+| Row value (`ValueUnit`) | Cinzel | 700 | 16 px default, 17 px week list; unit `max(15, round(size * 0.6))` | 0.02em | bone, gold-300, bone-dim | `GoldNumber.tsx` |
+| List names | Cormorant | 500 | 19 px; portion suffix 16 px bone-soft | 0 | bone | `LibraryRow.tsx`, `LogRecents.tsx` |
+| Stoic line | Cormorant | 400 italic | 19 px, line 1.35 (1.15 tight), max 2 lines at 326 px | 0 | bone-dim; author `.label` | `TodayStoic.tsx` |
+| Empty state sentence | Cormorant | 500 italic | 18 px, line 1.35 | 0 | bone-soft | `SectionHeading.tsx` |
+| Toast text | Cormorant | 600 | 17 px, line 1.3 | 0 | bone | `Toast.tsx` |
+| Search input | Cormorant | 600 | 20 px | 0 | bone | `LibrarySearch.tsx` |
+
+Rules. No `text-[9px]`, `text-[10px]` or `text-[11px]` remains in `src`; the smallest text is 12 px. Every Cormorant numeral carries `.num` (`font-variant-numeric: lining-nums tabular-nums`); `.meta`, `.hint`, `.field-input`, `.portion-value` set it themselves. Units are lowercase Cormorant in their own span, never inside a Cinzel span. Cinzel digits are proportional: `.digits` lays them in `inline-grid` cells of `0.62em` (`.sep` thin space `0.28em`, `.dot` decimal `0.3em`). Thousands grouping is a thin space U+2009 in `formatInt` (`src/lib/units.ts`), LOCKED by `src/lib/units.test.ts` ("formats with thin-space grouping"). Inscription cut is the `.inscribed` class, applied per element (not automatic): `text-shadow: 0 1px 0 rgba(0,0,0,0.7), 0 -1px 0 rgba(255,247,218,0.06)`.
+
+Gradient text, no `filter` on the number. `GoldNumber` markup: `<span class="gold-num" role="text" aria-label="1272"><span class="gold-shadow digits">…</span><span class="gold-hi digits">…</span><span class="gold-face digits">…</span></span>`. `.gold-num { position: relative; display: inline-block; contain: paint }`; `.gold-shadow` absolute, `translateY(1px)`, `rgba(0,0,0,0.55)`; `.gold-hi` absolute, `translateY(-1px)`, `rgba(255,247,218,0.14)`, hidden on low tier; `.gold-face` carries the gradient (section 2) with `background-clip: text; color: transparent; will-change: background-position`. `.no-brush` and `.no-grain` drop the brush; `.ember` swaps to `--ember-grad`. The hero uses the same layers per odometer cell. `.gold-text` exists for gold text at 32 px and up but no screen uses it; gold under 32 px is flat `text-gold-300`.
 
 ## 4 Spacing + layout grid
 
-Base unit 4 px. Side gutters 16 px; 20 px where a shard strip lives (left and right edges of every screen, so no tappable element sits under a shard). Label to value gap 6 px. Card padding 20 px 18 px. Section gap 24 px. Row heights: list rows 52 px (60 px in the library), recents rows 52 px, settings rows 56 px, chips 40 px, inputs 56 px, buttons 56 px. Tap targets 44 px minimum. Radius ladder: 2 px (marks, ticks), 4 px (inputs, buttons, chips: stone, not pills), 16 px (sheet top corners only). Hairlines: `--gold-line` on anything ruled like the goal line (rows, tab bar top), `--bone-08` on neutral dividers, `--gold-border` on the two gold-filled elements and on focused inputs.
+Base unit 4 px. Side gutters 20 px (`px-5`) on every screen header and body and inside sheets; the side shard strips (64 px boxes from `--safe-top + 40px` to `--safe-bottom + 56px`) carry shallow shards under that gutter. Field label to input 8 px (`mb-2`). Tablet padding 16 px 18 px (`Tablet`, unless `flush`); settings groups `px-4 pt-1 pb-2`. SectionHeading rule 10 px under the title (`pb-2.5`). Section gap 32 px on LIBRARY (`gap-8`) and HISTORY (`pt-8` per section); settings group tablets 16 px apart (`gap-4`).
 
-Frames. Phone: one fixed 390 x 844 frame, no page scroll on TODAY; LIBRARY, HISTORY and SETTINGS scroll inside a column between the header and the tab bar. Short phones (height under 700 px, iPhone SE class): the stage shrinks to `100svh` minus the fixed rows with a 280 px floor, the number drops to 72 px, the flank inscriptions move onto one row under the sub-line. Desktop (width 768 px or more): the whole app is a 430 px slab centred on the `#040406` field, height `min(100vh, 932px)`, same proportions; shard strips hug the slab's edges, not the window.
+| Element | Height | Source |
+| --- | --- | --- |
+| Library rows | 60 px | `LibraryRow.tsx` `h-[60px]` |
+| Recents, TODAY sheet rows, week rows | 56 px | `h-14` |
+| Settings rows | min 60 px (14 px top and bottom + 32 px), control column 168 px | `SettingsRow.tsx` |
+| Inputs | 56 px (`fieldSize` sm 44, lg 64) | `Field.tsx` |
+| PortionField | 64 px, steppers 64 x 64 | `.portion-field` |
+| Portion picks, chips | 40 px (chip sm 32 with a 44 px hit area) | `.portion-pick`, `.chip` |
+| Segmented | md 44 (default), lg 40, sm 32 with a 44 px hit area | `Segmented.tsx` |
+| Buttons | gold 56, hairline and danger 48, `size` sm 44 or lg 56, ghost min 44 x 44 | `Button.tsx` |
+| Toggle | track 48 x 28, knob 20 x 20, hit min 44 | `.toggle-track` |
+| Icon button | 44 x 44 | `.icon-btn` |
+| Sheet header row | 56 px | `Sheet.tsx` |
+| Toast | min 56 px | `Toast.tsx` |
+| Tab bar | 56 px plus `--safe-bottom`; keystone 78 x 64 | `TabBar.tsx` |
 
-Z-index ladder: backdrop 0, canvas 1, inscriptions 10, tab bar 30, shard strips 40, sheets 50, toast 60, opening overlay 70. Safe areas via `env(safe-area-inset-*)` as `--safe-top` and `--safe-bottom`. Keyboard: a `visualViewport` resize listener writes `--vv-h` on `:root` (section 10).
+Tap targets 44 px minimum. Radius ladder: 2 px (toggle knob, grab bar, marks), 3 px (PortionField step cells inside the 4 px well), 4 px (inputs, buttons, chips, tablets, segmented, toast: stone, not pills), 16 px (sheet top corners only). One exception: the macro ring's tap target is `rounded-full`.
+
+Hairlines, all 1 CSS px:
+
+| Token | Where |
+| --- | --- |
+| `--gold-line` (0.42) | tab bar top edge, segmented dividers, toast action divider, the HISTORY day sheet list top, the BUILD totals bar |
+| `--gold-line-strong` (0.55) | the one lead rule per screen (`SectionHeading rule="strong"`, rhombus terminal), toast edge, sheet top edge (as `0 -1px 0` shadow) |
+| `--rule` (0.16) | row rules (`.row-rule`), quiet SectionHeading rule, settings dividers |
+| `--bone-edge` (0.4) | inputs and PortionField at rest |
+| `--gold-edge` (0.55) | segmented, chips, portion picks, hairline buttons, toggle track, disabled gold button cover |
+| `--ember-edge` (0.7) | danger buttons, warn toast |
+| `--gold-border` mask (`.gold-border::before`) | active chip, active portion pick |
+| `rgba(231,225,210,0.10)` | stat stone cell dividers, inset 16 px |
+
+Frames (`src/App.tsx`). Every width: one column `max-w-[430px] h-dvh overflow-hidden`, centred. TODAY is a fixed frame (`main` `overflow-hidden`, no page scroll); LIBRARY, HISTORY and SETTINGS scroll inside `main` with `paddingBottom: calc(56px + var(--safe-bottom) + 24px)`. The TODAY stage is `flex: 0 1 460px` with a 280 px floor at every height, so it gives first on short phones; under `(max-height: 699px)` the hero also drops to 72 px and the plaques tighten (`TodayScreen.tsx`); narrow phones `(max-width: 371px)` take the compact ring row. Desktop `md` (768 px and up): the column becomes a slab `h-[min(100vh,932px)]` with `box-shadow: 0 0 0 1px #1A1A21, 0 0 0 2px rgba(216,180,90,0.06), 0 40px 120px rgba(0,0,0,0.8)` on the `#040406` field; shard strips are absolute inside the slab, so they hug it.
+
+Z-index ladder (`:root`): `--z-backdrop` 0, `--z-canvas` 1, `--z-inscriptions` 10, `--z-tabbar` 30, `--z-shards` 40, `--z-sheet` 50, `--z-toast` 60, `--z-opening` 70. Sheets portal to `<body>` because `main` is a z 10 stacking context. Safe areas: `--safe-top`, `--safe-bottom`, `--safe-left`, `--safe-right` from `env(safe-area-inset-*, 0px)`. Keyboard: `Sheet.tsx` installs once a `visualViewport` resize and scroll listener plus a window resize listener that write `--vv-h` (default `100svh`) and `--vv-top` on `:root` and toggle `html.keyboard-up` under 620 px. Scene anchors `--goal-y` (default 263 px) and `--plinth-y` (default 507 px) are rewritten by `MonumentLayer.tsx` on mount, renderer change, scale change, window and `visualViewport` resize, and by `ColumnScene.tsx` when the camera comes to rest (section 6).
 
 ## 5 Opening sequence
 
@@ -153,174 +240,284 @@ Reduced motion (system or Settings REDUCED): both versions become one 240 ms cro
 
 ## 6 Home screen
 
-Owner `src/screens/Today*`. 390 x 844, single fixed frame, heights sum to 844:
+Owner `src/screens/Today*`. One fixed frame, no scroll (`<main>` is `overflow-hidden` on TODAY). `TodayScreen.tsx` stacks five rows under `padding-top: var(--safe-top)`: header 40, stage `flex: 0 1 460px` (min 280), ring row 132, stoic `flex: 1 1 0` (min 67), spacer `flex: 0 0 calc(64px + var(--safe-bottom))` (tab bar 56 plus 8 px air). The non-stage rows total 303 px, the same chrome budget `MonumentLayer` subtracts before it scales the monument: `k = clamp((frame - safe-top - safe-bottom - 303) / 460, 0.55, 1)`, `transform: scale(k)` from the top centre. `--goal-y` and `--plinth-y` are written on mount, window and `visualViewport` resize, scale change and camera rest: projected from world Y 2.0 and 0 with the rest camera (`camera.project`, `ColumnScene.tsx`) while the 3D scene is up, else by the monument layer from its design values `safe-top + 216k` and `safe-top + 460k` (`STAGE_PLINTH_Y` 460 minus `GOAL_Y * PX_PER_UNIT` = 2.0 x 122); `:root` defaults are 263 px and 507 px. Everything in the stage is positioned from those two variables, so the inscriptions stay registered with a scaled monument. Values below are for 390 x 844 with safe areas 47 and 34 (k = 1):
 
 | y (px) | Height | Element |
 | --- | --- | --- |
-| 0 to 47 | 47 | Top safe area, obsidian-950. The top shard strip starts here. |
-| 47 to 87 | 40 | HEADER BAND. Left: date `MON 13 OCT` (Cormorant 14 px, tracking 0.08em, bone-dim). Centre: TEMPERANCE (Cinzel 700, 12 px, tracking 0.34em, gold). Right: `settings` icon 22 px, bone-dim, 44 px tap target. |
-| 87 to 547 | 460 | THE MONUMENT STAGE. The canvas sits behind it, absolute, 390 x 513 from y 47 to 560 so the plinth steps bleed under the ring row. Inscriptions are DOM over the canvas (z 10) and the canvas is `pointer-events: none`. |
-| 103 to 121 | 18 | Label REMAINING (Cinzel 11 px, tracking 0.4em, bone-dim, centred). Reads EATEN when the hero figure is swapped (tap the number, persisted in `settings.hero`). Reads OVER THE LINE in ember-text when remaining is negative. |
-| 121 to 225 | 104 | The big number, Cinzel 700 96 px, `--gold-grad`, centred, digit cells 0.62em. Over the line: 88 px, `--ember-grad`, magnitude only (no minus sign). A radial scrim sits behind it: `radial-gradient(ellipse 60% 70% at 50% 50%, var(--scrim), transparent 72%)` so gold stays legible when the lit column rises behind. |
-| 225 to 247 | 22 | Sub-line `of 2 500 · 1 988 eaten` (Cormorant italic 17 px, bone-dim). Swapped hero shows `of 2 500 · 512 left`. |
-| 263 | 0 | THE GOLD GOAL LINE: 3D only (slab, ring, glow, section 7). Design value y 263; the actual y of world `(0, 2.0, 0)` is read once at mount with `camera.project` and written to `--goal-y`, which the GOAL label and the fallback use. A DOM label `GOAL 2 500` (Cinzel 9 px, tracking 0.3em, gold-400) sits right-aligned at the right gutter, 6 px above `--goal-y`. |
-| 263 to 507 | 244 | Column territory. Column top sits at `507 - 122 * H` (design value; `--plinth-y` is also read from `camera.project` of `(0, 0, 0)` at mount). At goal the top kisses the line; past it the stone passes behind the number. |
-| 400 to 452 | 52 | FLANK INSCRIPTIONS. Left block x 16 to 120, left aligned: EATEN (Cinzel 9 px, tracking 0.35em, bone-dim) over `1 988` (Cinzel 22 px, bone). Right block x 270 to 374, right aligned: GOAL over `2 500`. Tapping EATEN opens the TODAY sheet (section 10). |
-| 507 to 547 | 40 | Plinth top and front face (3D), blank. Severe. |
-| 547 to 671 | 124 | MACRO RING ROW. Ring 112 px at x 24, y 553. Readouts x 160 to 366: three 32 px rows PROTEIN, CARBS, FAT (section 9). Tapping the ring opens the TODAY sheet. |
-| 671 to 735 | 64 | THE STOIC LINE (section 14). Cormorant italic 17 px bone-dim, centred, max 2 lines at 326 px, then a 24 x 1 px gold-400 rule and the author in Cinzel 9 px tracking 0.3em bone-dim. |
-| 735 to 754 | 19 | Air; the plinth contact shadow fades into it. |
-| 754 to 810 | 56 | THE ENTABLATURE tab bar, obsidian-900, 1 px `--gold-line` top edge, `backdrop-filter: blur(20px)`. Five 78 px slots: TODAY (`landmark`), LIBRARY (`book-marked`), LOG keystone, HISTORY (`scroll-text`), SETTINGS (`settings`). Icons 22 px stroke 1.5 over Cinzel 9 px labels, bone-dim; active = gold text and a 16 x 1 px gold-400 mark above the icon. The keystone is 78 x 64 px and rises 8 px above the bar (y 746 to 810): the only gold-filled element on the home screen, `--gold-grad`, obsidian-900 `plus` icon 22 px and LOG in Cinzel 10 px tracking 0.3em. `:active` scale 0.96. |
-| 810 to 844 | 34 | Bottom safe area, obsidian-900 (the bar's colour continues). |
+| 0 to 47 | 47 | Top safe area. The top shard strip lives here (section 8). |
+| 47 to 87 | 40 | HEADER (`TodayHeader.tsx`), grid `1fr auto 1fr`, 20 px gutters. Left: date `.label` (Cinzel 700 12 px 0.12em bone-dim, uppercase by CSS, reads `THU 15 OCT`). Centre: TEMPERANCE Cinzel 700 14 px 0.3em gold-300 `.inscribed` (0.2em under 372 px wide). Right: streak button 44 px tall, min 44 wide, `rhombus 12 rhombus` with 7 px gaps, number Cinzel 700 14 px 0.02em gold-300, `aria-label="Streak 12 days"` (`1 day` singular), tap opens HISTORY. At a zero streak an empty `aria-hidden` 44 x 44 span keeps the wordmark centred. No settings gear. |
+| 87 to 547 | 460 | STAGE (`data-stage`, `data-intro="stage"`). The monument layer (canvas, SVG fallback, temple) sits behind at `top: var(--safe-top)`, 513 px tall, its bottom 28 px masked to transparent. Inscriptions are DOM over it; the stage's only paint is the number scrim. |
+| 87 to 247 | 160 | HERO (`TodayNumber.tsx`), a bottom-anchored column whose bottom sits 16 px above the line. Eyebrow `.eyebrow` (Cinzel 700 13 px 0.22em bone-dim, h 18): REMAINING, EATEN when `settings.hero` is `'eaten'`, OVER THE LINE in ember-text with a 14 px `Flame` whenever remaining is negative. 2 px gap. The number (odometer, below). 4 px gap. Sub-line h 22, Cormorant 500 18 px roman bone-soft `.num`: `51% of goal` (`round(eaten / goal * 100)`, 0 without a goal), the same whichever figure the hero shows; over, ember-text with `text-shadow: 0 0 2px #050507, 0 0 10px #050507, 0 0 18px rgba(5, 5, 7, 0.9)`. Scrim behind, from the stage top to the line: `radial-gradient(ellipse 60% 70% at 50% 50%, var(--scrim), transparent 72%)`. |
+| 263 | 0 | GOAL LINE (3D, section 7). DOM marker `tp-goal-label`: a 7 x 7 box at `top: calc(var(--goal-y) - 3.5px); right: 20px` holding one outline rhombus, `role="img"`, `aria-label="Goal 2 600 kcal"`, no text. |
+| 443 to 495 | 52 | FLANK PLAQUES (`TodayFlanks.tsx`), top `--plinth-y - 64px`, inset 20 px. Left x 20 to 124 left aligned (a button, opens the TODAY sheet), right x 266 to 370 right aligned. Label `.label` over value Cinzel 700 24 px 0.02em bone `.num`, then a 44 x 1 rule `linear-gradient(90deg, rgba(216, 180, 90, 0.55), rgba(216, 180, 90, 0.08))` (270deg on the right) fading toward the column with a 5 px gap and an outline rhombus on the column side; the three spread with `justify-between`. Left reads EATEN (`tp-eaten-value`); with the hero swapped and remaining not negative it reads LEFT and the remaining figure (`tp-left-value`). Right reads GOAL (`tp-goal-value`). |
+| 547 to 679 | 132 | MACRO RING ROW (section 9). Ring 120 px at x 20, y 553. Readouts x 160 to 370 from y 559, three 36 px rows. Tapping the ring opens the TODAY sheet. |
+| 679 to 746 | 67 | STOIC BLOCK (`TodayStoic.tsx`, section 14), content centred, 32 px side padding. Measured with a `ResizeObserver`: at 108 px or more a 96 px meander sits 14 px above the line; at 86 px or more a 24 x 1 gold-400 rule sits 10 px under it; below 86 px (`tight`) both drop and the leading closes from 1.35 to 1.15. Line Cormorant 400 italic 19 px bone-dim, max 2 lines (`line-clamp-2`) at 326 px; author `.label` 8 px under (6 px tight). At 390 x 844 with safe areas the block gets exactly its 67 px floor, so it renders tight. |
+| 746 to 844 | 98 | Spacer under the tab bar: bar 754 to 810 (56), keystone 746 to 810 (78 x 64, rises 8 px), bottom safe area 810 to 844. Bar: `TabBar.tsx`, gradient `#0E0E13` to `#0B0B0F`, 1 px `--gold-line` top, five 20 percent slots, icons 24 px stroke 1.5 over `.label-tab` (Cinzel 700 12 px 0.06em) bone-dim; active label gold-300, icon gold-400 lifted 2 px; a 24 x 2 gold-400 indicator rides the top edge (360 ms `--ease-stone`). |
 
-Tab switch: 180 ms crossfade of the screen column plus a 460 ms diagonal gold light wipe (`.tp-sweep`, a fixed `pointer-events: none` 100deg gradient at 12% alpha, restarted with `void el.offsetWidth`). The canvas is mounted once at the app root and kept alive across tabs: off TODAY it is `visibility: hidden` (never `display: none`, which collapses the renderer) with the ticker stopped.
+Hero size. `max(32px, min(base, (room - gap - chrome - 8px) / 1.08))` where room is `--goal-y - safe-top - 40px`, base 96 (88 over), chrome 46. Over the line the gap becomes `min(37px, (--plinth-y - --goal-y) * 0.1516) + 7px` (`OVER_MAX_PX` 37 from `src/scene/tokens.ts`, so 44 at full scale) and the block ends 44 px above the line. Tapping the number swaps the hero (`setHero`). Each `log` pulse sweeps the foil once: WAAPI on the number wrapper, `--tilt-x` -1 to 1 at offset 0.82 then back to the current value, 600 ms `cubic-bezier(0.16, 1, 0.3, 1)`; skipped under reduced motion.
+
+Odometer (`TodayOdometer.tsx`). Digits in 0.62em cells (thin space 0.28em), each 1.08em tall with `overflow: hidden`. Inside, a 20 glyph strip (0 to 9 twice) moves by `translateY(calc(var(--d) * -1.08em + 0.13em))`; the 0.13em drop centres Cinzel's high figures in the cell. Transition `transform 560ms cubic-bezier(0.2, 0.9, 0.2, 1)` delayed 28 ms per digit counted from the right. A falling number rolls down, a rising one rolls up (`rollPlan`). A wrapping digit never reverses: falling, it first snaps 10 up into the second half without transition and rolls down from there; rising, it rolls on into the second half. Any strip that lands at index 10 or more snaps back 10 without transition on a timer at `560 + i * 28 + 40` ms (no `transitionend`). The 16 percent edge mask (`#000 16%, #000 84%`) is applied only while rolling. A new leading digit clips in from the bottom, 320 ms `--ease-cut`. Three stacked strips per cell: a black 0.55 shadow 1 px down, a `rgba(255, 247, 218, 0.14)` lip 1 px up (high tier only), and the face clipped to `--gold-grad-text` (`--ember-grad` over), sized to the whole number and offset per cell so the light runs across the cells and follows `--tilt-x`. `--gold-brush` rides the face on the high tier, never on ember. Reduced motion: no roll, opacity 0.35 to 1 over 120 ms. `aria-label` is the plain digits.
+
+Short phones (height 699 px or less): number base 72 (66 over), chrome 39, eyebrow h 16, sub-line h 20 with a 2 px gap, plaques h 46 at `--plinth-y - 56px` with 20 px values. Narrow (width 371 px or less): the compact ring row (section 9).
+
+TODAY sheet (`TodaySheet.tsx`, from EATEN or the ring). `Sheet` titled TODAY with the day's total as `ValueUnit` on the right, auto height. Today's entries newest first in 56 px rows ruled `.row-rule`, grid `14px 1fr 44px`: a solid rhombus on the newest row only; name Cormorant 500 19 px bone (truncates) plus ` · 180 g` from `portionLabel` in Cormorant 500 16 px bone-soft (never truncates); meta `.meta` `3:20 pm · P 16 · C 7 · F 9`; kcal `ValueUnit`, gold on the newest row; a 44 px `Trash2` 22 px button, ember-text when pressed. Swipe left: axis locks after 6 px, travel capped at 140 px, a DELETE `.label` in ember-text fades in behind, release past 88 px slides the row out (200 ms) and folds it (height and opacity to 0, 220 ms `--ease-stone`). Delete calls `deleteEntry` and toasts `Removed · 612 kcal` with UNDO (`restoreEntry`). Rows run the list stagger on open; a row that arrives while the sheet is open gets `.row-new`. Empty: `Nothing logged yet.`
+
+Entry editor (`TodayEntryEdit.tsx`, tap a row; the sheet title becomes EDIT and the footer a gold SAVE). BACK ghost button and the entry time (`.hint`) in a 44 px row; NAME `Field` 12 px below; 16 px; PORTION `.label` row, with `was 180 g` (`.hint`) on the right only once the amount changed; `PortionField` in the recorded portion's unit (`entry.portion`, else servings); `PortionPicks` 8 px below, the linked meal's `usual` marked when its unit matches; 16 px; CALORIES `Field` size lg; 12 px; PROTEIN, CARBS, FAT thirds with inner labels. All four numbers rescale live by `(preview ?? amount) / startAmount` until any one of them is typed; from then on all four hold their values (`typed` snapshots the set). Save passes `{ name, macros, portion }` when the entry has a portion, else `{ name, macros, servings }`, to `updateEntry`.
+
+Tab switch (`App.tsx`): the outgoing screen fades 120 ms linear, the incoming one runs `tpTabIn` (opacity 0 and `translateX(dir * 14px)` to rest, 260 ms `--ease-stone`), and `.tp-sweep` (`linear-gradient(100deg, transparent 30%, rgba(216, 180, 90, 0.28) 46%, rgba(255, 90, 31, 0.1) 54%, transparent 68%)`, 300 percent wide) wipes once over 460 ms. Reduced motion swaps the screen at once, no wipe. The monument layer is mounted once at the app root; off TODAY it is `visibility: hidden` with the ticker stopped.
 
 ## 7 Column scene
 
-Owner `src/scene/**`. Every canvas goes through `SafeCanvas` (section 15); nothing imports `Canvas` from `@react-three/fiber` directly, enforced by a vitest file that scans `src/`.
+Owner `src/scene/**`. Every canvas goes through `SafeCanvas` (section 15). LOCKED: nothing else under `src/` imports `Canvas` from `@react-three/fiber` or renders a bare `<Canvas`; guard `src/scene/canvas-lint.test.ts`.
 
-Canvas. `<SafeCanvas dpr={[1, dprMax]} gl={{ antialias: tier === 'high', alpha: true, powerPreference: 'high-performance', stencil: false }} frameloop={loop} camera={rest} style={{ touchAction: 'pan-y' }} className="pointer-events-none">`. 390 x 513 CSS px. `onCreated`: `gl.toneMapping = THREE.NeutralToneMapping; gl.toneMappingExposure = 0.95; gl.setClearColor(0x000000, 0)`. Scene fog `FogExp2(#050507, 0.06)`. No shadows on any tier (`shadows={false}` at creation; turning shadows on later recompiles every shader). No postprocessing on any tier.
+Layer. `MonumentLayer` is mounted once at the app root: absolute, `top: var(--safe-top)`, full frame width (390 on the reference phone), 513 px tall, `z-[var(--z-canvas)]`, `pointer-events-none`, `aria-hidden`. Off TODAY it is `visibility: hidden` (never `display: none`) with the ticker stopped. Short phones: the root scales by `k = clamp(available / 460, 0.55, 1)` from `50% 0`, where `available` = frame height minus the safe areas minus (40 + 124 + 64 + 19 + 56); projected px are multiplied by `k`. The root carries `mask-image: linear-gradient(180deg, #000 0, #000 calc(100% - 28px), transparent 100%)`, so canvas, SVG and temple all fade over the bottom 28 px. Children in z order: `TempleBack`, the canvas wrapper, `FallbackMonument`, `TempleFront`.
 
-Frameloop (LOCKED). `never` until `gl.compileAsync(scene, camera)` resolves (`ShaderGate` from Pad King: dust mesh mounted `visible={false}` and both ember lights mounted at intensity 0 from the start so every program compiles in the gate; `precompileLightBake` for the `Environment` bake, three pinned `^0.186`). Then `always` only inside windows: the opening rise (420 to 1900 ms) and 1200 ms from each strike. Otherwise `demand` with a ticker that calls `invalidate()` at 24 fps (12 fps low tier) only while TODAY is the active tab, `document.visibilityState === 'visible'`, the canvas is on screen (IntersectionObserver) and fewer than 90 s have passed since the last `pointerdown`; after that it holds the last frame and any store change, resize, tilt sample or pointerdown invalidates once (and restarts the 90 s clock). Every gsap tween that touches a three object has `onUpdate: invalidate`.
+Canvas. `<Canvas dpr={[1, dprMax]} resize={{ offsetSize: true }} gl={makeRenderer} shadows={false} frameloop="never" flat={false} camera={{ fov: 28, near: 0.1, far: 40, position: [0, 0.9, 8.4] }} style={{ touchAction: 'pan-y', position: 'absolute', inset: 0 }}>`; `dprMax` follows the live tier. Renderer parameters: `antialias` per tier, `alpha: true`, `powerPreference: 'high-performance'`, `stencil: false`, `depth: true`, `failIfMajorPerformanceCaveat: true`, `preserveDrawingBuffer: false`. Early renderer: a rAF from the first commit builds the `WebGLRenderer` on R3F's own canvas before the first paint, enables `KHR_parallel_shader_compile` and `EXT_texture_filter_anisotropic`, sizes the drawing buffer to the container's offset size at `min(max(1, devicePixelRatio || 2), settings.dprMax)` (mount settings), marks `tp:gl-context`, and hands it to R3F through the `gl` factory (R3F owns and disposes it). `renderer.debug.checkShaderErrors` is on in dev only. `onCreated`: `NeutralToneMapping`, `toneMappingExposure = T.exposure` (1.0), `setClearColor(0x000000, 0)`, `shadowMap.enabled = false`. Scene fog `FogExp2(#050507, 0.03)`. No environment map, no PMREM, no Lightformer, no postprocessing, no shadows on any tier. All scene 2D canvases are CPU backed (`willReadFrequently: true`).
 
-Camera. `PerspectiveCamera` fov 28, near 0.1, far 40, rest position `[0, 0.9, 8.4]`, lookAt `[0, 1.67, 0]`. Visible height at z 0 is 4.19 units, so 513 px / 4.19 = 122 px per unit: plinth top Y 0 lands near screen y 507, goal Y 2.0 near y 263 (both measured once via `camera.project`, section 6). Dev tunables on `window.__tune` (exposure, light intensities, `follow`), read each frame from a `T` object, never React state.
+Programs (5 by design, not tested; after the gate `window.__tp.programs` holds the live `gl.info.programs` count): obsidian (`tp-obsidian|refl`), gold (`|gold`), tpFx (`tp-fx`), dust (`ShaderMaterial`), basic-map (inscription and contact shadow).
 
-Units. 1 world unit = one column metre. `H = 0.18 + 1.82 * (eatenKcal / goalKcal)`, clamped to 2.86 (147 percent of goal). At goal H = 2.0 exactly. The number keeps counting past the clamp.
+Frameloop. `never` until the gate finishes: one `gl.compileAsync(object, camera, scene)` per program, ranked obsidian, gold, fx, dust, basic-map, one rAF between chunks, then one `compileAsync(scene, camera)` sweep; marks `tp:gl-env-done` (no env work), `tp:gl-compile-start`, `tp:gl-compile-done`, then one `advance()` while still `never` and `tp:gl-first-frame`. Every program compiles here: the ember point light is mounted at intensity 0 and the dust mesh draws its motes from the start. After the gate: `always` inside hold windows, `demand` otherwise. Holds (`hold(ms)`, ignored under reduced motion): each strike `MS.always` 1600 ms (LOCKED, guard `strike.test.ts`); opening rise `ms + 1600`; goal line `ms + 100`; ghost, sweep and crack `ms + 50`; shake 500; smooth settle `ms + 100`; removal 1000. In `demand` the ticker (`ticker.ts`) calls `invalidate()` at 24 fps (12 low) only while idle is wanted, TODAY is shown, `document.visibilityState === 'visible'`, the root is on screen (IntersectionObserver, threshold 0) and fewer than 90 s have passed since the last `pointerdown` or `keydown`; the ticker is enabled only in WebGL mode and never under reduced motion. Any `pointerdown` or `keydown`, becoming visible, or showing TODAY invalidates once. The root carries `data-live` while the ticker runs. Every gsap tween on `mon` has `onUpdate: invalidate`. drei `PerformanceMonitor` (`ms={100} iterations={6} flipflops={3}`) is mounted only inside `always` windows (section 15).
 
-Plinth. drei `RoundedBox` 1.9 x 0.32 x 1.9 radius 0.02 centred at Y -0.16 (top at Y 0); lower step `RoundedBox` 2.5 x 0.10 x 2.5 centred at Y -0.37. `MeshStandardMaterial color #0D0D12 roughness 0.5 metalness 0.05 envMapIntensity 0.8`. drei `Edges` on the upper step, colour `#D8B45A`, `transparent opacity 0.5`, as the gold inlay. Contact shadow: a 3.2 x 3.2 plane at Y -0.425 with a 64 px radial alpha canvas texture, `MeshBasicMaterial color #000000 transparent opacity 0.6 depthWrite false`.
+Camera. Rest `[0, 0.9, 8.4]` fov 28 lookAt `[0, 1.67, 0]`; opening start `[0, 0.35, 6.0]` fov 34 lookAt `[0, 0.6, 0]` (`CAMERA_REST`, `CAMERA_OPEN`). Each frame at priority -1: `Monument.tick(dt)` with `dt` clamped to 0.1, then `position = (s * 0.033 * sin(97t), camY + s * 0.024 * sin(113t + 1.3), camZ)`, `lookAt(0, lookY, 0)`, `rotation.z += s * 0.012 * sin(89t)` with `s = trauma^2`, `fov = mon.fov + mon.fovPunch`. `--goal-y` and `--plinth-y` come from a scratch camera at rest projecting `(0, 2, 0)` and `(0, 0, 0)`, times `k`, plus the layer top; written at mount, on resize and when the dolly lands. Dev tunables on `window.__tune` (`T`: exposure 1.0, key 22, rim 2.5, sweep 9, ember 6, ambient 0.22, envIntensity 1, follow 0.4, turn 0.035): key, rim, sweep, ember, follow and turn are read each frame; exposure once in `onCreated`, ambient at mount; `envIntensity` is read by nothing.
 
-Column. One `CylinderGeometry(0.46, 0.46, 1, 48, 1)` (24 radial segments low tier), `geometry.translate(0, 0.5, 0)` so the base is the origin, shared by two meshes: `base` at Y 0 with `scale.y = min(H, 2.0)`, and `overflow` inside a `break` group. The `break` group sits at `position.y = min(H, 2.0)`, `rotation.z = -0.0436 * uCrack` (2.5 degrees), `position.x = 0.03 * uCrack`; `overflow` has `scale.y = max(0, H - 2.0)`; the capital torus is a child of `break` at local Y `max(0, H - 2.0)`, so it always rides the top and inherits the tilt. Constant radius on both meshes (no taper) so the seam has no step. Group `rotation.y` carries the idle turn and both meshes share one material.
+Units. 1 world unit = one column metre, 122 px per unit vertically, stage plinth top y 460, stage goal y 216 (`tokens.ts`).
 
-Capital. `TorusGeometry(0.47, 0.018, 12, 64)` lying flat (`rotation.x = PI / 2`), `MeshStandardMaterial color #D8B45A metalness 1 roughness 0.22 emissive #F6E3A1 emissiveIntensity 0`; on each strike `emissiveIntensity` 0 to 0.6 to 0 over 300 ms.
+| Name | Value |
+| --- | --- |
+| `heightFor` | `H = 0.36 + 1.64 * (eaten / goal)`, clamped to `H_MAX` 2.86; `H_MIN` 0.36 (base 0.24 + capital 0.12); exactly 2.0 at goal |
+| `crackFor` | `clamp((eaten - goal) / (0.25 * goal), 0, 1)` |
+| `renderH` | `h <= 2 ? h : 2 + 0.30 * (1 - exp(-(h - 2) / 0.30))`; crown at most 0.30 u (`OVER_MAX_PX` 37) above the line |
+| `shaftTop` | `R - 0.12` (the capital takes the top 0.12 of the drawn height `R = renderH(mon.h)`) |
 
-Obsidian material. High tier: `MeshPhysicalMaterial({ color: '#0B0B0F', roughness: 0.16, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.10, envMapIntensity: 1.6 })`, `customProgramCacheKey = () => 'tp-obsidian-phys'`. Low tier: `MeshStandardMaterial({ color: '#0B0B0F', roughness: 0.25, metalness: 0.1, envMapIntensity: 1.2 })`, key `'tp-obsidian-std'`. One `onBeforeCompile` injection on either, uniforms assigned by reference with `Object.assign(shader.uniforms, uniforms)`:
+LOCKED, guard `tokens.test.ts`: `heightFor` (`H_MIN` 0.36 on an empty or negative day, 1.18 at half, 2.0 at goal, clamped to `H_MAX`, finite at goal 0), `crackFor` (0 at goal, 0.2 at 5 percent over, 1 at 25 percent), `renderH` (identity to 2, under 2.3001 at 10, monotonic), `OVER_MAX_PX` 37, and the `COL` hexes for column, plinth, ambient, goalLine, goalFlash, ember, dust, spark and fog. Strikes tween raw `mon.h`; every renderer draws `renderH(mon.h)`.
 
-| Uniform | Type | Value |
-| --- | --- | --- |
-| `uCrack` | float | `clamp((eaten - goal) / (0.25 * goal), 0, 1)`; fully fractured at 25 percent over |
-| `uGoalY` | float | 2.0 |
-| `uTime` | float | seconds, ticked only while `uCrack > 0` and motion is not reduced |
-| `uDepth` | int | 1 = 3D voronoi (27 taps), 0 = 2D (9 taps, low tier) |
-| `uScale` | float | 6.0 |
-| `uFlute` | float | 0.012 (0 on low tier if frame time says so) |
-| `uEmber` | vec3 | `(1.0, 0.35, 0.12) * 2.5` |
+Temple (`Temple.tsx`, DOM and inline SVG, 0 GPU programs, stage coordinates, identical on tier none).
 
-Vertex (after `#include <begin_vertex>`): `float a = atan(transformed.z, transformed.x); float f = 0.5 + 0.5 * cos(16.0 * a); vec3 radial = normalize(vec3(transformed.x, 0.0, transformed.z)); transformed -= radial * uFlute * f; vec3 tang = vec3(-sin(a), 0.0, cos(a)); objectNormal = normalize(objectNormal + tang * (uFlute * 8.0 * sin(16.0 * a)) / 0.46); vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;` with `varying vec3 vWorldPos;` declared after `#include <common>` in both stages (three's own `worldPosition` only exists under envmap or shadow defines). Flute sign is verified by eye in review.
+| Part | Spec |
+| --- | --- |
+| Colonnade far | SVG `viewBox 0 0 390 513` `xMidYMax slice`. Wall `#0F0E13` from y 150 to 520 with 9 even-odd arches (x0 = 2 + 44i, opening 34, radius 17, springing y 250, foot 520). Arch haze: vertical gradient y 140 to 470, `rgb(122,96,56)` at 0 / 0.10 (offset 0.485) / 0; ember twin `rgb(255,90,31)` 0.08 swaps in over 700 ms on `[data-over]`. Group opacity 0.55. |
+| Colonnade near | Architrave y 30, 22 tall, `#0B0B0E`. Columns at x 22, 70, 320, 368, widths 30, 26, 26, 30, y 40 to 520, horizontal gradient `#08080B 0, #17161C 0.45, #1E1C22 0.6, #08080B 1` (mirrored on the right), 1.5 px rim `rgba(255,220,160,0.10)` on the shaft side. |
+| Colonnade mask | `linear-gradient(180deg, transparent 0, #000 25%, #000 70%, rgba(0,0,0,0.3) 100%)`. Parallax (high tier, not reduced): near `translate3d(calc(var(--tilt-x) * -7px), 0, 0)`, far `-2.5px`. |
+| Shaft | `div.tp-shaft` 520 x 560 at `left 50%, top 0, margin-left -260px`; `conic-gradient(from 168deg at 50% -168px, transparent 0deg, rgba(255,231,182,0.10) 8deg, rgba(255,236,196,0.16) 12deg, rgba(255,231,182,0.10) 16deg, transparent 24deg)`; mask `rgba(0,0,0,0.68) 0, #000 80px, #000 429px, transparent 560px`. Opacity 0.85; `tpShaftBreath` 0.85 to 1 to 0.85, 8 s ease-in-out infinite, running only under `[data-live]`. |
+| Flare | `div.tp-shaft-flare[data-tp-flare]`, same box, brighter cone (0.22 / 0.34 / 0.22 at 9 / 12 / 15 deg), opacity 0. Each landing: WAAPI 380 ms, 0 to 0.5 by 60 ms, back to 0 (not when hidden or reduced). |
+| Pool | Top 420, 120 tall, full width, `radial-gradient(42% 50% at 50% 35%, rgba(216,180,90,0.09), rgba(216,180,90,0) 70%)`. |
+| Goal haze | `TempleFront`, above the canvas: top 216, 240 tall, `radial-gradient(38% 100% at 50% 0%, rgba(246,227,161,0.07), rgba(246,227,161,0) 72%)`, no blend mode. |
 
-Fragment. After `#include <color_fragment>`: `float above = smoothstep(uGoalY - 0.02, uGoalY + 0.15, vWorldPos.y); vec3 p3 = vWorldPos * uScale; vec2 p2 = vec2(atan(vWorldPos.z, vWorldPos.x) * 0.46, vWorldPos.y) * uScale; float f1, f2; voro(p3, p2, uDepth, f1, f2); float edge = 1.0 - smoothstep(0.0, 0.06 + 0.04 * uCrack, f2 - f1); float climb = smoothstep(0.0, 1.0, uCrack * 1.4 - (vWorldPos.y - uGoalY) * 0.6); float c = above * uCrack * edge * climb; diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.02), c);`. `voro` is a 3 x 3 x (2 * uDepth + 1) cell search with `hash3` (`fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453)`), loop bounds from the uniform (WebGL2 only; no constant loops for ANGLE to unroll), returning F1 and F2 distances. After `#include <roughnessmap_fragment>`: `roughnessFactor = mix(roughnessFactor, 1.0, c);`. After `#include <normal_fragment_maps>`: `normal = normalize(normal + 0.6 * c * vec3(dFdx(f1), dFdy(f1), 0.0));`. After `#include <emissivemap_fragment>`: `totalEmissiveRadiance += c * uEmber * (0.8 + 0.2 * sin(uTime * 3.0 + f1 * 20.0));`. Ember glow sprite at `[0, 2.25, 0.35]`, 64 px radial texture, additive, colour `#FF5A1F`, `opacity = 0.5 * uCrack`, scale `[1.3, 0.9, 1]`, scale pulsing 0.95 to 1.05 over 2 s while `uCrack > 0`.
+Opening targets `data-intro="colonnade"` and `data-intro="shaft"` sit on the wrappers. Reduced motion: shaft static at opacity 1, no parallax.
 
-Goal line. Slab `BoxGeometry(6.0, 0.012, 0.012)` at `[0, 2.0, 0]`, `MeshBasicMaterial color #F6E3A1 toneMapped false` (wider than the frustum, so it meets both canvas edges and the column occludes it where it passes through). Glow slab `BoxGeometry(6.0, 0.06, 0.06)`, `MeshBasicMaterial color #D8B45A transparent opacity 0.16 blending AdditiveBlending depthWrite false`. Ring `RingGeometry(0.56, 0.575, 96)` flat at Y 2.0 (`rotation.x = -PI / 2`, `side DoubleSide`), same gold basic material. Glow sprite at `[0, 2.0, 0.5]`, 64 px radial texture, additive, colour `#D8B45A`, opacity 0.35, scale `[1.6, 0.28, 1]`. Crossing flash: slab and ring colour to `#FFF7DA` and sprite opacity 0.9 for 90 ms, decaying to rest over 500 ms.
+Plinth (`Plinth.tsx`, static). Die `BoxGeometry(1.30, 0.24, 1.30)` at Y -0.12 (top at Y 0); step `(1.66, 0.09, 1.66)` at Y -0.285; step `(2.02, 0.08, 2.02)` at Y -0.37. One obsidian material `#121217`, roughness 0.35, `fluteOn 0`, f0 0.10, reflect 0.8, rim 0.08. Gilded arrises: 8 bars `1.30 x 0.008 x 0.008` on the die's four top and four bottom edges, merged, gold. TEMPERANTIA: canvas 1024 x 128 (512 x 64 low), drawn after `Promise.race([document.fonts.load('700 80px Cinzel'), 300 ms])` and again when the font lands (upload only); letters one by one at 0.2em tracking, cap height 72 percent, fill gradient `#7A5C22 0, #E9CF86 0.45, #F6E3A1 0.55, #8A6A2A 1`, stroke `rgba(0,0,0,0.6)` at `max(1, H / 64)`; `PlaneGeometry(1.10, 0.13)` at `[0, -0.125, 0.6515]`, `MeshBasicMaterial` map, transparent, `depthWrite false`, `polygonOffset` factor -1, FrontSide. Contact shadow: `PlaneGeometry(2.8, 2.8)` flat at Y -0.412, 64 px radial `shadow` texture, `#000000`, transparent, opacity 0.8, `depthWrite false`, `renderOrder -1`, FrontSide.
 
-Lights. `ambientLight` 0.12 `#2A2A33`. Key `spotLight #FFE9B8 intensity 18 decay 2 angle 0.5 penumbra 0.7` at `[2.4, 4.2, 2.6]` targeting `[0, 1.2, 0]`. Rim `directionalLight #C8B07A intensity 1.2` from `[-3, 2.5, -2.5]`. Sweep `pointLight #FFF4D6 intensity 9 distance 7 decay 2` at `[3.2 * sin(theta), 3.4, 3.2 * cos(theta)]`, `theta = 2 * PI * t / 14 + 0.4 * tiltX`; this one moving light is the idle light sweep and the opening pass (moving a light never recompiles; it is mounted from frame 0). Ember `pointLight #FF6A2B distance 2.2 decay 2` at `[0, 2.05, 0.6]`, `intensity = 6 * uCrack` (mounted at 0). drei `<Environment resolution={64} frames={1}>` (32 on low tier) with three `Lightformer`s: rect `#FFF1CC` intensity 3 at `[0, 5, -2]` scale `[6, 1, 1]`; rect `#8C7A5A` intensity 1.2 at `[-4, 1, 3]` `rotation-y PI / 3` scale `[1, 4, 1]`; rect `#FF6A2B` intensity 0.6 at `[0, -1, 4]` scale `[4, 0.5, 1]`. The bake is precompiled before the first draw; Lightformers never move.
+Column (`Column.tsx`). Shaft `CylinderGeometry(0.36, 0.36, 1, 160, 1)` (80 low), translated +0.5 so the base is the origin, shared by `base` (`scale.y = min(top, 2)`) and `overflow` inside the `break` group (`scale.y = max(0, top - 2)`), with `top = shaftTop(R)`; a mesh under 0.0005 is hidden. `break` sits at `position.y = min(top, 2)`, `position.x = 0.03 * crack`, `rotation.z = -0.0436 * crack` (2.5 degrees) and carries the capital. Shaft material: obsidian `#121218`, roughness 0.22, `fluteOn 1`, f0 0.30, reflect 1.6, rim 0.28. Attic base (static, stands from frame 0): `LatheGeometry` 64 segments (32 low), profile `[r, y]` `[0,0] [0.50,0] [0.512,0.018] [0.515,0.045] [0.505,0.072] [0.480,0.088] [0.440,0.094] [0.410,0.105] [0.398,0.125] [0.410,0.145] [0.440,0.150] [0.452,0.162] [0.458,0.180] [0.448,0.198] [0.420,0.208] [0.380,0.212] [0.366,0.222] [0.360,0.240]`, obsidian `#121218`, roughness 0.22, `fluteOn 0`, f0 0.30, reflect 1.6, rim 0.18. Gold fillets `TorusGeometry(0.513, 0.010, 8, 96)` at Y 0.045 and `(0.456, 0.009, 8, 96)` at Y 0.180, merged. Base, fillets, shaft and ghost sit in the turn group (`rotation.y = mon.rotY`); the shockwave and the ember glow do not.
 
-Strike (per store `pulse`). The scene subscribes to `useStore.pulse` (`{ id, kind: 'log' | 'remove', deltaKcal, totalKcal, over }`) and reads the new H from `totalKcal`. `kind: 'log'`: a GSAP timeline on a ref object `s = { h, sx, sy }`: `scale.y` from `H0` to `1.015 * H1` over 170 ms `--ease-hit` (accelerates and stops hard), then to `H1` over 120 ms `--ease-settle`; at the 170 ms mark: `trauma = 1.0`, dust burst, capital pulse, `navigator.vibrate?.(18)`. Strikes within 600 ms coalesce: the running tween retargets `H1` and no second burst fires. If the top crosses 2.0: goal flash, 60 ember sparks, `uCrack` blooms to its value over 700 ms `--ease-stone`, ember light to its value over the same 700 ms. `kind: 'remove'`: sink to the new H over 600 ms `--ease-stone`, no dust, no shake; if the top drops below 2.0, `uCrack` to 0 over 600 ms. The slam starts after the sheet's `transitionend` or 220 ms, whichever comes first; the store write, number, ring and recents never wait for it.
+Capital (`Capital.tsx`), a child of `break` at local Y `max(0, top - 2)`. Echinus `LatheGeometry` `max(24, round(lathe * 0.75))` segments (48 high, 24 low), profile `[0.36,0] [0.375,0.012] [0.40,0.03] [0.43,0.05] [0.45,0.065] [0.455,0.075]`, plus astragal `TorusGeometry(0.37, 0.016, 10, 96)` at local Y -0.01, merged, own gold material. Abacus `BoxGeometry(0.98, 0.045, 0.98)` with its top at local 0.12, obsidian (`fluteOn 0`, rim 0.18) sharing the shaft's crack uniforms. Group scale `min(1, R / 0.36) * mon.capScale`, so it sinks into the base during the rise. Strike: emissive 0 to 0.8 (150 ms `power2.out`) to 0 (150 ms `power2.in`); scale 1 to 1.06 (110 ms `power2.out`) to 1 (110 ms `--ease-settle`).
 
-Shake. Trauma model in `useFrame`: `trauma = max(0, trauma - dt * 2.4); s = trauma * trauma; camera.position = rest + (s * 0.033 * sin(t * 97), s * 0.024 * sin(t * 113 + 1.3), 0); camera.rotation.z = s * 0.012 * sin(t * 89)` (about 4 px at the column, 140 ms visible). The stage container runs the matching DOM keyframe (`translate 3px` two cycles, 140 ms) so canvas and inscriptions move as one and the fallback shakes identically. The opening landing uses `trauma = 0.75`.
+Obsidian material (`createObsidianMaterial`). One `MeshStandardMaterial` class, `metalness 0`, `toneMapped false`, same `onBeforeCompile` and `customProgramCacheKey` on every instance (shaft, abacus, base, plinth); uniforms are per material, assigned by reference with `Object.assign(shader.uniforms, ...)`; never `clone()`.
 
-Dust (LOCKED: one `InstancedMesh`). 220 instances of `PlaneGeometry(0.05, 0.05)` (90 on low tier), `frustumCulled={false}`, `visible` toggled on burst, `ShaderMaterial transparent depthWrite false blending NormalBlending`, soft-circle 64 px alpha texture, billboarded in the vertex shader (`mv = modelViewMatrix * vec4(centre, 1.0); mv.xy += position.xy * size`). Per-instance attributes: `aSeed` vec4 (angle 0 to 2 PI, speed 0 to 1, life offset 0 to 0.12 s, size 0 to 1) and `aKind` float (0 = foot, 160 instances; 1 = top spark, 60 instances). Uniforms: `uTime`, `uBurst` (burst time, -100 initially), `uTopY` (H at burst), `uEmber` (1 when the burst crossed the goal, else 0), `uColorDust #9A8E7A`, `uColorSpark #FF8C42`, `uMap`. Foot particle: origin radius 0.55 to 0.9 at Y 0.02, outward 0.8 to 1.6 u/s, up 0.6 to 1.4 u/s, gravity -2.2, life 0.7 to 1.1 s, size 0.03 to 0.09, alpha `(1 - t / life) * 0.55`. Top spark (only when `uEmber > 0.5`, else size 0): origin radius 0.2 at `uTopY`, outward 0.3 to 0.8, up 1.2 to 2.0, gravity -1.6, life 1.0 to 1.4 s, size 0.02 to 0.05, colour `uColorSpark`, `toneMapped false`. `t = uTime - uBurst - lifeOffset`; size 0 outside `0 < t < life`. CPU cost per burst: two uniform writes. Idle: `visible = false`.
+| Uniform | Value |
+| --- | --- |
+| `uCrack` | `mon.crack` |
+| `uGoalY` | 2.0 |
+| `uTime` | `mon.crackTime`, ticks only while crack > 0 and motion is not reduced |
+| `uDepth` | int, 1 high (3D voronoi, 27 taps), 0 low (2D, 9 taps); a live downgrade lowers it |
+| `uScale` | 6.0 |
+| `uFlute` | 0.014 (both tiers) |
+| `uFluteOn` | 1 shaft, 0 everything else |
+| `uFluteDepth` | 0.55 |
+| `uEmber` | `(2.5, 0.875, 0.3)` linear |
+| `uTurn` | `mon.rotY`, removed from `vWorldPos` so the crack field stays on the stone |
+| `uGlintY` / `uGlintOn` / `uGlintCol` | `top - 0.04` / `mon.glintOn` / `#F6E3A1`, `#FF6A2B` when the strike crosses |
+| `uF0` / `uReflect` / `uRim` | per material (above); `uReflectTint` 0, `uRimColor` `#C9A961` |
 
-Idle. Live idle while TODAY is visible: column group `rotation.y += 0.035 * dt` (one turn per 180 s), sweep theta advances on the 14 s period, both driven by the demand ticker. Deep idle (another tab, hidden, 90 s without touch, reduced motion): no ticker, `invalidate()` only on change.
+Vertex (after `#include <begin_vertex>`), only when `uFluteOn > 0.5`: `f = 0.5 - 0.5 * cos(20a)` with `a = atan(z, x)`; `transformed -= radial * uFlute * f` (scallop deepest at the flute centre); entasis `transformed.xz *= 1.0 - 0.08 * smoothstep(0.5, 2.0, worldY)`; varyings `vFluteXZ`, `vSide = 1 - step(0.5, abs(objectNormal.y))`, `vTanV = normalize(normalMatrix * (-sin a, 0, cos a))`. `vWorldPos` is the world position rotated by `-uTurn`. Fragment: the crack block runs only `if (uCrack > 0.001 && vWorldPos.y > uGoalY - 0.05)`: `above = smoothstep(uGoalY - 0.02, uGoalY + 0.06, y)`, `p3 = vWorldPos * uScale` (uDepth 1) or `p2 = vec2(atan(z, x) * 0.36, y) * uScale` (uDepth 0), `tpVoro` (3 x 3 x (2 * uDepth + 1) cells, loop bounds from the uniform, so WebGL2 only), `edge = 1 - smoothstep(0, 0.06 + 0.04 * uCrack, F2 - F1)`, `climb = smoothstep(0, 1, uCrack * 1.6 - (y - uGoalY) * 0.6)`, `c = above * uCrack * edge * climb`; diffuse to `vec3(0.02)`, roughness to 1, normal `+ 0.6 * c * (dFdx(F1), dFdy(F1), 0)`, emissive `+ c * uEmber * (0.8 + 0.2 * sin(uTime * 3 + F1 * 20))`. Per-pixel flutes after the crack normal, on side faces of the shaft: `w = fract(a * 20 / 2pi) - 0.5`, `fillet = smoothstep(0.40, 0.46, |w|)`, `facing = clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0, 1)`, `normal += vTanV * (-2 * w * uFluteDepth * (1 - fillet) * smoothstep(0.08, 0.35, facing))`. Glint: `+ uGlintCol * 0.35 * exp(-((y - uGlintY) / 0.06)^2) * uGlintOn`. Reflection (before `#include <opaque_fragment>`): `env = tpEnvSample(reflect(-geometryViewDir, normal) in world)`, `F = mix(uF0, 1, (1 - nv)^5)`, `outgoingLight += env * uReflect * F * (1 - c) + uRimColor * (1 - nv)^3 * uRim * (1 - c)`.
 
-Over goal. H continues above 2.0 (the `overflow` mesh grows), the `break` group tilts to 2.5 degrees as `uCrack` reaches 1, cracks climb from the line, the ember glow sprite and light come up, the hero label flips to OVER THE LINE with the ember number. All of it reverses on delete.
+Environment texture (`environment.ts`). One 256 x 128 equirect canvas, `SRGBColorSpace`, `RepeatWrapping` on S, `LinearFilter`, no mips; sampled at `u = atan(z, x) / 2pi + 0.5`, `v = asin(y) / pi + 0.5`. The shaft only reflects rows 0.43H to 0.54H; a normal at angle phi reflects `u = 0.75 - phi / pi`. Painted in this order: base gradient `#0e0e13 0, #0b0b10 0.5, #0a0807 1`; key band `glow(W * 0.5, H * 0.14, W * 0.62, H * 0.16, '#fff1cc', 0.95)`; S-CENTRE `vstrip(192, 28, 0.30H to 0.66H, '#6c604f', 1.0)`; S-KEY `vstrip(156, 9, 0.30H to 0.66H, '#fff3dc', 1.0)`; S-FILL `vstrip(220, 6, 0.32H to 0.64H, '#ffe6be', 0.6)`; S-RIM `vstrip(64, 40, 0.28H to 0.70H, '#d9bc80', 0.7)`. `vstrip` stops 0 / 0.3 / 0.7 / 1 with a 20 percent top and bottom feather (`destination-in`).
 
-Reduced motion. Column at H instantly, no dust, no shake, no tilt animation, no idle turn, sweep light static at `theta = 0.6`, `uTime` frozen (steady ember, no pulse), `frameloop="demand"` with one `invalidate()` per store change. The still frame always shows the final state: column, cracks, gold.
+Gold (`createGoldMaterial`): `MeshStandardMaterial` `#D8B45A`, metalness 1, roughness 0.22, emissive `#F6E3A1` at 0, reflection strength 1.4, tint 1, f0 1.0, no rim; tone mapped. Separate instances on fillets, capital and arrises; only the capital pulses.
 
-Resilience. `webglcontextlost`: `preventDefault`, remount the canvas by key once with the SVG monument covering; a second loss within 30 s switches to the SVG monument for the session. `isSoftwareRenderer` (section 15) never mounts the canvas.
+tpFx (`fxMaterial.ts`). One `ShaderMaterial`, `DoubleSide`, `fog false`, transparent, `depthWrite false`, `toneMapped false`, `AdditiveBlending` with `premultipliedAlpha: true`; the fragment writes alpha = its brightest channel. `uMode` 0 ghost, 1 line and collar, 2 radial glow (`uBill` billboards a unit plane by `uBillScale`) or ring band (`uRing`). Default `uGold #D8B45A`, `uFlashCol` and `uHot #FFF7DA`.
+
+Goal line (`GoalLine.tsx`). `PlaneGeometry(6.0, 0.10)` at `[0, 2.0, 0]`, mode 1: `yy = (vUv.y - 0.5) * 0.10 / 0.006`, `core = exp(-yy^2)`, `glow = exp(-|yy| * 0.22) * 0.18 * edge` (`edge` fades the outer 30 percent of the plane height), `glint = max(0, 1 - |x - uSweepX| / 0.45)^3`, sparkle `uSparkle * step(0.985, hash(floor(x * 90), floor(uTime * 6))) * 0.6`, `c = uGold * (core * (0.85 + 0.9 glint + spark) + glow * (1 + 1.5 glint))`, flash `mix(c, uFlashCol * (core + glow) * 1.4, uFlash)`, draw `c *= step(vUv.x, uDraw)` plus hot tip `uHot * exp(-((vUv.x - uDraw) * 60)^2) * 2 * core` while drawing. `uDraw = 0.2 + 0.6 * mon.goalX` (1 when done: the frustum shows about uv 0.23 to 0.77); `uSweepX = mon.shimmerX ?? 2.4 * mon.tiltX` (0 reduced); `uTime` frozen at 0 reduced; `uSparkle` 1 high, 0 low. Collar: `RingGeometry(0.47, 0.545, 96)` flat at Y 2.0, mode 1 ring, circle radius 0.5075, half width 0.006, glow at a quarter, overall 0.65, no glint, alpha `mon.goalFade`. Glow: mode 2 billboard at `[0, 2.0, 0.5]`, scale `[2.4, 0.22]`, `#D8B45A`, alpha `(0.36 + 0.5 * flash) * goalFade`. Crossing flash: `flash` 1 held 90 ms, then 0 over 500 ms `power2.out`.
+
+Ghost (`Ghost.tsx`). `CylinderGeometry(0.372, 0.372, 2.0, 80, 1, true)` translated +1.0, mode 0, `renderOrder 1`, same entasis: `above = smoothstep(uH + 0.004, uH + 0.05, y)`, `rev = 1 - smoothstep(uReveal * 2 - 0.04, uReveal * 2, y)`, `c = uGold * (edge * 0.19 + fres * 0.015 + arris * (0.012 + 0.045 * fres)) * above * rev * top * uAlpha` (`uAlpha` 1) with `fres = (1 - nv)^2.2`, `edge = (1 - nv)^5`, `arris = (0.5 + 0.5 cos(20 atan))^24`, `top = 1 - 0.4 * smoothstep(1.75, 2.0, y)`. `uH = shaftTop(R)`, `uReveal = mon.ghost` (0 at mount, 1 after the opening or `setInstant`). Hidden when `mon.ghost <= 0.001` or `top >= 1.97`.
+
+Shockwave (`Shockwave.tsx`). `RingGeometry(0.9, 1.0, 96)` flat at Y 0.004, mode 2 ring band, scale 0.55 to 1.9 over 480 ms `power3.out`, alpha `0.55 * (1 - p)^2`, `#D8B45A` or `#FF6A2B` when crossing; visible only while `0 <= p < 1`.
+
+Ember glow: mode 2 billboard at `[0, 2.08, 0.30]`, scale `[1.0, 0.5] * (1 + 0.05 * sin(emberPulse * pi))` (2 s period), `#FF5A1F`, alpha `0.65 * crack`, visible while crack > 0.001.
+
+Lights (`Lights.tsx`). `ambientLight #3A3428` 0.22. Key `spotLight #FFE9B8` 22, decay 2, angle 0.5, penumbra 0.8, at `[2.2, 2.6, 3.2]` targeting `[0, 1.2, 0]`. Rim `directionalLight #C8B07A` 2.5 from `[-2.6, 1.3, -2.2]`. Sweep `pointLight #FFF4D6` 9, distance 7, decay 2, at `[3.2 sin(t'), 3.4, 3.2 cos(t')]`, `t' = mon.theta + 0.4 * mon.tiltX`, theta starting at 0.6. Ember `pointLight #FF6A2B`, distance 2.2, decay 2, at `[0, 2.05, 0.6]`, intensity `6 * crack` (mounted at 0). `mon.tiltX` comes from the `tilt` event (live tilt, or the 9 s gold sweep relayed by `tilt.ts`); a tilt sample does not invalidate.
+
+Strike (`strike.ts`, one `Monument` per layer, read by both renderers). The layer subscribes to the store: a new `pulse` sets targets from `totalKcal`; if the LOG sheet is open the slam waits for `logOpen` to go false or 220 ms, whichever comes first; before the column is placed a pulse only moves the target (the opening picks it up); off TODAY it settles silently. `kind: 'log'`: glint on; `h` to `1.015 * H1` over 170 ms `--ease-hit`, then to `H1` over 120 ms `--ease-settle`; at 170 ms: `trauma = 1`, dust burst, impact, capital pulse, stage shake, shaft flare, `vibrate(18)` (crossing: `navigator.vibrate([12, 40, 24])` via the local `buzz`), goal flash if crossing. Impact: `fovPunch` 0 to -0.5 over 130 ms `power2.out` and back over 130 ms `--ease-settle`; `uReflect` x1.5 (1.6 to 2.4) over 60 ms and back over 200 ms on the shaft and base; glint off over 200 ms; shockwave. A strike within 600 ms of the last one retargets and fires no second burst (a crossing still flashes). Crack: crossing blooms at 170 ms over 700 ms `--ease-stone`, otherwise from the start over 700 ms; the ember light follows. `kind: 'remove'`: sink to `H1` over 600 ms `--ease-stone`, then a shimmer `uSweepX` +3 to -3 over 300 ms `power1.inOut`; no dust, no shake; crack to 0 over 600 ms below the line, else to its target. A non-pulse change (goal, import, day rollover) eases over 600 ms `--ease-stone` while shown, silently otherwise. The store write, number, ring and recents never wait.
+
+Shake. `trauma = max(0, trauma - dt * 2.4)` in `tick`; camera offsets as above. DOM: `shakeStage()` toggles `.shake` on `[data-stage]` (`stageShake`, 140 ms linear: 3/-2, -3/2, 2/-1, -2/1 px, back to 0). The opening landing uses trauma 0.75.
+
+Dust (`Dust.tsx`, one `InstancedMesh`). `PlaneGeometry(0.05, 0.05)`, `frustumCulled false`, `renderOrder 3`, `ShaderMaterial` transparent, `depthWrite false`, `NormalBlending`, 64 px `soft` radial map, billboarded (`mv.xy += position.xy * size / 0.05`); seeds from a fixed LCG. Instance order: motes (40 high, 16 low), smoke (12, 6), foot grit then top sparks from the dust count (220 high: 160 + 60; 90 low: 65 + 25). Drawn count = motes, plus smoke and `min(dust, bus.dustCount)` for 1.6 s after a burst; lowering the count trims sparks first.
+
+| Kind | Origin | Velocity | Life, size | Alpha, colour |
+| --- | --- | --- | --- | --- |
+| 0 foot | radius 0.50 to 0.75, Y 0.02 | out 0.8 to 1.6, up 0.6 to 1.4, gravity -2.2 | 0.7 to 1.1 s, 0.03 to 0.09 | `(1 - t / life) * 0.55`, `#9A8E7A` |
+| 1 spark (crossing only) | radius 0.2, Y `renderH(burstTop)` | out 0.3 to 0.8, up 1.2 to 2.0, gravity -1.6 | 1.0 to 1.4 s, 0.02 to 0.05 | `1 - t / life`, `#FF8C42` |
+| 2 smoke | radius 0.45 to 0.7, Y 0.03 | out 0.25 to 0.45, up 0.10 to 0.25, `centre = origin + vel * (1 - exp(-2.2t)) / 2.2` | 1.3 to 1.6 s, 0.18 to 0.55 | `(1 - t / life)^1.5 * 0.16`, `#8E826E` |
+| 3 mote | `y = mod(s * 4 - uMoteTime * 0.045, 4) - 0.1`, x within `max(0.15, 1.094 - 0.2126y)`, z -0.6 to 1.4 | drifts down | always, 0.010 to 0.024 | `0.5 * (0.55 + 0.45 sin(1.1 uMoteTime + 7 * seed))`, faded at both ends, `#FFE3A8` |
+
+Grit and smoke brighten in the shaft: `1 + 1.2 * (1 - smoothstep(0.3, 1.1, |x|))`. `t = uTime - uBurst - lifeOffset` (offset 0 to 0.12 s); size 0 outside `0 <= t <= life`. Motes advance only on rendered frames.
+
+Idle. While idle is wanted and TODAY is shown: `rotY += 0.035 * dt` (one turn per 180 s), `theta += 2pi / 14 * dt`; frames come from the ticker. Deep idle (another tab, hidden, 90 s without input, reduced motion): no ticker, one `invalidate()` per change.
+
+Over goal. The crown grows toward the 0.30 u asymptote, `break` tilts to 2.5 degrees as crack reaches 1, cracks climb from the line, ember glow and light come up, the ghost hides, the root gets `data-over` (arch haze to ember). All of it reverses on delete.
+
+Reduced motion. Strikes and the opening snap to H, crack set at once, no dust, smoke, shockwave, glint, fov punch, shake, flare or idle turn; theta 0.6; `uTime` frozen; goal line glint at 0; motes drawn but frozen; ghost at rest; no hold windows, so `demand` with one `invalidate()` per change.
+
+Resilience. `webglcontextlost`: `preventDefault`, remount the canvas by key once with the SVG covering; a second loss within 30 s switches to the SVG for the session (section 15). Measurement switches (`debugFlags.ts`): `?tp-noenv` (no reflection injection), `?tp-nocrack` (no obsidian injection), `?tp-chunks` (`tp:gl-chunk-<program>` marks), `?tp-notemple`, `?tp-nomask`; `?tp-std` is parsed and read nowhere.
 
 ## 8 Fractured edges overlay technique
 
-Owner `src/components/ui/Shards.tsx`. LOCKED: four fixed strip SVGs (top, bottom, left, right), not one full-screen SVG, so the per-frame glint repaints four strips and never the whole screen. Each strip: `position: fixed; pointer-events: none; z-index: 40`, offset by its `env(safe-area-inset-*)`. Top and bottom strips are `100vw x 64px` with `viewBox 0 0 390 64` and `preserveAspectRatio="xMidYMin slice"` (bottom uses `xMidYMax`); left and right strips are `64px x 100vh` with `viewBox 0 0 64 844` and `xMinYMid` or `xMaxYMid slice`, so shards crop on wide or tall screens instead of stretching. On desktop the strips hug the 430 px slab.
+Owner `src/components/ui/Shards.tsx` (data `shards-data.ts`, generator `scripts/shards.mjs`). Four strip SVGs (top, bottom, left, right), never one full-screen SVG, so a glint update repaints four thin strips. `App.tsx` renders `<Shards />` inside the 430 px frame: the root is `absolute inset-0`, `pointer-events: none`, `aria-hidden`, z 40 (`--z-shards`), so on a phone the strips hug the viewport and on desktop the slab. Each strip is a wrapper div that takes the placement and an SVG that fills it with `slice` aspect, so a smaller box crops the stone and never stretches it:
 
-Shards. Polygons generated once by a seeded script (`scripts/shards.mjs`, fixed seed, committed as static SVG so the stone is identical every launch): 5 across the top, 9 down the left, 11 down the right, 3 at each bottom corner (bottom strip stays shallow, 8 to 18 px, so it never eats the tab bar), each 4 to 6 points with jagged inner edges, depth 18 to 64 px (deepest at the top right and bottom left corners), outer edge flush with the screen. Three layers per strip: (1) fill, each polygon using one of six reusable `linearGradient` facets at different angles with stops `#1A1A20 0%`, `#0A0A0D 55%`, `#26262E 100%`, so neighbouring shards read as broken planes catching light differently; (2) glint, one `polyline` traced along the broken inner edge of every shard, `stroke="url(#glint)" stroke-width 0.8 opacity 0.55`, never on the screen-side edges, plus three or four short facet lines inside the bigger shards at opacity 0.25; (3) specular, a `<g class="spec">` holding a 140 px wide soft `linearGradient` band (bone `#E7E1D2` at 0.22 to transparent) clipped to the shard shapes with `clipPath`, moved by CSS `transform: translateX(calc(var(--tilt-x) * 120px))` (translateY on the side strips). No `feTurbulence`, no `feGaussianBlur`, no runtime filters.
+| Strip | viewBox | Aspect | Box |
+| --- | --- | --- | --- |
+| top | `0 0 390 64` | `xMidYMin slice` | top 0, full width, height `max(var(--safe-top), 12px)`, last 6 px masked to transparent |
+| bottom | `0 0 390 64` | `xMidYMax slice` | bottom 0, full width, height `calc(var(--safe-bottom) + 6px)` |
+| left | `0 0 64 844` | `xMinYMid slice` | 64 px wide, from `safe-top + 40px` to `safe-bottom + 56px` (between the header band and the tab bar) |
+| right | `0 0 64 844` | `xMaxYMid slice` | as left, on the right edge |
 
-Light. `#glint` is a `userSpaceOnUse` gradient (stops transparent 0, `#F6E3A1` 48%, `#FFF7DA` 50%, `#F6E3A1` 52%, transparent 100%) whose `x1` and `x2` are set by the tilt loop (`x1 = 390 * (tiltX * 1.2 - 0.6)`, `x2 = x1 + 390`); the specular `<g>` reads `--tilt-x` directly. Tilt loop: one rAF-throttled listener at 30 Hz writes `--tilt-x` (-1 to 1), `--tilt-angle` (`--tilt-x * 18deg`) and the gradient attributes. Desktop: pointer position normalised to the slab. Phone: `DeviceOrientation` `gamma / 30` clamped, lerped 0.12 per frame. Where `DeviceOrientationEvent.requestPermission` exists (iOS 13+) tilt is opt-in via Settings GOLD FOLLOWS TILT (a user gesture) and a one-line offer under the toast after the first log; elsewhere it is on by default. Until tilt is live, `@property --tilt-x { syntax: '<number>'; inherits: true; initial-value: 0 }` is animated by `@keyframes goldSweep { from { --tilt-x: -1 } to { --tilt-x: 1 } }` 9 s ease-in-out alternate infinite on `:root`, `animation-play-state` tied to live idle. The number, the borders, the shards and the 3D sweep light all read the same variable: one light for the whole screen. Low tier: tilt and glint update at 15 Hz. Reduced motion: no auto sweep (`--tilt-x` rests at 0); user-driven tilt still allowed.
+Shards. Generated once by `scripts/shards.mjs` (mulberry32, seed `7e4d1a5c`) and committed as `shards-data.ts`, so the stone is identical every launch. 7 across the top, 13 down the left, 15 down the right, 3 at each bottom corner; each 4 to 6 points, two flush on the screen edge. Generator depth bounds: top 10 to 44 deepening toward the right, sides 6 to 18 (left deepening toward the bottom, right toward the top), bottom left 8 to 16, bottom right 6 to 13. Actual depths at this seed: top 12 to 22, left 7 to 15, right 7 to 17, bottom 9 to 14; for ordering the test asserts only that the last top shard is deeper than the first, the last left shard at least as deep as the first, the first right shard at least as deep as the last, and the deepest bottom shard on the left. Glint runs follow the inner edge only where its outward normal faces the top left light: segments whose normal has positive x are dropped on the top and bottom strips, positive y on the sides. LOCKED by `src/components/ui/shards-data.test.ts`: the counts 7, 13, 15 and 6, 4 to 6 points, facet ids 0 to 5, at least one glint run per shard, the depth bounds, exactly two flush points, glint normals, and 3 or 4 facet lines on any shard deeper than 24 px. At this seed no shard is deeper than 22 px, so every `lines` array is empty. Layers per strip, no runtime filters:
+1. Fill: six `linearGradient` facets at 18, 72, 126, 180, 234 and 288 degrees, stops `#1C1C22 0%`, `#0A0A0D 55%`, `#2A2A31 100%`; each polygon uses one (`nextFacet` never gives the same facet as the shard before it).
+2. Fracture: every glint polyline drawn first in `#000` at `stroke-opacity 0.6`, width 1.5, round joins and caps.
+3. Glint: the same polylines, width 0.8, stroked with a `userSpaceOnUse` gradient (stops `#F6E3A1` at opacity 0, 0.48 `#F6E3A1`, 0.5 `#FFF7DA`, 0.52 `#F6E3A1`, 1 at opacity 0), group opacity `var(--shard-glint, 0.4)`. Facet lines inside the shards would draw here at 0.18, clipped to the shards (none at this seed).
+4. Specular: a band 140 units long across the strip's long axis (64 deep), `#E7E1D2` 0 to 0.16 to 0, clipped to the shard shapes, moved by `translateX(calc(var(--tilt-x) * 120px))` (`translateY` on the sides).
 
-Polished centre. A page-level CSS vignette on `body::after`: `radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0,0,0,0.55) 100%)`, fixed, `pointer-events: none`, z 0, under the shards. Backdrop (ported from Pad King `StudioBackdrop`, recoloured): a fixed `96vmax` radial key light `rgba(220,224,230,0.06)` moved by `--tilt-x`, plus the SVG `feTurbulence` grain as a static data-URI background at opacity 0.05 (static image, not a runtime filter) so pure black never bands. The backdrop returns nothing under reduced motion except the grain.
+Light (`src/lib/tilt.ts`, started once by `App.tsx`). One rAF loop throttled to 30 Hz (15 Hz on the low tier) writes `--tilt-x` (-1 to 1, 4 decimals) and `--tilt-angle` (`x * 18deg`) on `:root` and dispatches a window `tilt` CustomEvent with the value. Each strip listens and sets its glint gradient's `x1`/`x2` (top, bottom) or `y1`/`y2` (sides) to `a = L * (tilt * 1.2 - 0.6)`, `a + L`, with L 390 or 844. Sources: mouse position over `min(innerWidth, 430)` centred; `DeviceOrientation` `gamma / 30`, clamped, lerped 0.12 per frame. Orientation is listened to where no permission is needed, or on iOS when Settings GOLD FOLLOWS TILT is on (`requestTiltPermission` inside the tap); there is no offer under the toast. Without a live source, or on touch devices 2500 ms after the last orientation sample, `:root.auto-sweep` runs `@keyframes goldSweep { from { --tilt-x: -1 } to { --tilt-x: 1 } }` 9 s ease-in-out infinite alternate (`@property --tilt-x`, `<number>`, initial 0) and the loop relays the computed value to the gradients. `sweep-paused` pauses it while the document is hidden. `suspendTilt` holds the relay while the opening drives the glint through `emitTilt`; on release the relay eases back at 0.18 per frame. Reduced motion (system or `.reduce-motion`): no auto sweep, `--tilt-x` rests at 0, user tilt still allowed. The number, gold borders, shard specular, backdrop key pool and temple parallax read the same variable; the shard glints and the 3D sweep light follow it through the `tilt` event.
+
+Polished centre. Page vignette on `body::after` (`index.css`): `radial-gradient(120% 90% at 50% 38%, transparent 50%, rgba(0, 0, 0, 0.65) 100%)`, fixed, `pointer-events: none`, z 0. `Backdrop.tsx`, fixed full screen at z 0 under the frame, four static layers: (1) key pool, a 96vmax square centred at x 50 percent and y `calc(var(--goal-y) + 40px)`, `radial-gradient(closest-side, rgba(255,247,218,0.09) 0%, rgba(216,180,90,0.055) 34%, rgba(122,94,34,0.024) 62%, transparent 100%)`, shifted `var(--tilt-x) * 7vw`; (2) floor pool `radial-gradient(60% 22% at 50% var(--plinth-y), rgba(216,180,90,0.08), transparent 70%)`; (3) floor falloff `radial-gradient(80% 50% at 50% 100%, rgba(0,0,0,0.5), transparent 70%)`; (4) grain, a 160 px `feTurbulence` tile (`baseFrequency 0.85`, 2 octaves, seed 7) as a data-URI image at opacity 0.055. Reduced motion keeps all four; the key pool stops following the tilt. Desktop (768 px and up): field `#040406` with `radial-gradient(60% 50% at 50% 40%, rgba(216,180,90,0.06), transparent 70%)`, slab `box-shadow: 0 0 0 1px #1A1A21, 0 0 0 2px rgba(216,180,90,0.06), 0 40px 120px rgba(0,0,0,0.8)`, height `min(100vh, 932px)`.
 
 ## 9 Macro ring geometry
 
-Owner `src/screens/TodayRing.tsx`. SVG `viewBox 0 0 120 120` rendered at 112 px (56 px in an expanded history day). Centre (60, 60), radius 50, `stroke-width 7`, `stroke-linecap butt` (chiselled ends, never round). Track: full circle `#1A1A21` width 7. Three arcs as explicit `<path>` arcs computed from angles (not dashoffset, so the gaps stay exact), starting at -90 degrees plus a 3 degree half gap, clockwise, in the order protein, carbs, fat. Gap 6 degrees between arcs (18 total, 342 shared).
+Owner `src/screens/TodayRing.tsx`. SVG `viewBox 0 0 120 120` at 120 px (96 px compact), centre (60, 60), painted in this order: inner bezel circle r 41, `radialGradient` `#121218` to `#0B0B0F`, stroke `rgba(216, 180, 90, 0.35)` 0.6; track r 50, `#0A0A0D`, width 7; groove hairlines at r 46.5 and 53.5, `rgba(231, 225, 210, 0.36)` (the `GROOVE` constant, hard-coded; the `--bone-rule` token holds the same value but is unread), width 0.75. Three arcs as explicit `<path>` arcs from angles (`arcPath`, never dashoffset), width 7, `stroke-linecap butt`, clockwise from `RING_START` -87 degrees (-90 plus a 3 degree half gap), protein, carbs, fat, a 6 degree gap after each (342 shared). Each arc is a `linearGradient` `userSpaceOnUse` from (10, 10) to (110, 110): protein `#FFF1C4` to `#E6C670`, carbs `#D2AE55` to `#9C7B33`, fat `#A88A55` to `#8E7243`. Split by calorie contribution (`macroEnergySplit` in `src/lib/macros.ts`: `protein * 4`, `carbs * 4`, `fat * 9` over their sum), `deg = 342 * share`. A zero macro draws no arc but keeps its gap. Empty day: three 114 degree arcs in `#2A2A33`, no ticks, no letters, centre `0` in bone-dim. LOCKED by `src/screens/TodayRing.test.tsx`: the 114 / 6 / -87 layout closing the circle, the kept gap, the 4/4/9 split, the 342 progress arc, `arcPath` shapes, the empty-day colour and grooves, 12 px letters, the compact mode.
 
-Split by calorie contribution (`macroEnergySplit` in `src/lib/macros.ts`): `p = protein * 4`, `c = carbs * 4`, `f = fat * 9` over their sum, so the ring matches the big number. `deg_i = 342 * share_i`. Colours: protein `#F2D98A`, carbs `#B8923E`, fat `#6E5324`. Outside each arc's midpoint at radius 58, a 4 px tick in the arc colour and the letter P, C or F in Cinzel 9 px tracking 0.2em. A zero macro draws no arc but keeps its gap, so a missing macro never reads as a complete ring. Empty day: three equal 114 degree arcs in `#1A1A21` with the gaps, centre `0 g`.
+Ticks and letters at each arc's midpoint (only the focused macro's in progress mode): a tick from r 54.5 to 59.5 in the swatch colour (protein `#F2D98A`, carbs `#B8923E`, fat `#8E7243`), width 1.2, drawn only when the arc is longer than 0.5 degrees; the letter P, C or F at r 66.5, Cinzel 700, 0.04em, bone-dim, or bone-mute when its arc is 0.5 degrees or less, `fontSize = letterUnits(size)` = `12 * 120 / size` units, so 12 px at 120 and 15 units at 96. Tip glint (not under reduced motion, not on the empty day): an r 1.5 `#FFF7DA` dot at each arc end, opacity 1 while that arc is still tweening (120 ms in) and 0 after (300 ms out); `drop-shadow(0 0 4px rgba(246, 227, 161, 0.6))` on the high tier only. Motion: on each change the six angles tween over 520 ms `--ease-stone` in rAF (`useTweened`), then each path `d` is rewritten; reduced motion snaps.
 
-Centre: protein grams in Cinzel 700 20 px gold (`142 g`) over PROTEIN in Cinzel 8 px tracking 0.3em bone-dim.
-
-Readouts (x 160 to 366, three 32 px rows): 10 x 2 px swatch in the arc colour, label Cinzel 10 px tracking 0.3em bone-dim (PROTEIN, CARBS, FAT), value Cormorant 500 18 px bone `.num` (`142 g`), share Cormorant 15 px bone-dim `.num` (`31%`) right aligned. If macro targets are set, a ghost arc (`#26262E`, width 2, radius 44) shows each target's calorie share inside the ring. Tapping a readout row flips the ring into single-macro progress mode for 6 s or until tapped again: one arc of `grams / target` over 342 degrees in that colour, centre `142 g` over `OF 180`.
-
-Motion: on each store change the arc angles tween to the new split over 520 ms `--ease-stone` in rAF (angles, then path `d` rewritten); reduced motion snaps. Tapping the ring opens the TODAY sheet.
+Centre (DOM over the SVG): protein grams Cinzel 700 22 px gold-300 `.inscribed` with `g` as `.unit` (Cormorant 500 15 px bone-soft), over PROTEIN `.label` 6 px below at 0.1em (0.04em compact). Readouts (`TodayRingRow`, x 160 to 370 from 12 px into the 132 px row, three 36 px rows, parts 10 px apart): a 12 x 2 swatch with a 1 px `rgba(255, 247, 218, 0.3)` top highlight; label `.label` at 0.1em, 70 px wide (64 compact), gold-300 when active; grams Cormorant 600 20 px bone `.num` plus `.unit` `g`; right aligned Cormorant 600 16 px bone-soft: `of 180 g` when that macro has a target, else its energy share `31%` (`0%` on an empty day). Tapping a readout with a target set flips the ring to single-macro progress mode: one arc of `grams / target` (capped at 342 degrees) in that macro's gradient, the other two collapsed, the row's right column reads the percent of target in gold-300, the centre reads `142 g` over `OF 180`; a second tap or 6 s (restarted by any change to the totals) returns. A macro without a target has no progress mode. There are no target ghost arcs. Compact (`(max-width: 371px)`): ring 96 px, readouts from x 132, the right column becomes `sr-only`, and macros with a target get a 2 px underline whose bottom sits 7 px below the grams (`-bottom-[7px]`), `--rule` track filled `rgba(216, 180, 90, 0.6)` to `grams / target`. Tapping the ring opens the TODAY sheet. The 56 px ring in the HISTORY day sheet is a separate component (`MiniRing`, section 12).
 
 ## 10 Log form + recents
 
-Owner `src/screens/Log*`, `src/components/MealForm*`, `src/components/ui/Sheet.tsx`. The LOG keystone opens a bottom sheet, obsidian-900 with a 1 px `--gold-line-strong` top edge, 16 px top corners and a 36 x 3 px gold-400 grab bar. OMA HQ pattern, in order: the form on top, the submit, the recent items underneath, tap to re-log.
+Owner `src/screens/Log*`, `src/components/MealForm*`; the sheet is `src/components/ui/Sheet.tsx`, the portion control `src/components/ui/PortionField.tsx`. The LOG keystone opens `LogSheet`: the form, the sticky footer (chips over LOG), RECENT underneath; tap a recent to re-log.
 
-Sheet geometry (LOCKED). Height `min(92svh, var(--vv-h))`; `--vv-h` is written by a `visualViewport` resize listener; when `--vv-h < 620px` the sheet pins to the visual viewport (`position: fixed; top: 0; height: var(--vv-h)`), the home stage underneath is not touched. Rises 320 ms `--ease-sheet` (reduced motion: 160 ms fade), dismisses 200 ms. The footer is sticky inside the sheet so LOG always sits above the keyboard.
+Sheet. Panel `linear-gradient(180deg, #15151B 0px, #0B0B0F 160px)` with a 1 px `rgba(216,180,90,0.55)` top edge, 16 px top corners, max width 430, 20 px side padding, a 48 px `#0B0B0F` underfill so the spring never shows a gap. Grab bar 40 x 3 `--gold-grad-text`, 10 px from the top. Header 56 px: LOG in `.title-sheet` (Cinzel 700 16 px 0.2em bone) over a 72 px meander; right a Segmented md `Quick` | `Build` and the close `X` 22 px in 44 px. Height `min(92svh, var(--vv-h))`; under a 620 px visual viewport it pins to it (`top: var(--vv-top)`, `height: var(--vv-h)`). In 420 ms `--ease-spring`, out 200 ms, scrim 0.74 over 320 ms; reduced motion a 160 ms fade. Drag the grab bar or header down (8 px to start): release closes past 30 percent of the height or above 0.5 px/ms (last 80 ms), else springs back. The footer has no rule; rows dissolve under a 20 px fade.
 
-Header (56 px): LOG in Cinzel 14 px tracking 0.35em; right: a two-way inscribed switch QUICK | BUILD (32 px, gold hairline, active = gold text with a 2 px gold-400 underline).
+QUICK (`MealFormQuick.tsx`), y from the top of the content column:
 
-QUICK form (inputs 56 px, obsidian-800, 1 px `#26262E` line, radius 4, Cormorant 500 20 px bone, focus = `--gold-focus` hairline, no glow; labels Cinzel 10 px tracking 0.35em bone-dim 6 px above; 12 px row gaps):
-1. NAME (text, optional, placeholder `Meal`). LOCKED: no `datalist`; a custom suggestion row of up to 5 chips from recents appears under the field as he types (matches by `matchesQuery`); tapping one fills all four numbers and sets `mealId`.
-2. CALORIES (2/3 width, `inputmode="decimal"`, unit suffix inside the field reads `kcal` or `kJ` per Settings; typed kJ is divided by 4.184 on save via `fromInputEnergy`) | PORTION (1/3 width: a 56 px stepper with `minus` and `plus` ghost icons 44 px each, 0.5 to 4 step 0.5, default 1; the value is `servings` on the entry).
-3. PROTEIN g | CARBS g | FAT g thirds, `inputmode="decimal"`, default 0.
-4. One 36 px line: left the quiet hint in Cormorant 14 px bone-dim (`macros = 1 012 kcal`, adding `· differs from calories` when typed calories differ from the 4/4/9 sum by more than 8 percent, never blocking); right a SAVE TO LIBRARY toggle (Cinzel 10 px label, 36 x 20 px hairline switch; on by default for a new name, off when the name matches a library meal).
+| y | Height | Element |
+| --- | --- | --- |
+| 0 to 12 | 12 | NAME label (`.label`: Cinzel 700 12 px 0.12em bone-dim) |
+| 20 to 76 | 56 | NAME (`tp-log-name`), placeholder `Meal`, max 80 |
+| 92 to 132 | 40 | Basis switch, Segmented lg: `Per serve`, `Per 100 g`, `Per 100 ml` (`tp-log-basis`, `-serve`, `-g`, `-ml`) |
+| 148 to 160 | 12 | CALORIES label; right the basis tag `PER 100 G` gold-300 0.08em (`tp-log-basis-tag`), fades in 160 ms `--ease-cut` |
+| 168 to 232 | 64 | CALORIES (`tp-log-kcal`), value Cormorant 600 28 px, suffix `kcal` or `kJ` |
+| 248 to 304 | 56 | PROTEIN, CARBS, FAT thirds, 12 px gaps, label inside, suffix `g` |
+| 324 | 1 | `--rule` |
+| 341 to 361 | 20 | PORTION label; right the live result (`tp-log-result`) |
+| 369 to 433 | 64 | PortionField (`tp-log-portion`, `-input`, `-less`, `-more`) |
+| 441 to 481 | 40 | PortionPicks (`tp-log-portion-pick-<value>`) |
+| 493 to 529 | 36 | Hint (`tp-log-hint`, always rendered) left, SAVE TO LIBRARY toggle (`tp-log-save-library`) right; the toggle wraps under the hint when narrow |
+| 553 | | RECENT |
 
-LOCKED: LOG is enabled on calories alone (name defaults to `Meal`), and Enter or Go on any field commits when calories exist. Each typed digit lands with a 120 ms `clip-path` wipe from the top of its cell and `navigator.vibrate?.(8)` on Android.
+Name suggestions add a 40 px chip row 8 px under NAME while typing. Fields are `.tablet-inset` (border `--bone-edge`, focus `#E6CB78` border and ring), Cormorant 600 22 px `.num` bone, placeholder `0`, `inputmode="decimal"`, `enterKeyHint="go"`; only digits, `.` and `,` get in; each typed character buzzes 8 ms. Typed kJ is divided by 4.184 on save. A QUICK prefill focuses CALORIES after 340 ms.
 
-BUILD mode: an INGREDIENT search field (48 px) over saved ingredients; tapping one adds a row (name, AMOUNT input in its `per.unit`, computed kcal right aligned in gold via `makeComponent`), rows removable with `x`. Totals bar under the rows: `kcal · P · C · F` in Cinzel 15 px. Then MEAL NAME and the SAVE TO LIBRARY toggle (saves an assembled meal with its components), then the same footer.
+Basis. The typed numbers are label numbers and never convert. Switching resets the amount to 1 serve, 100 g or 250 ml (`BASIS_DEFAULT`), or to the source meal's `usual` on its own basis (`switchBasis`). `QuickDraft` holds `basis` and `amount`; amounts are cleaned (`cleanAmount`: serve to 3 decimals, max 100; g and ml to 1 decimal, max 100 000), never snapped.
 
-Sticky footer: at rest it holds the FAVOURITES chip row (40 px chips, Cinzel 11 px tracking 0.2em, gold hairline, horizontal scroll, max 8, from `favouriteMeals`; tap = `logMeal(id, 1)` instantly, two taps from home to a strike) above the LOG button (56 px full width, `--gold-grad` fill, obsidian-900 LOG in Cinzel 14 px tracking 0.3em, disabled at 40 percent opacity without calories). When `--vv-h < 620px` the chip row collapses (typing, not tapping) so the footer is 56 px plus 12 px padding. In thumb reach either way.
+Live result. Hidden until calories parse: what LOG adds, serve `kcal x amount`, g or ml `kcal x amount / 100` (`quickResult`), following each keystroke through `onPreview`. `ValueUnit` gold (Cinzel 700 16 px gold-300, U+2009, unit Cormorant 500 15 px bone-soft) then ` · P 16` in `.hint`; counts over 380 ms (instant under reduced motion) with a 300 ms gold glow.
 
-Submit rule. The zustand write (`logQuick` or `logMeal`) is synchronous and snapshots the numbers; the number, ring and recents update on that write. The sheet dismisses in 200 ms and the strike fires from the store `pulse` (section 7). A toast (Cormorant 15 px, obsidian-800 slab, gold hairline, bottom at `--safe-bottom + 72px`, z 60) reads `Logged · 612 kcal` with an UNDO text button (Cinzel 10 px gold) for 4 s; UNDO calls `deleteEntry` (column sinks, no dust). Never a confirm dialog. If persistence throws (quota, private mode) the entry stays in memory, the strike still plays and the toast reads `Saved for this session only. Export now.` with an EXPORT action.
+PortionField. h 64, grid `64px 1px 1fr 1px 64px`. Minus and plus 64 x 64, 22 px icons bone-dim; pressed or held gold-300 on `rgba(216,180,90,0.10)`, icon scale 0.9; minus at the minimum `#5E5A54`. Dividers inset 14 px, `rgba(216,180,90,0.42)` fading out. Value Cormorant 600 30 px bone, unit 6 px after it Cormorant 500 18 px bone-soft: `g`, `ml`, `serve` (1 or less), `serves`. Steps: 0.25 serve; 5 g under 50, 10 g under 500, then 25 g; minimum 0.25 serve or 1. Hold repeats after 380 ms, every 70 ms easing to 35 ms, with a `rgba(216,180,90,0.45)` inner hairline and a 120 ms wipe on each changed digit. Typed values commit on blur or Enter; nonsense reverts with `.shake` (140 ms) and a 10 ms buzz. The buttons never take focus from the input. Focus: border and unit gold-300.
 
-RECENT (under the footer's scroll content, inside the sheet): header RECENT in Cinzel 10 px tracking 0.4em bone-dim with `LAST 12` right. Source: a new selector `recentEntries(entries, 12)`, the last 12 distinct `name + kcal` pairs across all days, newest first (library-only `recentMeals` would lose unsaved quick logs). Rows 52 px, `<button>`, ruled by 1 px `--gold-line`: a 3 x 30 px gold-400 bar at the left; name Cormorant 500 18 px bone with `P 32 · C 48 · F 12` in Cormorant 13 px bone-dim `.num` beneath; right: kcal in Cinzel 15 px gold-400 and a 40 px `square-plus` ghost icon. Tap the row = re-log the snapshot as it was (`logQuick` with the entry's per-serving macros and `servings`, toast, strike). Long press 450 ms = prefill QUICK with it for editing first. Swipe left = hide from recents. Row hover and press: `--gold-line` wash. Empty: `Nothing logged yet.` in Cormorant italic 15 px bone-dim. A newly logged row rises in from the top (14 px rise, 240 ms) with its gold rule drawing left to right (240 ms).
+PortionPicks. Four 40 px chips, 8 px gaps, 1 px `--gold-edge`; number Cinzel 700 13 px 0.04em bone-dim plus unit Cormorant 500 15 px (serve picks: number only). Active: `.gold-border`, `rgba(216,180,90,0.12)`, number gold-200. Sets: serve `0.5, 1, 1.5, 2`; g `100, 150, 200, 250`; ml `150, 250, 330, 500`. A `usual` outside the set replaces the first pick and carries a 5 px solid rhombus (`Usual, 180 grams`). Tap buzzes 6 ms; the keyboard stays up.
 
-TODAY sheet (from EATEN or the ring): today's entries from `entriesForDay`, newest first, same row style with the time (`formatTime`), swipe left to delete (column sinks 600 ms, no dust, toast with UNDO), tap to edit the snapshot (`updateEntry`). The kJ toggle applies to every number here.
+Hint and save. The hint (`.hint`, Cormorant 600 15 px bone-soft) is empty unless typed calories differ from the 4/4/9 sum by more than 8 percent: `Macros add to 526 kcal.` Never blocks. SAVE TO LIBRARY is on for a new non-empty name, off for an empty name or a library meal's name; an explicit tap wins.
+
+Keyboard. Focusing the amount scrolls the PORTION block `scrollIntoView({ block: 'end' })` next frame and again at 320 ms (`scroll-margin-bottom: 12px`). Enter in the amount commits, then submits. LOCKED: calories alone enable LOG (`MealForm.test.ts`, `needs calories alone to log`); an empty name is stored as `Meal` (`store-extra.test.ts`, `logQuick cleans the name and clamps silly servings`).
+
+Name suggestions (`LogSuggestions.tsx`, not a datalist): up to 5 chips from the 40 newest recents, distinct by name, matched by `matchesQuery`, hidden on a single exact match; trailing `180 g · 175 kcal`, max width 260. Tap fills the draft with the basis and amount eaten (`draftForEntry`) and focuses CALORIES.
+
+BUILD (`MealFormBuild.tsx`). INGREDIENT (right `3 added`); search 48 px with `search` 18 px gold-500, placeholder `Search` (disabled, `No ingredients saved yet`, with an empty library); up to 6 hits, 48 px rows, `per 100 g · 165 kcal` at the right; Enter adds the first; none: `Nothing by that name.` Component rows min-h 64, grid `minmax(0,1fr) 96px auto 44px`: name 19 px over the macro line (bone-mute plus REMOVED when the ingredient is gone), a 44 px amount with its unit, kcal `ValueUnit`, `X` 22 px. No rows: `Add ingredients to build a meal.` Totals bar 48 px between `--gold-line` rules: kcal `ValueUnit` gold, then ` · P 42 · C 78 · F 14` in `.meta`. Then MEAL NAME and SAVE TO LIBRARY.
+
+Footer. The chip row (`.chip-row`, 8 px gaps, sideways scroll, right 28 px masked) hides while the keyboard is up. First REPEAT (`tp-repeat-yesterday`) when yesterday holds an entry: `rotate-ccw` 16 px gold-400, `REPEAT`, trailing `1 951 kcal`, max width 200; one tap copies all of yesterday onto today in one write (`repeatDay`), toast `Logged · 2 140 kcal · yesterday's meals`, UNDO removes the copies; a second tap during the close is ignored. Then up to 8 favourites by last use (`favouritesByUse`): 40 px, `#16161C`, `--gold-edge`, name Cinzel 700 12 px 0.1em gold-300, max 168 px, no trailing energy; tap = `logMeal(id)` at the usual amount. LOG: gold, full width, 56 px, Cinzel 700 15 px 0.24em `#17110A`; disabled (no calories, or no BUILD amount above 0): `#121218` with a `--gold-edge` outline and label `#9C9791`, never opacity.
+
+Submit. Store writes are synchronous. A QUICK draft still holding exactly what a library meal filled in (name, basis, numbers within 0.6 kcal and 0.06 g), on the meal's own basis (no `per`, or a g or ml `per`; a meal with a serve `per` falls through to `logQuick`), calls `logMeal(id, basis === 'serve' ? amount : { amount, unit: basis })`, which also stores the amount as the meal's `usual`. Otherwise `logQuick` with `servings: amount` (serve) or `per: { amount: 100, unit }, amount` (g, ml) and `saveToLibrary`. BUILD: `logQuick({ name, macros, servings: 1, components, saveToLibrary })`. The sheet closes, the strike plays from the store `pulse`, the toast reads `Logged · 180 g · 175 kcal` (`Logged · 612 kcal` for one serve) with UNDO (`deleteEntry`) for 4 s; `closeLog` runs first, so it settles in the lane above the tab bar (a toast docks at the top only while a sheet stays open). Never a confirm dialog. If persistence failed the entry stays in memory and the toast reads `Saved for this session only. Export now.` (ember edge, 8 s) with EXPORT, which opens the SETTINGS tab.
+
+RECENT (`LogRecents.tsx`). Heading RECENT with the strong gold rule, right `Last 12` in `.hint`. Source `recentEntries(entries, 12, settings.hiddenRecents)`: the last 12 distinct `name + per-serving kcal` pairs (`recentKey`) across all days, newest first. Rows 56 px, grid `14px minmax(0,1fr) auto 44px`, ruled `--rule`: a 5 px solid rhombus on the newest row only; name Cormorant 500 19 px bone, truncating, then ` · 180 g` (Cormorant 500 16 px bone-soft, never truncates); `.meta` `P 16 · C 7 · F 9`; kcal `ValueUnit`, gold-300 on the newest; `square-plus` 22 px, gold-300 and turned 90 degrees while pressed. Tap = `relogEntry` (the exact snapshot), close, toast, strike. Long press 450 ms = prefill QUICK with it. Swipe left past 72 px = hide (folds 220 ms; key kept in `settings.hiddenRecents`, last 200). Right click opens EDIT FIRST | HIDE; Delete or Backspace hides, `E` edits first. Rows stagger in on open; a row logged since the last open washes gold 900 ms and its rhombus scales in 240 ms. Empty: `Nothing logged yet.` (Cormorant 500 italic 17 px bone-soft).
+
+TODAY sheet (`TodaySheet.tsx`, from EATEN or the ring): today's entries newest first, the same 56 px rows with `3:20 pm · P 16 · C 7 · F 9` and a 44 px trash; swipe left past 88 px deletes (folds 220 ms), toast `Removed · 612 kcal` with UNDO (`restoreEntry`); tap edits the snapshot (`updateEntry`). The kJ setting applies to every number.
 
 ## 11 Library + favourites folder
 
-Owner `src/screens/Library*`. Header 56 px: LIBRARY in Cinzel 14 px tracking 0.35em; right a 44 px `plus` that asks MEAL or INGREDIENT. Search field 48 px (Cormorant 20 px, `search` icon 16 px). Three inscribed sections, each headed in Cinzel 10 px tracking 0.4em bone-dim over a 1 px `--gold-line-strong` rule:
+Owner `src/screens/Library*`. Header and search stay put over a fade, `linear-gradient(180deg, #050507 0%, #050507 70%, rgba(5,5,7,0) 100%)`, padding-bottom 16 px. Header 56 px: LIBRARY `.title-screen` (Cinzel 700 18 px 0.2em bone); right a 44 px `plus` 22 px gold-300 that opens the ADD sheet (NEW MEAL, NEW INGREDIENT: 64 px rows, Cinzel 700 14 px 0.16em gold-300, a `.hint` note each). Search: `.tablet-inset` 48 px, `search` 18 px gold-500, Cormorant 600 20 px, placeholder `Search`, a 44 px clear `X`; it filters all three sections. Sections 32 px apart; lists stagger in once per session.
 
-FAVOURITES (the folder, `folder-heart` icon 14 px beside the heading): pinned at the top, items with `favourite: true` from both `favouriteMeals` and favourite ingredients, ordered by `lastUsedAt` then name. Shows up to 8 rows with ALL at the right when there are more; collapsed state remembered in `localStorage` key `temperance.fav.collapsed`. Empty: `Mark a meal to keep it here.` in Cormorant italic 15 px bone-dim. The same favourites feed the chip row on the LOG sheet. The favourite mark is the `star` icon, outline bone-dim off, filled gold-400 on, 44 px target at the row's trailing edge; long press a row anywhere toggles it.
+Rows (`LibraryRow.tsx`), every list: 60 px, grid `1fr 44px 44px`, ruled `--rule`, `content-visibility: auto` (plain `ul`, no virtualisation). The body is one button that opens the detail sheet: a 14 px mark gutter, the name Cormorant 500 19 px bone (truncating) with the energy `ValueUnit` bone on the same line, and the `.meta` line (Cormorant 600 16 px bone-soft, whole grams) under both. Then the star (20 px in 44: off bone-dim; on gold-400, fill `rgba(216,180,90,0.28)`) and, on meal rows, `square-plus` 22 px: one tap logs the usual amount (`logMeal(id)`, 8 ms buzz, toast with UNDO), a solid rhombus flashes in the gutter (300 ms) and the plus holds at 90 degrees gold-300 for 900 ms. Long press 450 ms anywhere (10 px of movement cancels) toggles the favourite. Ingredient rows keep an empty action cell so the kcal column lines up.
 
-MEALS: rows 60 px, ruled `--gold-line`: name Cormorant 500 19 px bone; sub-line `612 kcal · P 32 C 48 F 12` Cormorant 13 px bone-dim `.num`; trailing 44 px `square-plus` logs one portion immediately (`logMeal`, toast with UNDO; the strike plays when TODAY is next visible, the entry already counts). Row tap opens the MEAL DETAIL sheet: name, numbers, portion stepper, and four hairline actions LOG, EDIT, FAVOURITE, DELETE (56 px each). Under EDIT a quiet note in Cormorant italic 14 px: `Edits change future logs only. Past days keep their numbers.` Assembled meals list their components with amounts and can be reopened in BUILD. Delete is two-step inline: the row's rule turns ember and shows DELETE? (Cinzel 10 px); a second tap deletes; past entries keep their snapshots.
+FAVOURITES (`tp-fav-folder`): favourite meals and ingredients together, last used first, then name. `SectionHeading` with `folder-heart` 16 px gold-400 and the screen's one strong gold rule. Right: `ALL 12` / `FEWER` when there are more than 8, and a 18 px chevron to collapse (state in `localStorage` key `temperance.fav.collapsed`). Hidden when nothing is marked; a search with no match reads `Nothing matches.` Favourite meals also get the one-tap plus. The same meals, by last use, feed the LOG chips.
 
-INGREDIENTS: rows 60 px with the basis in the sub-line (`per 100 g · 165 kcal · P 31 C 0 F 3.6` or `per serve`). Same detail sheet (basis amount instead of portion). Deleting an ingredient never touches entries or saved meals (components keep their snapshot; the line reads `removed` in bone-mute).
+MEALS: heading with the count (`8`, `.hint`) and a Segmented sm `A TO Z` | `MOST` (`tp-meals-sort`); it takes the strong rule only when the folder is hidden. A TO Z = `libraryMeals` (favourites first, then alphabetical); MOST = `useCount` descending, then name. Meta `P 69 · C 70 · F 18`, led by the basis for a per-amount meal (`per 100 g · P 9 · C 4 · F 5`). Empty `No meals yet.`, no match `Nothing matches.` INGREDIENTS: the count; meta `per 100 g · P 31 · C 0 · F 4`; value = kcal per basis; no plus (logged from the detail sheet). Empty `No ingredients yet.`
 
-Sorting: favourites by last logged, meals and ingredients alphabetical (`libraryMeals`, `libraryIngredients`) with a `most logged` chip that sorts by `useCount`. Plain `ul` with `content-visibility: auto`; 300 items need no virtualisation.
+Detail sheet (`LibraryDetailSheet.tsx`, title `Meal detail` or `Ingredient`). Name Cormorant 500 26 px bone, a 14 px gold-400 star when favourite. A `.tablet` of numbers scaling live with the amount: kcal `ValueUnit` 32 px gold-300, PROTEIN, CARBS, FAT `ValueUnit` 20 px bone. 20 px under it the PORTION label row with the basis right (`per 100 g · 97 kcal`, `.hint`), the PortionField and PortionPicks (section 10). Meal: unit `meal.per?.unit ?? 'serve'`, start `meal.usual ?? meal.per?.amount ?? 1`, its usual marked on the picks. Ingredient: unit `per.unit`, start the basis amount; picks `1, 2, 3, 4` times the basis when it is a serve or under 50 (olive oil per 10 ml: `10, 20, 30, 40`). Actions 24 px below: LOG gold full width 56 px, `180 g · 175 kcal` centred under it in `.hint`; EDIT and FAVOURITE hairline 56 px side by side; DELETE danger, half width, centred: the first tap arms `DELETE?` for 3.5 s, any other tap disarms, the second deletes with toast `Removed · Greek yoghurt` (no UNDO). Note Cormorant 500 italic 16 px bone-soft: `Edits change future logs only. Past days keep their numbers.` (ingredients add `and saved meals`). Meal LOG `logMeal(meal.id, meal.per ? { amount, unit } : amount)`, which makes the amount its new `usual`; ingredient LOG `logQuick({ name, macros, per, amount })`, so the entry records `180 g`. A built meal lists BUILT FROM under the actions (amounts and kcal scaled by the portion, `removed from the library` for a gone ingredient) with a BUILD link that reopens it in the LOG sheet.
+
+Editor (`LibraryEditor.tsx`, tall sheet, SAVE gold in the footer, disabled until valid). Meal: KIND `Numbers` | `Built` (new meals only); NAME. Numbers: the 40 px basis switch (a meal saved per 30 g shows `Per 30 g`); switching never converts the numbers and resets USUAL to 1, 100 or 250 (or the meal's own on its own basis); CALORIES 64 px with the basis tag; macro thirds; the 8 percent hint. Built: component rows with a 44 x 132 px amount, gold totals, ADD INGREDIENT search. Then USUAL: right `one tap logs 175 kcal`, a PortionField bound to `usual`. Foot: `Past days keep their numbers.` (edits) and a FAVOURITE toggle. Save calls `addQuickMeal`, `addBuiltMeal` or `updateMeal(id, { name, macros or components, favourite, per, usual })`. Ingredient: NAME; COUNTED PER, a 44 x 104 px amount beside Segmented `G` | `ML` | `SERVE`; CALORIES; thirds; hint; foot `Saved meals keep their numbers.`
+
+Empty library: search, folder and sort hidden; one EmptyState 48 px under the header (`.tablet.bracketed`, `ColumnGlyph`, `Nothing saved yet.` Cormorant 500 italic 18 px bone-soft) with two hairline 44 px buttons 8 px apart, `+ MEAL` and `+ INGREDIENT`.
+
+Snapshots: editing or deleting a meal or ingredient never touches entries; built meals keep their component snapshots.
 
 ## 12 History
 
-Owner `src/screens/History*`. Header 56 px: the month in Cinzel 12 px tracking 0.3em with `chevron-left` and `chevron-right` 44 px targets.
+Owner `src/screens/History*`. Two modes behind LEDGER | BODY: Segmented md 44 px in a 168 px slot, centred (`tp-history-mode`), remembered in `localStorage` key `temperance.history.mode`. The sticky header is `#050507` with its bottom 24 px fading out. LEDGER adds a 56 px month row: `chevron-left` and `chevron-right` 18 px in 44 px targets around `October 2026` in `.title-screen` (Cinzel 700 18 px 0.2em bone).
 
-THE COLONNADE: a horizontal strip 180 px tall of day columns from `historyDays(entries, today, 30)`, one per day, 22 px wide with 8 px gaps, 14 visible, scroll-snapped by week, newest at the right, with a fixed gold-400 hairline across the strip at 60 percent of its height (the goal). Each day is a miniature obsidian column (SVG rect, 3 stop vertical gradient `#1A1A21` / `#0B0B0F` / `#050507`, two flute lines at opacity 0.25 and 0.08) whose height is `eaten / goal` against that line; a day over the line shows an ember-tipped top above it (`--ember-grad`, `filter: drop-shadow(0 0 2px var(--ember-glow))` on high tier only); today has a gold base mark; an untracked day is a 4 px stub. Tap a day: its entries list (snapshots, time, swipe to delete, with a recompute of that day only).
+THE COLONNADE (`HistoryColonnade.tsx`). A strip 180 px tall: 154 px of column, a 6 px stylobate (1 px `rgba(216,180,90,0.42)`, 3 px `#121218`, 2 px `#0B0B0F`), 20 px of day numbers. Days from `historyDays(entries, anchor, 30)`; the anchor is today, the chevrons move it to the end of the previous or next month (back disabled when nothing is older, forward disabled at today). Columns 22 px wide with 8 px gaps (tap target 30 x 180), newest at the right, weeks snapped with `x proximity`, 20 px gutters faded by a mask. The goal is a fixed hairline `rgba(216,180,90,0.8)` at 60 percent of the column (92 px), labelled `GOAL` Cinzel 700 12 px 0.08em gold-300 at the right gutter. Height `round(eaten / goal x 92)`, floor 4, cap 154 (`columnHeight`).
 
-Three stat stones under the colonnade (Cinzel 20 px value over a Cinzel 9 px tracking 0.3em label, bone over bone-dim): `7 DAY AVG`, `UNDER THE LINE` (`5 OF 7`), `STREAK` as a roman numeral from `disciplineStreak`.
+| Part | Value |
+| --- | --- |
+| Shaft | horizontal `#15151B`, `#24242C` 0.45, `#3A3A44` 0.75, `#1C1C24` (lit from the right) |
+| Flutes | at 30, 50, 70 percent, `#E7E1D2` at 0.07, 0.12, 0.05 |
+| Cap | 2 px `#D8B45A` |
+| Today | `#D8B45A` to `#B8902E`, flutes `#5A4518`, cap `#E6CB78`, a 40 px glow `radial-gradient(50% 50% at 50% 100%, rgba(216,180,90,0.45), transparent 70%)` |
+| Over | shaft to the line, then an ember tip (`#FFB088`, `#FF5A1F` 0.3, `#B3300A`, min 5 px) with a `#FFB088` cap; `drop-shadow(0 0 3px var(--ember-glow))` on high tier only |
+| Untracked | 4 px stub `#22222A` at 0.6 |
+| Day number | Cinzel 700 12 px; gold-300 today, bone-dim tracked, bone-mute untracked |
 
-Week list: rows 56 px ruled `--gold-line`, newest first: `MON 13` (Cinzel 10 px tracking 0.28em bone-dim, 60 px column), `2 040 kcal` (Cinzel 16 px gold-400), `P 150` (Cormorant 13 px bone-dim `.num`), and the delta right aligned: `260 LEFT` in bone-dim or `340 OVER` in ember-text (Cinzel 10 px tracking 0.2em). Tap expands the day inline (240 ms): entries and the day's ring at 56 px. Days older than 90 collapse into month rows with the same bar and totals.
+Columns rise once, `scaleY` 0 to 1 over 500 ms `--ease-stone`, 22 ms apart from the right. Nothing ever logged: 14 ghost stubs at 0.3 and `The ledger opens with your first meal.` (Cormorant 500 italic 18 px bone-soft). Tap a day: the day sheet.
 
-Goal: v1 compares every day against the current `settings.goalKcal`. An optional `goalByDay: Record<string, number>` snapshot is listed in the schema block (section 13) for a later version; nothing in History may depend on it in v1.
+Stat stones (`HistoryStones.tsx`): one `.tablet.bracketed` row 96 px, three equal cells; value Cinzel 700 24 px over a Cinzel 700 12 px caption. `AVG 7 DAYS` (`2 015 kcal`, gold-300, mean of the logged days), `UNDER` (`5 of 7`, logged days at or under the goal), `STREAK` (Arabic, `disciplineStreak`, laurel behind at 0.7). Nothing logged in the window: `·` in bone-mute; STREAK reads `0` once anything was ever logged.
+
+THIS WEEK (`HistoryWeek.tsx`): strong gold rule, right `7 days`. The last 7 days newest first, rows 56 px, grid `14px 72px minmax(0,1fr) auto`: rhombus on today; `THU 15` Cinzel 700 12 px 0.08em (gold-300 today); `ValueUnit` 17 px (gold-300 today) and `P 117` in `.meta`; the delta Cinzel 700 12 px 0.08em, `272 LEFT` bone-dim or `flame` 14 px and `340 OVER` ember-text. Untracked day: `Nothing logged.` bone-mute. An empty week is one row `Nothing logged this week.` Then EARLIER (`To 90 days`): logged days 7 to 89 days back. Tap a row: it opens inline (420 ms `--ease-stone`) to the 56 px ring, readouts, its entries and OPEN DAY. Then MONTHS (`Before 90 days`): older logged days grouped by month, 56 px rows: `OCT 2026`, the average per logged day, a 48 x 6 bar against a tick at 60 percent, `5 of 9 under`; tap opens its days.
+
+Day sheet (`HistoryDaySheet.tsx`). Title `Today`, `Yesterday` or `Mon 13 Oct`; header right the day total, `ValueUnit` 17 px gold-300. A 56 px ring (arcs only, flat `#F2D98A`, `#B8923E`, `#8E7243`), readouts and the delta. Entries newest first, 56 px rows `14px minmax(0,1fr) auto 44px`: name with ` · 180 g`, `.meta` `3:20 pm · P 16 · C 7 · F 9`, kcal, `trash-2` 22 px. Swipe left over an ember field, release past 72 px deletes; trash deletes too. Toast `Removed · 612 kcal`, UNDO puts the snapshot back (`restoreEntry`). Only that day changes. Empty: `Nothing logged yet.`
+
+BODY (`HistoryBody.tsx`). WEIGHT (strong rule): a `.tablet.bracketed`, padding 18, the latest weigh-in in `GoldNumber` 44 px without brush plus `kg` 22 px, its day under it; right two stones, `7 DAY TREND` (`DOWN 0.9 kg`, `UP 0.4 kg`, `LEVEL`, or `No trend yet.`) and `ABOVE TARGET` / `BELOW TARGET` (`4.1 kg`), `TARGET` (`AT TARGET` when the latest, to 0.1 kg, equals it) or, with no target set, `TO TARGET` over `Set a target in Settings.`; values Cinzel 700 `clamp(18px, 5.4vw, 22px)`. Chart (`HistoryWeightChart.tsx`): 90 days, height 160, plot insets left 30, right 6, top 12, bottom 26, gridlines `rgba(231,225,210,0.06)` 0.5 px every whole kg (every 2, 5, 10, 20 or 50 kg when a kilogram is under 4 px), labels at least 18 px apart in Cinzel 700 12 px `#D3CDC2`, target gold-400 at 0.6 dashed `4 4` with `TARGET 80.0` gold-300, area `rgba(216,180,90,0.16)` to 0, line 1.5 px gold-400, the last point a 4 px gold-200 dot in an 8 px `rgba(216,180,90,0.25)` halo. No weigh-ins: EmptyState `No weigh-ins yet.`, no stones, no chart. Input row: kg input and LOG WEIGHT (gold), `1fr 1fr`, 12 px gap, 56 px; one weigh-in per day, a second replaces it (`Logged · 84.3 kg`, `Updated · 84.3 kg`). RECENT WEIGH-INS: the last 10, 56 px rows `14px minmax(0,1fr) auto auto 44px`, kg `ValueUnit` (gold-300 today), change `0.4 down` in `.meta`, `trash-2` 20 px bone-mute; toast `Removed · 84.1 kg` with UNDO. PROGRESS PHOTOS: COMPARE and ADD PHOTO, a 3-column grid with 8 px gaps, tiles framed `0 0 0 1px #2A2A33, 0 0 0 2px rgba(0,0,0,0.8)` with the day (`TODAY`, `MON 12 OCT`) Cinzel 700 12 px 0.08em bone on a 48 px gradient; empty: `No photos yet.` with ADD PHOTO. Photos live in IndexedDB, outside the backup.
+
+Goal: every day compares against the current `settings.goalKcal`; there is no per-day goal.
 
 ## 13 Settings
 
-Owner `src/screens/Settings*`. Opened from the header icon; a column of rows (Cormorant 19 px values, Cinzel 10 px tracking 0.35em labels, 56 px rows, ruled `--gold-line`):
+Owner `src/screens/Settings*`. Reached from the tab bar. Sticky header 64 px, SETTINGS `.title-screen` centred, fading from `#050507` at 55 percent. Three groups 16 px apart, each a `.tablet.bracketed` with padding 4 px 16 px 8 px, headed inside by a rhombus and `I · GOALS`, `II · DISPLAY`, `III · DATA` (`.label`, gold-300, 16 px top padding, a `--rule` 12 px under it). Rows min-h 60 (14 px top and bottom), divided by `--rule`, label Cinzel 700 12 px 0.12em bone-dim. Two layouts (`SettingsRow`): `column`, the control in a 168 px right column (`SETTINGS_COL`); `stack`, the label above a full-width control. Column inputs are 44 px carved fields, Cormorant 600 22 px right aligned, unit inside (the macro thirds are 56 px, label inside, value left); all select on focus, commit on blur or Enter, and revert when unusable. Buttons are 44 px and fill the column.
 
-| Row | Control | Store |
-| --- | --- | --- |
-| DAILY GOAL | 56 px numeric input in the display unit (kcal or kJ), converted with `fromInputEnergy` on save | `setGoalKcal` |
-| MACRO TARGETS | P, C, F gram inputs in one row (optional; 0 hides the ghost arcs) | `setTargets` |
-| UNITS | segmented KCAL | KJ; display only, x 4.184 on output, kcal integers stored | `setUnit` |
-| HERO FIGURE | segmented REMAINING | EATEN (also set by tapping the number) | `settings.hero` |
-| GOLD FOLLOWS TILT | toggle; on iOS the tap calls `DeviceOrientationEvent.requestPermission()` | `settings.tilt` |
-| MOTION | segmented SYSTEM | REDUCED | FULL. LOCKED mapping: SYSTEM = `'system'`, REDUCED = `'on'` (forces reduced), FULL = `'off'` (forces full) | `setMotion` |
-| OPENING | segmented SHORT | FULL DAILY | OFF, default SHORT after the first launch | `settings.opening` |
-| REPLAY OPENING | hairline button; sets `introCount` to 0 and plays the full opening on the next launch | `resetIntro()` |
-| DAYS | note only: `Days reset at local midnight.` | |
-| EXPORT JSON | `exportData()` as `temperance-YYYY-MM-DD.json`; Web Share API with files when `navigator.canShare({ files })`, else a download link | |
-| IMPORT JSON | file input, then MERGE or REPLACE with a two-step confirm; errors read `That file is not a Temperance backup.` | `importData` |
-| ERASE ALL | two-step, ember text, second tap reads ERASE EVERYTHING | `resetAll` |
+| Row | Layout | Control | Store |
+| --- | --- | --- | --- |
+| DAILY GOAL | column | input in the display unit, `fromInputEnergy` on commit | `setGoalKcal` |
+| MACRO TARGETS | stack | three 56 px thirds, PROTEIN, CARBS, FAT inside, suffix `g`; 0 hides that ghost arc | `setTargets` |
+| TARGET WEIGHT | column | kg, one decimal; empty clears; 0 or 500 and over keep the old value | `setTargetWeight` |
+| UNITS | column | Segmented `KCAL` / `KJ`; display only, x 4.184 on output, kcal stored | `setUnit` |
+| HERO FIGURE | stack | Segmented `REMAINING` / `EATEN` | `setHero` |
+| GOLD FOLLOWS TILT | column | Toggle; on calls `requestTiltPermission()` inside the tap; refused: `Motion access was not allowed.` | `setTilt` |
+| MOTION | stack | `SYSTEM` / `REDUCED` / `FULL` = `'system'` / `'on'` (forces reduced) / `'off'` (forces full) | `setMotion` |
+| OPENING | stack | `SHORT` / `FULL DAILY` / `OFF` | `setOpening` |
+| REPLAY OPENING | column | `REPLAY` (`rotate-ccw`): `introCount` to 0, toast `The opening will play next launch.` | `resetIntro` |
+| INSTALL | column | only while installable, `INSTALL` (`house-plus`) | `runInstall` |
+| EXPORT | column | `EXPORT` (`share-2`, or `download` without `navigator.canShare`): `temperance-YYYY-MM-DD.json` through the share sheet when `canShare({ files })`, else a download; toast `Exported · <file>`. iOS outside the app adds `Safari clears unused sites after 7 days. Install the app or keep a backup.` | `exportData` |
+| IMPORT | column | `IMPORT` (`upload`) picks a JSON file; a valid backup opens a carved panel under the row: name, `12 meals · 48 entries`, a cancel `X`, `MERGE` / `REPLACE`, then a confirm (`IMPORT`, or armed danger `REPLACE EVERYTHING` under `Replace clears what is on this device first.`); toast `Imported · 12 meals · 48 entries`. A bad file: an inline line and a warn toast `That file is not a Temperance backup.` (4 s) | `importData` |
+| ERASE ALL | column, then stack | danger `ERASE` (`x`); the first tap arms for 6 s: full-width `ERASE EVERYTHING` and an `X` to keep; the second erases the store and the photos, toast `Erased.` | `resetAll` |
 
-Footer: version and build hash, `Data lives on this device.`, and the stoic sources line (`Long, Gummere, Carter, Higginson translations, public domain`).
+Footer, centred: a 120 px meander; `.hint` lines `Data lives on this device.`, `Days reset at local midnight.`, `12 photos · 8.4 MB. Photos stay on this device and are not in the backup.` (count only when there are photos); the sources line Cormorant 500 15 px bone-soft `Long, Gummere, Carter, Higginson translations, public domain`; `TEMPERANCE · V0.1.0 · <hash>` in `.label` 0.08em bone-mute (`__APP_VERSION__`, `__BUILD_HASH__`).
 
-Schema additions required (one change, `SCHEMA_VERSION` 2 with a `migrate` that fills defaults): `Settings.tilt: boolean` (default false), `Settings.opening: 'short' | 'full' | 'off'` (default `'short'`), `Settings.hero: 'remaining' | 'eaten'` (default `'remaining'`), store action `resetIntro()`, selector `recentEntries(entries, limit)`, optional `goalByDay?: Record<string, number>` reserved for a later version. Persist `version` and `migrate` ship from day one; the install prompt (ported from Pad King `InstallPrompt`, 20 s delay, 14 day snooze in `localStorage` key `temperance.install.snoozed`) guards against Safari's 7 day storage eviction for uninstalled sites.
+Install (`SettingsInstall.tsx`). Installable: not standalone, and a captured `beforeinstallprompt` or iOS. Besides the row, one toast-lane prompt, never a floating card: after the opening, 20 s on SETTINGS or LIBRARY, only when no toast is showing and no sheet is open (retry every 4 s), once a session: `Keep it on the home screen.` with INSTALL for 8 s (iOS `Share, then Add to Home Screen.`, no action). Showing it snoozes it 14 days (`localStorage` key `temperance.install.snoozed`); a declined install snoozes too. The row ignores the snooze.
+
+Schema. `SCHEMA_VERSION` 4, persisted as `temperance.v1` with `version` 4; `migrate` passes data through and `merge` fills settings from `DEFAULT_SETTINGS` (goal 2500, targets 180 / 250 / 80 g, `kcal`, motion `'system'`, opening `'short'`, hero `'remaining'`, tilt false, `hiddenRecents` empty). v2 added `opening`, `hero`, `tilt`, `hiddenRecents`; v3 `weights`, `targetWeightKg`; v4 `Meal.per`, `Meal.usual`, `LogEntry.portion`, all optional so older backups import unchanged. `Settings.name` is stored and never shown. No `goalByDay`. A failed write sets `persistFailed` and the data stays in memory (section 10). Progress photos live in IndexedDB, outside the export.
 
 ## 14 Daily stoic line
 
@@ -361,19 +558,34 @@ Placement: home screen row y 671 to 735 only, under the ring and above the entab
 
 ## 15 Non-WebGL fallback + GPU tiering
 
-Owner `src/scene/SafeCanvas.tsx`, `src/scene/webgl.ts`, `src/scene/FallbackMonument.tsx`. Detection at boot (`canUseWebGL`, cached once, throwaway context released with `WEBGL_lose_context`): LOCKED, the 3D path requires a `webgl2` context (`canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: true })`) because the crack shader's loop bounds come from uniforms (GLSL ES 3.00); webgl1-only devices, `null` contexts, and software renderers (`WEBGL_debug_renderer_info` `UNMASKED_RENDERER_WEBGL` matching `/swiftshader|llvmpipe|software|basic render/i`) all get the SVG monument. `SafeCanvas` makes the decision before `<Canvas>` mounts (so three never throws on context creation) and wraps the canvas in a class error boundary whose fallback is the SVG monument. A vitest file forbids a bare `<Canvas` or `import { Canvas } from '@react-three/fiber'` anywhere except `SafeCanvas.tsx`. Settings MOTION = REDUCED does not force the fallback; a second context loss within 30 s does.
+Owner `src/scene/SafeCanvas.tsx`, `src/scene/webgl.ts`, `src/scene/tier.ts`, `src/scene/FallbackMonument.tsx`. Detection at boot (`probeWebGL`, cached for the page, throwaway context released with `WEBGL_lose_context`): LOCKED, the 3D path requires `canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: true, powerPreference: 'high-performance' })` (hard-coded guard: `probeWebGL` asks only for webgl2; `probeTier` and `canUseWebGL()` in `SafeCanvas.tsx` refuse the canvas when `probeWebGL().ok` is false), because the crack shader's loop bounds come from a uniform (GLSL ES 3.00). A `null` context, an exception, or a software renderer (`UNMASKED_RENDERER_WEBGL`, else `RENDERER`, matching `/swiftshader|llvmpipe|software|basic render/i`) gives tier none and the SVG monument. `SafeCanvas` decides before `<Canvas>` mounts and reports `onFallback('no-webgl')` in a microtask; a class error boundary wraps the canvas and reports `onFallback('error')`. LOCKED: `<Canvas` and `import { Canvas } from '@react-three/fiber'` appear only in `SafeCanvas.tsx`; guard `src/scene/canvas-lint.test.ts`. Context loss: the first remounts the canvas by key with the SVG covering; a second within 30 s calls `onFallback('context-loss')`. An error or a second loss sets tier none for the session (none is never cached). Settings MOTION = REDUCED does not force the fallback.
 
-THE SVG MONUMENT (same geometry and screen positions as the 3D, owned by the stage, 390 x 513): plinth as two trapezoids with facet gradients at y 507 to 558; column as a rect 112 px wide anchored at y 507 with a 3 stop horizontal gradient (`#050507` / `#1A1A21` / `#050507`) for roundness and 16 vertical flute lines at alternating opacity 0.25 and 0.08; cap slab 1 px lighter; the capital as a 112 x 6 px gold ellipse; goal line as a 1 px `#F6E3A1` rule across the stage at `--goal-y` with a 6 px `rgba(246,227,161,0.35)` glow box-shadow, plus a 122 x 18 ellipse ring. Height: `scaleY` on the column group with `transform-origin: bottom`, `H * 122px`. Strike: `scaleY` 170 ms `--ease-hit` to 1.015 then 120 ms `--ease-settle`; the stage container runs the same 140 ms shake keyframe; dust is 12 absolutely positioned 6 px spans with an 800 ms rise-and-fade keyframe (omitted under reduced motion). Crack: a group of 7 hand-drawn jagged `<path>`s above the goal line, stroke `#FF5A1F` width 1.2, `stroke-dasharray` draw-on over 700 ms, `filter: drop-shadow(0 0 6px var(--ember-glow))` on high tier only; visible paths scale with overshoot (2 at 5 percent over, 7 at 25 percent or more). Over the line the overflow group also rotates 2.5 degrees about the seam. Light sweep: a `rgba(255,244,214,0.14)` highlight band translating across the column rect on the 14 s loop; no idle turn. The same SVG plays the opening rise when shaders miss the 600 ms window, covers context-loss remounts, and is the static OG image source.
+THE SVG MONUMENT (`FallbackMonument.tsx`, same `mon` as the 3D, no React state per frame). Stage 390 x 513, plinth top y 460, goal y 216, 122 px per unit vertically, 123 px per unit horizontally at the column's depth. Drawn height `R = renderH(mon.h)`.
 
-GPU tiering. `src/scene/tier.ts`, result cached in `localStorage` key `temperance.tier` as `{ tier, at }` for 30 days so the second open skips the probe:
+| Part | Spec |
+| --- | --- |
+| Plinth | Die and two steps projected through the rest camera (plain math). Tops: step 3 `#211E19`, step 2 `#26221C`, die `#4A3F2A` to `#6B5C3B` vertical gradient. Fronts `#121218` to `#0B0B0F`. Gold arrises: 1 px `#E6CB78` at 0.9 round the die top and along the die's bottom front edge. TEMPERANTIA as SVG text, Cinzel 700 12 px, letter-spacing 2 px, `#D8B45A`, on the die face. Contact shadow ellipse rx 190, ry 30, `#000` 0.8 to 0. Static from frame 0. |
+| Shaft | Rect 88 px wide (`2 * 0.36 * 123`) from the goal line to the front foot, `scaleY(min(R - 0.12, 2) / 2)` from y 460. Gradient `#0C0C10 0, #2A2A33 0.22, #121218 0.45, #8A8578 0.64, #1A1A21 0.72, #0C0C10 1`. 10 flute lines 1 px at `-cos(a) * 44`, alternating `#FFF3DC` 0.13 and `#000` 0.24. Rims 1.5 px `rgba(217,188,128,0.55)` at both edges. |
+| Attic base | Path from the 3D lathe profile, gradient `#0C0C10 / #24242C 0.25 / #141419 0.5 / #5C584F 0.66 / #1A1A21 0.76 / #0C0C10`. Two fillet arcs, stroke `#D8B45A` 1.2 at 0.85. Static. |
+| Capital | At the shaft top, scale `min(1, R / 0.36) * capScale`: astragal bar and echinus in a gold gradient `#7A5C22 / #E9CF86 0.45 / #F6E3A1 0.6 / #8A6A2A`, abacus `0.98 * 123` wide with a 1 px `#E6CB78` top line at 0.5. |
+| Crown | Over the line: a shaft group `0.18 * 122` px tall, `scaleY(upper / 0.18)`, `rotate(-2.5 * crack deg)` and `translate(3.6 * crack px)` about the line. |
+| Cracks | 7 jagged paths above the line, clipped to the crown, stroke `#FF5A1F` 1.2, `pathLength 1` draw-on by `stroke-dashoffset` over `--t-crack` (700 ms) `--ease-stone`; `ceil(crack * 7)` visible (at least 1 when crack > 0); `drop-shadow(0 0 6px var(--ember-glow))` unless `data-tier` is `low` (so on under tier none). Ember ellipse rx 62, ry 30 at y 206, opacity `0.65 * crack`, `mix-blend-mode: screen`. |
+| Goal line | Rect 1.5 px `#EBD08A` across the stage at y 216, `drop-shadow(0 0 6px rgba(246,227,161,0.45))`, `scaleX(mon.goalX)` from the left. Flash adds `drop-shadow((6 + 8f) px, alpha 0.35 + 0.5f)`. Collar ellipse rx 61.5, ry 7, stroke `#F6E3A1` 1 px, opacity `0.7 * goalFade`. |
+| Ghost | 92 px rect, horizontal fill `#D8B45A` at 0.16 edges / 0.03 centre; edge lines 1.25 px at 0.5; four lines at x plus or minus `0.31 * 46` and `0.81 * 46` at 0.14. Clipped from `yOf(2 * mon.ghost)` down to the crown; hidden when `mon.ghost <= 0.001` or `R >= 1.97`. |
+| Light band | 40 px rect `rgba(255,244,214,0.14)` peak, clipped to the shaft. Its `tpBandSweep` animation uses `var(--t-light-sweep)`, which `src/index.css` does not define, so the band sits still at the column centre. |
+| Dust | 12 spans, 6 px `#9A8E7A`, in one row at top 456 (plinth top minus 4), x `cos(a) * r` from the centre with `a = 2pi * i / 12 + 0.3` and `r` 64 / 80 / 96 px, hidden until a landing, then `tpDustRise` 800 ms `--ease-stone` (delays 0 to 120 ms, scale to 0.4, opacity 0.6 to 0). Not under reduced motion. |
+
+Strikes play from the same `mon` tweens as the 3D (170 ms hit to 1.015, 120 ms settle, 600 ms sink). Shake: the root gets `.shake` when trauma jumps by more than 0.3 (not under reduced motion), plus `shakeStage()` on `[data-stage]`. Joining: if the canvas compiles within 600 ms of the layer mounting it shows at once and the SVG is hidden; later, the SVG plays the opening and the canvas crossfades in over 200 ms `--ease-stone` once the opening is done. The SVG is the `SafeCanvas` boundary fallback only when no layer bus exists (`standalone`, a still of the store). It sits inside the same DOM temple (section 7); the shaft does not breathe in SVG mode (the ticker, which sets `data-live`, runs only in WebGL mode). `tp-column` carries `data-h`, the raw `mon.h`.
+
+GPU tiering (`tier.ts`). Low and high are cached in `localStorage` `temperance.tier` as `{ tier, at }` for 30 days; none is never cached. Order at boot: WebGL probe, then cache, then heuristic; a heuristic low is cached at once, a heuristic high waits for the frame probe.
 
 | Tier | Condition | Settings |
 | --- | --- | --- |
-| none | no webgl2, software renderer, two context losses | SVG monument, every DOM and SVG effect intact |
-| low | median of the first 30 rendered frame times over 20 ms (measured during the opening while `frameloop` is `always`), or `hardwareConcurrency <= 4`, or `deviceMemory <= 4`, or `dpr * canvas area > 1.2 Mpx` | `dprMax` 1.0, dust 90, `MeshStandardMaterial` (no clearcoat), env resolution 32, `uDepth` 0, no antialias, ticker 12 fps, glint and tilt at 15 Hz, no number grain layer, no history drop-shadows |
-| high | everything else | `dprMax` 1.5 (LOCKED cap), dust 220, `MeshPhysicalMaterial` clearcoat, env 64, `uDepth` 1, antialias, ticker 24 fps, 30 Hz tilt |
+| none | no webgl2, software renderer, canvas error, two context losses in 30 s | SVG monument in the same DOM temple, `no-grain` on `<html>` (set for every tier but high), static colonnade, tilt 30 Hz, crack drop-shadow on |
+| low | `hardwareConcurrency <= 4`, or `deviceMemory <= 4`, or `dpr^2 * min(innerWidth, 430) * 513 > 1.2e6` (a DPR 3 phone), or the median of the first 30 frame times over 20 ms (measured while `frameloop` is `always`) | `dprMax` 1.0, dust 90, shaft 80 segments, lathe 32, inscription 512, `uDepth` 0, no sparkle, no antialias, motes 16, smoke 6, ticker 12 fps, tilt 15 Hz, `no-grain` on `<html>`, static colonnade |
+| high | everything else | `dprMax` 1.5, dust 220, shaft 160 segments, lathe 64, inscription 1024, `uDepth` 1, sparkle, antialias, motes 40, smoke 12, ticker 24 fps, tilt 30 Hz, colonnade parallax |
 
-drei `PerformanceMonitor` (`flipflops={3}`) may additionally lower `dpr` to 1.25 on decline during the strike windows and raise it back; never below 1.0, never above 1.5. The dust count follows the same callbacks.
+Both tiers use the same `MeshStandardMaterial` programs, `uFlute` 0.014 and the one 256 x 128 environment texture; the `physical`, `envRes` and `tiltHz` fields in `TierSettings` are read by nothing (`tilt.ts` reads `getTier()` itself). `<html>` carries `data-tier`. A mid-session downgrade applies the dpr cap, dust count, ticker rate, tilt rate, `uDepth`, colonnade parallax and `no-grain` at once; segments, lathe, inscription, antialias, sparkle, motes and smoke are fixed at mount and change on the next launch through the cache. drei `PerformanceMonitor` (`flipflops={3}`), mounted only inside `always` windows: decline sets `dpr` to `[1, max(1, min(1.25, cap))]` and the dust count to at most 90; incline restores `[1, dprMax]` and the tier count. Every `setDpr` uses the clamped `[1, max]` form, so dpr never goes below 1.0 or above the tier cap.
 
 ## 16 Motion tokens
 
@@ -381,80 +593,107 @@ drei `PerformanceMonitor` (`flipflops={3}`) may additionally lower `dpr` to 1.25
 :root {
   --ease-cut: cubic-bezier(0.7, 0, 0.2, 1);        /* chisel reveals, clip-path */
   --ease-stone: cubic-bezier(0.16, 1, 0.3, 1);     /* settles, draws, fades, sinks */
-  --ease-hit: cubic-bezier(0.6, 0, 1, 0.4);        /* the strike rise: accelerates, stops hard */
+  --ease-hit: cubic-bezier(0.6, 0, 1, 0.4);        /* the strike rise */
   --ease-settle: cubic-bezier(0.34, 1.56, 0.64, 1);/* overshoot return */
-  --ease-sheet: cubic-bezier(0.2, 0.9, 0.2, 1);    /* sheet open */
-  --ease-count: cubic-bezier(0.2, 0.9, 0.2, 1);    /* number ticks */
+  --ease-sheet: cubic-bezier(0.2, 0.9, 0.2, 1);    /* spring fallback */
+  --ease-count: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --ease-enter: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-press: cubic-bezier(0.2, 0, 0, 1);
+  --ease-spring: linear(0, 0.068 5%, 0.217 10%, 0.394 15%, 0.561 20%, 0.705 25%, 0.817 30%, 0.9 35%, 0.956 40%, 0.991 45%, 1.011 50%, 1.02 55%, 1.023 60%, 1.021 65%, 1.018 70%, 1.014 75%, 1.01 80%, 1.007 85%, 1.004 90%, 1.002 95%, 1);
 
-  --t-hit: 170ms;          /* scale.y to 1.015 x target */
-  --t-settle: 120ms;       /* to target */
-  --t-shake: 140ms;        /* 4 px in 3D, 3 px DOM, two cycles, decaying */
-  --t-dust: 1100ms;        /* longest particle life; the always window is 1200ms */
-  --t-capital: 300ms;      /* emissive 0 to 0.6 to 0 */
-  --t-flash: 90ms;         /* goal line to #FFF7DA, then 500ms decay */
-  --t-crack: 700ms;        /* uCrack bloom, --ease-stone; ember light same */
-  --t-crack-out: 600ms;    /* uCrack to 0 on delete */
-  --t-count: 380ms;        /* big number old to new, --ease-count */
-  --t-gold-flash: 600ms;   /* one --tilt-x sweep across the number after a log */
-  --t-ring: 520ms;         /* arc angles, --ease-stone */
-  --t-sink: 600ms;         /* delete, --ease-stone, no dust */
-  --t-sheet-in: 320ms;
+  --t-hit: 170ms;  --t-settle: 120ms;  --t-shake: 140ms;  --t-dust: 1100ms;
+  --t-capital: 300ms;  --t-flash: 90ms;  --t-crack: 700ms;  --t-crack-out: 600ms;
+  --t-count: 380ms;  --t-gold-flash: 600ms;  --t-ring: 520ms;  --t-sink: 600ms;
+  --t-press-in: 70ms;  --t-press-out: 300ms;
+  --t-sheet-in: 420ms;  /* on --ease-spring */
   --t-sheet-out: 200ms;
-  --t-tab: 180ms;          /* screen crossfade */
-  --t-sweep-wipe: 460ms;   /* diagonal gold wipe on tab change */
-  --t-row-in: 240ms;       /* new row rise 14px and rule draw */
-  --t-digit: 120ms;        /* typed digit clip wipe */
-  --t-toast: 4000ms;
-  --t-fade: 160ms;
-  --t-idle-turn: 180s;     /* one revolution, 0.035 rad/s */
-  --t-light-sweep: 14s;    /* sweep light orbit */
-  --t-gold-sweep: 9s;      /* goldSweep keyframe, ease-in-out alternate */
-  --t-live-idle-cap: 90s;  /* ticker stops after 90 s without a touch */
-  --t-coalesce: 600ms;     /* strikes inside this window merge */
-  --t-opening: 1900ms;
-  --t-opening-short: 700ms;
-  --t-opening-reduced: 240ms;
+  --t-tab: 180ms;  --t-tab-out: 120ms;  --t-tab-in: 260ms;  --t-indicator: 360ms;  --t-sweep-wipe: 460ms;
+  --t-roll: 560ms;  --t-roll-stagger: 28ms;
+  --t-row-in: 420ms;  --t-row-stagger: 35ms;  --t-new-row: 900ms;  --t-row-out: 220ms;
+  --t-toast-in: 320ms;  --t-ghost: 440ms;  --t-shockwave: 480ms;
+  --t-always: 1600ms;  /* scene strike window */
+  --t-digit: 120ms;  --t-toast: 4000ms;  --t-fade: 160ms;  --t-gold-sweep: 9s;
+  --t-opening: 1900ms;  --t-opening-short: 700ms;  --t-opening-reduced: 240ms;
 }
+@supports not (transition-timing-function: linear(0, 1)) { :root { --ease-spring: var(--ease-sheet); } }
 ```
 
-Entrance stagger on LIBRARY, HISTORY and SETTINGS (mount only, never on state change): 14 px rise and fade, 500 ms `cubic-bezier(0.2, 0.7, 0.2, 1)`, delays 0 / 60 / 120 / 240 / 300 ms by block, `animation-fill-mode: backwards`. GSAP owns the opening and the strike timelines (inside `gsap.context`, reverted on cleanup so StrictMode never double-fires); CSS owns everything else; the `motion` package is not used.
+CSS reads only `--ease-cut`, `--ease-stone`, `--ease-press`, `--ease-spring`, `--ease-enter`, `--ease-sheet` and `--t-press-in`, `--t-press-out`, `--t-sheet-in`, `--t-sheet-out`, `--t-indicator`, `--t-tab-in`, `--t-sweep-wipe`, `--t-shake`, `--t-crack`, `--t-row-in`, `--t-row-stagger`, `--t-new-row`, `--t-toast-in`, `--t-gold-sweep`. One read dangles: the SVG fallback's light band (`.tp-svg-band` in `FallbackMonument.tsx`) runs `animation: tpBandSweep var(--t-light-sweep) linear infinite`, and `--t-light-sweep` is no longer defined, so the declaration is invalid at computed-value time and the band does not sweep. The rest are reference values; the number that runs is a constant in TypeScript:
 
-Reduced motion (system `prefers-reduced-motion` or Settings REDUCED): strike 0 ms (snap), no shake, no dust, crack bloom 0 ms, number no count, ring snaps, sheet 160 ms fade, no idle turn, no light sweep, no gold auto sweep, no entrance stagger, no tab wipe. The global CSS block zeroes animation and transition durations (`0.01ms`) and keeps `fill-mode: both` on the fallback keyframes so final states persist. Reduced motion removes movement, never information.
+| Motion | Constant | Value |
+| --- | --- | --- |
+| Strike, scene | `MS` in `src/scene/strike.ts` | hit 170, settle 120, shake 140, dust 1100, capital 300, ghost 440, flash 90 (decay 500), crack 700, crack out 600, sink 600, coalesce 600, always 1600, light sweep 14000, shockwave 480 |
+| Idle turn, live idle | `T.turn` in `tokens.ts`, `LIVE_IDLE_CAP` in `ticker.ts` | 0.035 rad/s, 90 000 ms |
+| Opening | `FULL_MS`, `SHORT_MS`, `FADE_MS` in `src/intro/timeline.ts` | 1900, 700, 240 ms |
+| Hero odometer | `ROLL_MS` in `TodayOdometer.tsx` | 560 ms, 28 ms per cell from the right |
+| Ring arcs | `useTweened(flat, 520, easeStone)` in `TodayRing.tsx` | 520 ms |
+| Tab out, in phase | `TAB_OUT_MS` in `App.tsx` | 120 ms linear, then `.tp-tab-in` 260 ms; phase cleared after 300 ms |
+| Sheet | `SHEET_OUT_MS`, `REDUCED_FADE_MS` in `Sheet.tsx` | 200 ms `cubic-bezier(0.4, 0, 1, 1)`, 160 ms; scrim in 320 ms linear |
+| Toast | `OUT_MS`, `duration` in `Toast.tsx` | 200 ms out, 4000 ms default life |
+| Row delete | `FOLD_MS` in `TodaySheet.tsx`, inline in `LogRecents.tsx` | 220 ms, height and opacity to 0 |
+| PortionField repeat | `REPEAT_DELAY`, `REPEAT_EVERY`, `REPEAT_FLOOR` | 380, 70 easing by 0.9 to 35 ms |
+
+Press. `.press` transitions transform, colours, border and shadow over `--t-press-out` on `--ease-spring`; `:active` scales to `var(--press-scale, 0.97)` over `--t-press-in` on `--ease-press`. Per component `--press-scale`: 0.97 gold, ghost, chip; 0.98 hairline, danger; 0.94 icon button, tab slot; 0.96 keystone; 1 segment. `.portion-pick` (0.97) and `.portion-step` (1) set the variable but do not carry `.press`, so it is inert there: a pick never scales and a step only scales its icon to 0.9. Gold surfaces also light from the press point: `press.ts` writes `--px`/`--py` and restarts `.is-lit`, and the `.press-light-spot` child span runs `radial-gradient(circle at var(--px) var(--py), rgba(255,247,218,0.55), transparent 60%)` from opacity 0.9 to 0 over 450 ms `--ease-press`. The keystone ring goes `0 0 0 0 rgba(246,227,161,0.45)` to `0 0 0 14px rgba(246,227,161,0)` over 520 ms `--ease-press`. The disabled gold button is a `#121218` cover with a `--gold-edge` inset line; enabling slides its `clip-path` from `inset(0)` to `inset(0 0 0 100%)` over 220 ms `--ease-cut`.
+
+Lists. `.tp-stagger > *` runs `tpRowIn` (opacity 0 and `translateY(10px)` to rest) over 420 ms `cubic-bezier(0.2, 0.7, 0.2, 1)` `backwards`, delay `var(--stagger-delay, 0ms) + min(var(--i), 8) * 35ms`; each `.row-rule::after` draws `scaleX` 0 to 1 from the left 80 ms later. `--stagger-delay` is 120 ms inside a sheet. `useStaggerOnce(tab)` returns the class once per tab per session (`sessionStorage` `temperance.staggered.<tab>`), on every mount inside a sheet, never under reduced motion. New row `.row-new`: `rgba(216,180,90,0.14)` to 0 over 900 ms. Mark `.rhombus.is-new` scales 0 to 1 over 240 ms; `.rhombus.is-flash` goes `#fff7da` and scale 1 to 1.4 to 1 over 300 ms; `.row-action` SquarePlus rotates 90 degrees over 200 ms. `.rise-in` (14 px, 500 ms, delays 60 / 120 / 240 / 300 ms) and `.hairline-gold` are still defined; nothing uses them.
+
+Other CSS motion: tab wipe `.tp-sweep-run` 460 ms `--ease-stone` (`linear-gradient(100deg, transparent 30%, rgba(216,180,90,0.28) 46%, rgba(255,90,31,0.1) 54%, transparent 68%)`, `background-size: 300% 100%`); tab and segmented indicators 360 ms (`--ease-stone` and `--ease-spring`); toggle knob 180 ms `--ease-stone`; toast in 320 ms `--ease-spring` from 12 px below (from 12 px above when docked at the top); digit wipe 120 ms `--ease-cut`; invalid shake 140 ms (`stageShake`, 3 px); `goldSweep` on `:root.auto-sweep` 9 s ease-in-out alternate, paused by `.sweep-paused`.
+
+GSAP owns the opening (`src/intro/timeline.ts`, `useOpening.ts` inside `gsap.context`) and the strike (`src/scene/strike.ts`); CSS and the Web Animations API own everything else. No `motion` or framer package is installed.
+
+Reduced motion (system `prefers-reduced-motion` unless Settings FULL, or Settings REDUCED). `useMotionClass` keeps `html.reduce-motion` (setting `'on'`) and `html.force-motion` (setting `'off'`) in sync. The CSS block (`:root:not(.force-motion)` under the media query, and `:root.reduce-motion`) sets `animation-duration` and `transition-duration` to `0.01ms`, one iteration and `animation-fill-mode: both` on every element and pseudo-element; stops `auto-sweep` with `--tilt-x: 0`; removes press `transform` and `scale`; keeps `.row-new` at 900 ms because it carries information. So every CSS colour change is instant and tabs swap at once with no wipe (`App.tsx` skips the out phase). Motion that must still read runs on the Web Animations API, which the block does not touch: sheets fade 160 ms, the hero number crossfades opacity 0.35 to 1 over 120 ms. No stagger, no press light, no `vibrate`. Reduced motion removes movement, never information.
 
 ## 17 Icon set
 
-All from `lucide-react` 1.56.0 (verified present), stroke 1.5, `currentColor`, 22 px in bars and 16 to 20 px inline. No emoji anywhere.
+All from `lucide-react` (`^1.56.0` in `package.json`), `currentColor`. Every lucide element in `src` passes `strokeWidth={1.5}`; no test enforces it. No emoji anywhere.
+
+Sizes as used: 24 px tab icons and the keystone plus; 22 px row actions, close `x`, the PortionField steppers, the LIBRARY add; 20 px the library star, the weigh-in trash and the editor remove `x`; 18 px search, the search clear `x`, chevrons, the back arrow, the editor ingredient-add plus and the photo viewer actions; 16 px icons inside buttons and chips (the detail sheet BUILD chevron included), section heading icons, toast undo, warnings, weight trend; 14 px the flame beside OVER labels and the favourite star beside a detail title. Colour: bone-dim at rest, gold-300 pressed or active, gold-400 for the active tab icon, section heading icons and the REPEAT and trend icons. Exceptions at rest: search icons gold-500; the LIBRARY add plus and the editor ingredient-add plus gold-300; the weigh-in trash bone-mute.
 
 | Use | lucide name |
 | --- | --- |
 | TODAY tab | `landmark` |
 | LIBRARY tab | `book-marked` |
-| LOG keystone | `plus` |
+| LOG keystone | `plus` (24 px, `#17110a` on gold) |
 | HISTORY tab | `scroll-text` |
-| SETTINGS tab and header | `settings` |
-| Favourite on / off | `star` (fill `currentColor` when on) |
+| SETTINGS tab | `settings` (the tab only; the header right slot is the streak) |
+| Favourite on / off | `star`: rows stroke gold-400 with fill `rgba(216,180,90,0.28)` when on, bone-dim off; detail sheet title and FAVOURITE button `fill-current` when on |
 | Favourites folder heading | `folder-heart` |
-| Log one portion from a row | `square-plus` |
-| Re-log from recents | `rotate-ccw` |
+| Log one portion from a row | `square-plus` (rotates 90 degrees on press) |
+| Repeat yesterday, replay opening | `rotate-ccw` |
 | Undo in toast | `undo-2` |
 | Edit | `pencil` |
-| Delete, remove row, close sheet | `x` |
-| Erase all, delete day entry | `trash-2` |
+| Close sheet, remove row, cancel | `x` |
+| Delete entry, photo, weigh-in | `trash-2` (row buttons bone-dim, ember-text when pressed; the HISTORY day sheet swipe reveal ember-text, ember when armed; the photo viewer DELETE action in the ember tone; weigh-in trash bone-mute, ember-text when pressed) |
 | Portion stepper | `minus`, `plus` |
+| Add meal, ingredient, ingredient row | `plus` |
 | Confirm, saved state | `check` |
 | Search fields | `search` |
-| Month and week navigation | `chevron-left`, `chevron-right` |
-| Expand a day, collapse a section | `chevron-down`, `chevron-up` |
-| Export | `share-2` (Web Share) or `download` |
+| Month navigation, back | `chevron-left`, `chevron-right` |
+| Row and day disclosure | `chevron-right` |
+| Collapse a section | `chevron-down`, `chevron-up` |
+| Export, share photo | `share-2` (Web Share) or `download` |
 | Import | `upload` |
-| Over the line marker in history | `flame` |
+| Install | `house-plus` |
+| Add photo | `image-plus` |
+| Compare photos | `columns-2` |
+| Weight trend | `trending-up`, `trending-down`, `minus` |
+| Over the line marker | `flame` |
 | Warnings (import error, quota) | `triangle-alert` |
-| Notes and footers | `info` |
-| Sheet grab bar | a plain 36 x 3 px div, no icon |
+| Sheet grab bar | a plain 40 x 3 px div, radius 2, `--gold-grad-text`, no icon |
 
 ## 18 Copy rules
 
-No em dashes and no en dashes anywhere (UI, quotes, toasts, this file); use a middle dot `·`, a comma or a full stop. No emoji; SVG icons only. Labels short, uppercase Cinzel, one or two words: LOG, EATEN, GOAL, REMAINING, RECENT, LIBRARY, HISTORY. No helper text under fields; the single quiet hint is the macros line. Sentence case in Cormorant for anything longer than a label; full stops on sentences, none on labels. Numbers: thin space U+2009 thousands grouping, kcal integers, grams to one decimal only where stored that way, `kJ` and `kcal` lowercase units after a thin space. Negative energy: LOCKED, no minus sign anywhere; the hero reads OVER THE LINE with the magnitude in ember, lists and history read `340 OVER` in ember-text against `260 LEFT` in bone-dim. Dates `MON 13 OCT`, times `12:40 pm` (`formatTime`). Toasts: `Logged · 612 kcal`, `Removed · 612 kcal`, `Saved for this session only. Export now.` Empty states one line: `Nothing logged yet.`, `Mark a meal to keep it here.`, `Nothing recent.` Errors state the fact, not the apology: `That file is not a Temperance backup.` Never preachy, never a streak nag, never an exclamation mark. Voice: the stone speaks in inscriptions, the app speaks in short sentences, Jacob is never addressed by name on screen.
+No em dashes and no en dashes anywhere (UI, quotes, toasts, this file); use a middle dot `·`, a comma or a full stop. Vitest checks it for the strings it covers (`stoic.test.ts`, `LibraryFormat.test.tsx`, `LibraryScreen.test.tsx`, `LogRepeat.test.tsx`, `History.test.ts`, `Settings.test.ts`, `TodayRing.test.tsx`, `TodayScreen.test.tsx`); the polish-spec section 9 `perl` check over `src` and `docs` is a release step, not a test. No emoji; lucide SVG icons only.
+
+Labels short, uppercase Cinzel (`.label`), one or two words, sentence case in source and uppercased by CSS: LOG, QUICK, BUILD, PORTION, RECENT, REPEAT, FAVOURITES, MEALS, AVG 7 DAYS, UNDER, STREAK, GOAL, `I · GOALS`. No full stops on labels. A heading's right slot is Cormorant `.hint` and stays as written: `Last 12`, `7 days`, `To 90 days`. Sentences are Cormorant, sentence case, full stop. Lower-case fragments without a full stop appear only as row meta or a label row's right slot: `one tap logs 175 kcal`, `removed from the library`, `0.4 down`, `5 of 9 under`. The one field hint is the macro line, `Macros add to 526 kcal.`, only past 8 percent; the other notes under SETTINGS rows are the iOS backup note and `Replace clears what is on this device first.`
+
+Numbers: thin space U+2009 thousands grouping (`formatInt`), kcal integers, whole grams in list meta, one decimal where stored that way in fields. Units lowercase after the number. `ValueUnit` and the LOG sheet strings (`energyLine`) put U+2009 before the unit; the LIBRARY, HISTORY and TODAY sheet strings and `formatAmount` use a plain space. No minus sign on energy: `energyLine` takes the magnitude and `deltaText` returns one (`History.test.ts`, `LogRepeat.test.tsx`); the hero reads OVER THE LINE in ember, lists `340 OVER` in ember-text with a flame against `272 LEFT` in bone-dim. Percent `51% of goal`.
+
+Portion label (`portionLabel`), after a name as ` · 180 g`: empty for exactly one serve; `180 g`; `250 ml`; `1.5 serves`; `0.5 serve` (singular at 1 or less); never `×`. Spoken `Greek yoghurt, 180 grams, 175 kcal`. Dates `Today`, `Yesterday`, else `Mon 13 Oct` (`formatDayLabel`); week rows `THU 15`; times `3:20 pm` (`formatTime`).
+
+Toasts: `Logged · 612 kcal`, `Logged · 180 g · 175 kcal`, `Logged · 2 140 kcal · yesterday's meals`, `Removed · 612 kcal`, `Removed · Greek yoghurt`, `Logged · 84.3 kg`, `Updated · 84.3 kg`, `Removed · 1 photo`, `Exported · temperance-2026-10-15.json`, `Imported · 12 meals · 48 entries`, `Erased.`, `Keep it on the home screen.`, `Saved for this session only. Export now.` Empty states, one line: `Nothing logged yet.`, `Nothing saved yet.`, `Nothing logged this week.`, `The ledger opens with your first meal.`, `No weigh-ins yet.`, `No photos yet.`, `Nothing matches.` Errors state the fact, not the apology: `That file is not a Temperance backup.`, `Motion access was not allowed.` The one progress word is `Saving...`.
+
+Never preachy, never a streak nag, never an exclamation mark (`stoic.test.ts` and `Settings.test.ts` check `!` in their strings). Voice: the stone speaks in inscriptions, the app in short sentences; Jacob is never addressed by name on screen.
 
 ## 19 Signature moment
 
