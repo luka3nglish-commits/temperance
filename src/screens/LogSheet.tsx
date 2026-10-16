@@ -78,6 +78,8 @@ export function LogSheet() {
   const [rows, setRows] = useState<BuildRow[]>(kept?.rows ?? [])
   const [buildName, setBuildName] = useState(kept?.buildName ?? '')
   const [buildSave, setBuildSave] = useState<boolean | null>(kept?.buildSave ?? null)
+  // a portion being typed in QUICK, before it commits on blur: kept in the reload draft too
+  const [typing, setTyping] = useState<number | null>(null)
   const caloriesRef = useRef<HTMLInputElement | null>(null)
   /** the recent being edited first: read once by the prefill it triggers */
   const editRef = useRef<LogEntry | null>(null)
@@ -159,8 +161,10 @@ export function LogSheet() {
   }, [kept, introDone, openLog])
 
   useEffect(() => {
-    if (open) saveLogDraft({ mode, draft, rows, buildName, buildSave }, unit)
-  }, [open, mode, draft, rows, buildName, buildSave, unit])
+    if (!open) return
+    const quick = mode === 'quick' && typing !== null ? { ...draft, amount: typing } : draft
+    saveLogDraft({ mode, draft: quick, rows, buildName, buildSave }, unit)
+  }, [open, mode, draft, typing, rows, buildName, buildSave, unit])
 
   // closed on purpose (X, scrim, drag, Escape, or after a log): nothing to bring back
   const wasOpen = useRef(open)
@@ -326,6 +330,7 @@ export function LogSheet() {
           caloriesRef={caloriesRef}
           formId={FORM_ID}
           onSubmit={submit}
+          onTyping={setTyping}
         />
       ) : (
         <MealFormBuild

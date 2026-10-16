@@ -213,6 +213,11 @@ export function Sheet({
     }
   }, [open, onClose])
 
+  // A tap closes the sheet from the scrim only when it also started there. A sheet that opens under a
+  // finger already down (the tap that skipped the opening reopening a kept LOG draft) must not take
+  // that tap's click as a close.
+  const scrimDown = useRef(false)
+
   // ---------- drag the grab bar or header down to dismiss ----------
   type Drag = { id: number; y0: number; dy: number; live: boolean; samples: Array<{ t: number; dy: number }> }
   const drag = useRef<Drag | null>(null)
@@ -288,7 +293,14 @@ export function Sheet({
         className={`absolute inset-0 transition-opacity ${shown ? 'opacity-100' : 'opacity-0'}`}
         // touch-action none: a swipe on the scrim never pans the page (pull to refresh); a tap still closes
         style={{ background: 'var(--scrim)', transitionDuration: shown ? '320ms' : 'var(--t-sheet-out)', transitionTimingFunction: 'linear', touchAction: 'none' }}
-        onClick={onClose}
+        onPointerDown={(e) => {
+          scrimDown.current = e.target === e.currentTarget
+        }}
+        onClick={() => {
+          const started = scrimDown.current
+          scrimDown.current = false
+          if (started) onClose()
+        }}
       />
       <div
         ref={panelRef}

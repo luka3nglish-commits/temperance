@@ -166,6 +166,45 @@ describe('a reload in the middle of a log', () => {
     expect(useUI.getState().logOpen).toBe(false)
   })
 
+  it('a portion still being typed (not yet committed on blur) comes back after a reload', () => {
+    mount()
+    act(() => useUI.getState().openLog())
+    type('tp-log-kcal', '250')
+    type('tp-log-portion-input', '2.5')
+    reload()
+    expect($('tp-log-portion')?.dataset.value).toBe('2.5')
+    submit()
+    const e = useStore.getState().entries[0]
+    expect(e.servings).toBe(2.5)
+    expect(e.macros.kcal).toBe(625)
+  })
+
+  it('the tap that ends the opening never closes the sheet it reopens (its click lands on the scrim)', () => {
+    mount()
+    act(() => useUI.getState().openLog())
+    type('tp-log-kcal', '612')
+    reload({ introDone: false })
+    // the finger goes down somewhere else: the opening skips and the kept sheet rises under it
+    act(() => {
+      document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      useUI.getState().setIntroDone(true)
+    })
+    const scrim = $('tp-log-sheet')?.previousElementSibling as HTMLElement | null
+    expect(scrim).not.toBeNull()
+    act(() => {
+      scrim!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    expect(useUI.getState().logOpen).toBe(true)
+    expect(localStorage.getItem(LOG_DRAFT_KEY)).not.toBeNull()
+    expect(value('tp-log-kcal')).toBe('612')
+    // a real tap on the scrim still closes it
+    act(() => {
+      scrim!.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      scrim!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    expect(useUI.getState().logOpen).toBe(false)
+  })
+
   it('a meal kept across one reload survives a second reload too', () => {
     mount()
     act(() => useUI.getState().openLog())
