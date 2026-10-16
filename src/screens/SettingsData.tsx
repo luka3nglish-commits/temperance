@@ -1,31 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Download, Share2, TriangleAlert, Upload, X } from 'lucide-react'
-import { Button, IconButton, useToast } from '../components/ui'
+import { Check, Download, HousePlus, Share2, TriangleAlert, Upload, X } from 'lucide-react'
+import { Button, IconButton, Segmented, useToast } from '../components/ui'
 import type { ExportFile, ImportMode, ImportResult } from '../lib/types'
 import { localDayKey } from '../lib/day'
 import { backupFileName, validateExportFile } from '../lib/exportFile'
 import { clearPhotos } from '../lib/photos'
 import { useStore } from '../store/useStore'
-import { SettingsNote, SettingsRow } from './SettingsRow'
-
-/** True when the page runs as an installed app. */
-export function isStandalone(): boolean {
-  try {
-    if (typeof window === 'undefined') return false
-    if (window.matchMedia('(display-mode: standalone)').matches) return true
-    return (navigator as Navigator & { standalone?: boolean }).standalone === true
-  } catch {
-    return false
-  }
-}
-
-/** True on iPhone and iPad (including iPadOS reporting itself as a Mac with touch). */
-export function isIOS(): boolean {
-  if (typeof navigator === 'undefined') return false
-  const ua = navigator.userAgent
-  if (/iPhone|iPad|iPod/i.test(ua)) return true
-  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
-}
+import { SettingsGroup, SettingsNote, SettingsRow } from './SettingsRow'
+import { canInstall, isIOS, isStandalone, runInstall, useInstall } from './SettingsInstall'
 
 /** Share a file where the platform can, otherwise hand it to the browser as a download. Returns how. */
 async function deliverFile(file: File): Promise<'shared' | 'downloaded' | 'cancelled'> {
@@ -83,7 +65,8 @@ const ARM_MS = 6000
 type Pending = { name: string; file: ExportFile; mode: ImportMode | null }
 
 /**
- * EXPORT JSON, IMPORT JSON and ERASE ALL rows. Import and erase confirm inline (no modal):
+ * The III · DATA tablet: INSTALL (only when installable), EXPORT, IMPORT and ERASE ALL. Every button
+ * fills the 168 px right column. Import and erase confirm inline (no modal):
  * import asks MERGE or REPLACE and then a confirm, erase asks a second time in ember.
  */
 export function SettingsData() {
@@ -177,33 +160,23 @@ export function SettingsData() {
   }
 
   const showEvictionNote = isIOS() && !isStandalone()
-
-  const modeButton = (mode: ImportMode, label: string) => {
-    const on = pending?.mode === mode
-    return (
-      <Button
-        variant="hairline"
-        size="sm"
-        role="radio"
-        aria-checked={on}
-        data-testid={`tp-settings-import-${mode}`}
-        onClick={() => chooseMode(mode)}
-        className={on ? 'bg-[var(--gold-line)] text-gold-300' : 'text-bone-dim'}
-      >
-        {label}
-      </Button>
-    )
-  }
+  const installable = useInstall(canInstall)
 
   return (
-    <div>
-      <SettingsRow
-        label="Export JSON"
-        below={showEvictionNote ? <SettingsNote>Safari clears unused sites after 7 days. Install the app or keep a backup.</SettingsNote> : null}
-      >
+    <SettingsGroup numeral="III" title="Data" id="settings-data" testId="tp-settings-group-data">
+      {installable ? (
+        <SettingsRow label="Install" testId="tp-settings-install-row">
+          <Button variant="hairline" size="sm" full data-testid="tp-settings-install" onClick={() => void runInstall()} icon={<HousePlus size={16} strokeWidth={1.5} />}>
+            Install
+          </Button>
+        </SettingsRow>
+      ) : null}
+
+      <SettingsRow label="Export" below={showEvictionNote ? <SettingsNote>Safari clears unused sites after 7 days. Install the app or keep a backup.</SettingsNote> : null}>
         <Button
           variant="hairline"
           size="sm"
+          full
           data-testid="tp-settings-export"
           onClick={() => void onExport()}
           icon={canShare ? <Share2 size={16} strokeWidth={1.5} /> : <Download size={16} strokeWidth={1.5} />}
@@ -213,41 +186,48 @@ export function SettingsData() {
       </SettingsRow>
 
       <SettingsRow
-        label="Import JSON"
+        label="Import"
         below={
           pending ? (
-            <div className="flex flex-col gap-2" data-testid="tp-settings-import-pending">
-              <p className="font-body text-[15px] leading-[1.4] text-bone-dim">
-                <span className="block truncate text-bone">{pending.name}</span>
-                <span className="num">{previewText(pending.file)}</span>
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <div role="radiogroup" aria-label="Import mode" className="flex items-center gap-2">
-                  {modeButton('merge', 'Merge')}
-                  {modeButton('replace', 'Replace')}
-                </div>
-                <div className="ml-auto flex items-center gap-1">
-                  {pending.mode ? (
-                    <Button
-                      variant={pending.mode === 'replace' ? 'ember' : 'hairline'}
-                      size="sm"
-                      data-testid="tp-settings-import-confirm"
-                      onClick={confirmImport}
-                      icon={<Check size={16} strokeWidth={1.5} />}
-                      className={pending.mode === 'replace' ? 'border-[rgba(255,90,31,0.7)] bg-[rgba(255,90,31,0.08)]' : ''}
-                    >
-                      {pending.mode === 'replace' ? 'Replace everything' : 'Import'}
-                    </Button>
-                  ) : null}
-                  <IconButton label="Cancel import" onClick={() => setPending(null)}>
-                    <X size={18} strokeWidth={1.5} />
-                  </IconButton>
-                </div>
+            <div className="tablet-inset flex flex-col gap-3 px-3 pt-2 pb-3" data-testid="tp-settings-import-pending">
+              <div className="flex items-center gap-2">
+                <p className="min-w-0 flex-1">
+                  <span className="block truncate font-body text-[17px] font-semibold leading-[1.3] text-bone">{pending.name}</span>
+                  <span className="hint block">{previewText(pending.file)}</span>
+                </p>
+                <IconButton label="Cancel import" className="-mr-2 shrink-0" onClick={() => setPending(null)}>
+                  <X size={22} strokeWidth={1.5} />
+                </IconButton>
               </div>
+              <Segmented<ImportMode | ''>
+                label="Import mode"
+                full
+                value={pending.mode ?? ''}
+                onChange={(m) => {
+                  if (m) chooseMode(m)
+                }}
+                options={[
+                  { value: 'merge', label: 'Merge', testId: 'tp-settings-import-merge' },
+                  { value: 'replace', label: 'Replace', testId: 'tp-settings-import-replace' },
+                ]}
+              />
               {pending.mode === 'replace' ? <SettingsNote>Replace clears what is on this device first.</SettingsNote> : null}
+              {pending.mode ? (
+                <Button
+                  variant={pending.mode === 'replace' ? 'danger' : 'hairline'}
+                  armed={pending.mode === 'replace'}
+                  size="sm"
+                  full
+                  data-testid="tp-settings-import-confirm"
+                  onClick={confirmImport}
+                  icon={<Check size={16} strokeWidth={1.5} />}
+                >
+                  {pending.mode === 'replace' ? 'Replace everything' : 'Import'}
+                </Button>
+              ) : null}
             </div>
           ) : importError ? (
-            <p data-testid="tp-settings-import-error" role="alert" className="flex items-center gap-2 font-body text-[15px] leading-[1.4] text-ember-text">
+            <p data-testid="tp-settings-import-error" role="alert" className="hint flex items-center gap-2 text-ember-text">
               <TriangleAlert size={16} strokeWidth={1.5} aria-hidden="true" className="shrink-0" />
               {importError}
             </p>
@@ -264,29 +244,42 @@ export function SettingsData() {
           aria-hidden="true"
           onChange={(e) => void onPick(e)}
         />
-        <Button variant="hairline" size="sm" data-testid="tp-settings-import" onClick={() => fileInput.current?.click()} icon={<Upload size={16} strokeWidth={1.5} />}>
+        <Button variant="hairline" size="sm" full data-testid="tp-settings-import" onClick={() => fileInput.current?.click()} icon={<Upload size={16} strokeWidth={1.5} />}>
           Import
         </Button>
       </SettingsRow>
 
-      <SettingsRow label="Erase all">
-        {armed ? (
-          <IconButton label="Keep everything" onClick={() => setArmed(false)}>
-            <X size={18} strokeWidth={1.5} />
-          </IconButton>
-        ) : null}
-        <Button
-          variant="ember"
-          size="sm"
-          data-testid={armed ? 'tp-settings-erase-confirm' : 'tp-settings-erase'}
-          onClick={onErase}
-          aria-live="polite"
-          icon={armed ? <TriangleAlert size={16} strokeWidth={1.5} /> : undefined}
-          className={armed ? 'border-[rgba(255,90,31,0.7)] bg-[rgba(255,90,31,0.08)]' : ''}
-        >
-          {armed ? 'Erase everything' : 'Erase'}
-        </Button>
-      </SettingsRow>
-    </div>
+      {armed ? (
+        <SettingsRow label="Erase all" layout="stack">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="danger"
+              armed
+              size="sm"
+              className="min-w-0 flex-1"
+              data-testid="tp-settings-erase-confirm"
+              onClick={onErase}
+              // the confirm replaces the first button: keep keyboard focus and announce it
+              autoFocus
+              icon={<TriangleAlert size={16} strokeWidth={1.5} />}
+            >
+              Erase everything
+            </Button>
+            <IconButton label="Keep everything" className="shrink-0" onClick={() => setArmed(false)}>
+              <X size={22} strokeWidth={1.5} />
+            </IconButton>
+          </div>
+        </SettingsRow>
+      ) : (
+        <SettingsRow label="Erase all">
+          <Button variant="danger" size="sm" full data-testid="tp-settings-erase" onClick={onErase} icon={<X size={16} strokeWidth={1.5} />}>
+            Erase
+          </Button>
+        </SettingsRow>
+      )}
+    </SettingsGroup>
   )
 }
+
+export { isIOS, isStandalone }
+

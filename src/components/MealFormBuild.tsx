@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import type { EnergyUnit, Ingredient, Meal } from '../lib/types'
 import { searchIngredients } from '../store/selectors'
-import { EmptyLine, IconButton, Input } from './ui'
-import { DigitInput, NameInput, buildTotals, componentFromRow, energyLine, macroLine, rowFromIngredient, saveToLibraryFor, type BuildRow, THIN } from './MealForm'
+import { formatEnergy, unitLabel } from '../lib/units'
+import { EmptyLine, IconButton, Input, ValueUnit } from './ui'
+import { DOT, DigitInput, NameInput, buildTotals, componentFromRow, energyLine, macroLine, rowFromIngredient, saveToLibraryFor, type BuildRow, THIN } from './MealForm'
 import { MealFormHint } from './MealFormHint'
 
 type Props = {
@@ -52,14 +53,14 @@ export function MealFormBuild({ rows, onRows, name, onName, saveOverride, onSave
       }}
     >
       <div>
-        <div className="mb-1.5 flex items-baseline justify-between">
-          <label htmlFor={`${formId}-ingredient`} className="font-display text-[10px] tracking-[0.35em] text-bone-dim">
+        <div className="mb-2 flex min-h-3 items-baseline justify-between">
+          <label htmlFor={`${formId}-ingredient`} className="label">
             Ingredient
           </label>
-          {rows.length ? <span className="num font-display text-[10px] tracking-[0.3em] text-bone-dim">{rows.length} added</span> : null}
+          {rows.length ? <span className="hint num leading-none">{rows.length} added</span> : null}
         </div>
         <div className="relative">
-          <Search size={16} strokeWidth={1.5} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-bone-dim" />
+          <Search size={18} strokeWidth={1.5} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 z-[1] -translate-y-1/2 text-gold-500" />
           <Input
             id={`${formId}-ingredient`}
             type="text"
@@ -81,20 +82,20 @@ export function MealFormBuild({ rows, onRows, name, onName, saveOverride, onSave
           />
         </div>
         {q && hits.length ? (
-          <ul role="listbox" aria-label="Ingredients" className="mt-1 overflow-hidden rounded-[4px] border border-obsidian-600 bg-obsidian-800">
+          <ul role="listbox" aria-label="Ingredients" className="tablet mt-2 overflow-hidden">
             {hits.map((ing) => (
-              <li key={ing.id} role="option" aria-selected="false">
+              <li key={ing.id} role="option" aria-selected="false" className="row-rule last:after:hidden">
                 <button
                   type="button"
                   onClick={() => add(ing)}
-                  className="flex h-12 w-full items-center justify-between gap-3 border-b border-[var(--bone-08)] px-4 text-left transition-colors duration-150 last:border-b-0 hover:bg-[var(--gold-line)] cursor-pointer"
+                  className="row-press flex h-12 w-full items-center justify-between gap-3 px-4 text-left cursor-pointer [@media(hover:hover)]:hover:bg-obsidian-700"
                 >
-                  <span className="min-w-0 truncate font-body text-[18px] font-medium text-bone">{ing.name}</span>
-                  <span className="num shrink-0 font-body text-[14px] text-bone-dim">
+                  <span className="min-w-0 truncate font-body text-[19px] font-medium text-bone">{ing.name}</span>
+                  <span className="hint num shrink-0">
                     per {ing.per.amount}
                     {THIN}
                     {ing.per.unit}
-                    {' · '}
+                    {DOT}
                     {energyLine(ing.macros.kcal, unit)}
                   </span>
                 </button>
@@ -111,41 +112,40 @@ export function MealFormBuild({ rows, onRows, name, onName, saveOverride, onSave
           {rows.map((r) => {
             const c = componentFromRow(r, ingredients)
             return (
-              <li key={r.key} className="flex items-center gap-3 border-b border-[var(--gold-line)] py-2">
-                <div className="min-w-0 flex-1">
-                  <p className={`truncate font-body text-[18px] font-medium ${r.removed ? 'text-bone-mute' : 'text-bone'}`}>
-                    {r.name}
-                    {r.removed ? <span className="font-display ml-2 text-[9px] tracking-[0.3em] text-bone-mute">removed</span> : null}
+              <li key={r.key} className="row-rule last:after:hidden grid min-h-16 grid-cols-[minmax(0,1fr)_96px_auto_44px] items-center gap-x-2 py-1.5">
+                <div className="min-w-0">
+                  <p className={`flex min-w-0 items-baseline gap-2 font-body text-[19px] font-medium leading-[1.25] ${r.removed ? 'text-bone-mute' : 'text-bone'}`}>
+                    <span className="truncate">{r.name}</span>
+                    {r.removed ? <span className="label shrink-0 text-bone-mute">Removed</span> : null}
                   </p>
-                  <p className="num font-body text-[13px] text-bone-dim">{macroLine(c.macros)}</p>
+                  <p className="meta truncate leading-[1.25]">{macroLine(c.macros)}</p>
                 </div>
                 <DigitInput
-                  compact
-                  className="w-[104px] shrink-0"
+                  fieldSize="sm"
                   aria-label={`${r.name} amount in ${r.unit}`}
                   suffix={r.unit}
                   placeholder="0"
                   value={r.amount}
                   onChange={(v) => update(r.key, v)}
+                  style={{ paddingLeft: 12 }}
                 />
-                <span className="num font-display inscribed w-[72px] shrink-0 text-right text-[15px] tracking-[0.02em] text-gold-400">{energyLine(c.macros.kcal, unit)}</span>
-                <IconButton label={`Remove ${r.name}`} className="-mr-2 shrink-0" onClick={() => remove(r.key)}>
-                  <X size={18} strokeWidth={1.5} />
+                <ValueUnit className="min-w-[64px] justify-end text-right" value={formatEnergy(c.macros.kcal, unit)} unit={unitLabel(unit)} />
+                <IconButton label={`Remove ${r.name}`} className="shrink-0" onClick={() => remove(r.key)}>
+                  <X size={22} strokeWidth={1.5} />
                 </IconButton>
               </li>
             )
           })}
         </ul>
-      ) : library ? (
+      ) : library && !q ? (
         <EmptyLine>Add ingredients to build a meal.</EmptyLine>
       ) : null}
 
-      <p className="num font-display inscribed flex h-11 items-center gap-2 border-y border-[var(--gold-line-strong)] text-[15px] tracking-[0.04em] text-bone">
-        <span className="text-gold-400">{energyLine(totals.kcal, unit)}</span>
-        <span className="text-bone-dim" aria-hidden="true">
-          {'·'}
+      <p className="flex h-12 items-baseline gap-0 border-y border-[var(--gold-line)] pt-[15px]" aria-label={`Total ${energyLine(totals.kcal, unit)}, ${macroLine(totals)}`}>
+        <ValueUnit value={formatEnergy(totals.kcal, unit)} unit={unitLabel(unit)} tone="gold" />
+        <span className="meta num" aria-hidden="true">
+          {` · ${macroLine(totals)}`}
         </span>
-        <span>{macroLine(totals)}</span>
       </p>
 
       <NameInput label="Meal name" placeholder="Meal" value={name} maxLength={80} onChange={(e) => onName(e.target.value)} />

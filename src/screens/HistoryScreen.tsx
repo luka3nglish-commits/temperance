@@ -112,23 +112,26 @@ export function HistoryScreen() {
 
   return (
     <section ref={root} data-testid="tp-history" data-mode={mode} aria-label="History" className="pb-6">
-      {/* two rows: the switch (about 170 px) and the month row (about 275 px at SEPTEMBER 2026) cannot share 350 px */}
-      <header className="rise-in sticky top-0 z-10 bg-obsidian-950/95 px-5 backdrop-blur-[20px]" style={{ marginTop: 'var(--safe-top)' }}>
+      {/* two rows: the switch and the month row; the bottom 24 px fades so rows dissolve under it, no hard edge */}
+      <header
+        className="sticky top-0 z-10 px-5 pb-6"
+        style={{ marginTop: 'var(--safe-top)', background: 'linear-gradient(180deg, var(--color-obsidian-950) 0, var(--color-obsidian-950) calc(100% - 24px), rgba(5,5,7,0) 100%)' }}
+      >
         <div className="flex h-14 items-center justify-center">
-          <div data-testid="tp-history-mode" data-mode={mode}>
-            <Segmented size="md" label="History view" value={mode} options={MODES} onChange={changeMode} />
+          <div data-testid="tp-history-mode" data-mode={mode} className="w-[168px]">
+            <Segmented size="md" full label="History view" value={mode} options={MODES} onChange={changeMode} />
           </div>
         </div>
         {mode === 'ledger' ? (
           <div className="flex h-14 items-center justify-between">
-            <IconButton label="Earlier month" onClick={back} disabled={!canBack} className="disabled:opacity-30 disabled:pointer-events-none">
-              <ChevronLeft size={22} strokeWidth={1.5} />
+            <IconButton label="Earlier month" data-testid="tp-history-prev" onClick={back} disabled={!canBack} className="-ml-3">
+              <ChevronLeft size={18} strokeWidth={1.5} />
             </IconButton>
-            <h1 className="font-display inscribed text-[12px] tracking-[0.3em] text-bone" aria-live="polite">
+            <h1 className="title-screen inscribed" aria-live="polite">
               {monthLabel}
             </h1>
-            <IconButton label="Later month" onClick={forward} disabled={!canForward} className="disabled:opacity-30 disabled:pointer-events-none">
-              <ChevronRight size={22} strokeWidth={1.5} />
+            <IconButton label="Later month" data-testid="tp-history-next" onClick={forward} disabled={!canForward} className="-mr-3">
+              <ChevronRight size={18} strokeWidth={1.5} />
             </IconButton>
           </div>
         ) : (
@@ -138,19 +141,19 @@ export function HistoryScreen() {
 
       {mode === 'ledger' ? (
         <>
-          <div className="rise-in rise-in-1">
-            <HistoryColonnade days={colonnadeDays} goalKcal={goalKcal} today={today} unit={unit} onPick={setPickedDay} />
+          <div className="-mt-3">
+            <HistoryColonnade days={colonnadeDays} goalKcal={goalKcal} today={today} unit={unit} onPick={setPickedDay} empty={earliest === null} />
           </div>
 
-          <div className="rise-in rise-in-2 px-5 pt-5">
-            <HistoryStones avgKcal={avg} under={under} streak={streak} unit={unit} />
+          <div className="px-5 pt-6">
+            <HistoryStones avgKcal={avg} under={under} streak={streak} unit={unit} anyLogged={earliest !== null} />
           </div>
 
-          <div className="rise-in rise-in-3 px-5 pt-6">
+          <div className="px-5 pt-8">
             <HistoryWeek entries={entries} today={today} goalKcal={goalKcal} unit={unit} onOpenDay={setPickedDay} />
           </div>
 
-          <div className="rise-in rise-in-4 px-5 pt-6">
+          <div className="px-5 pt-8">
             <HistoryMonths entries={entries} today={today} goalKcal={goalKcal} unit={unit} onOpenDay={setPickedDay} />
           </div>
 

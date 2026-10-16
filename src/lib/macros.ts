@@ -10,9 +10,9 @@ export function scaleMacros(m: Macros, factor: number): Macros {
   return { kcal: m.kcal * factor, protein: m.protein * factor, carbs: m.carbs * factor, fat: m.fat * factor }
 }
 
-/** Round to 1 decimal so stored snapshots stay tidy without losing half-grams. */
+/** Round to 2 decimals so stored snapshots stay tidy and integer display rounds the true value once. */
 export function roundMacros(m: Macros): Macros {
-  const r = (n: number) => Math.round(n * 10) / 10
+  const r = (n: number) => Math.round(n * 100) / 100
   return { kcal: r(m.kcal), protein: r(m.protein), carbs: r(m.carbs), fat: r(m.fat) }
 }
 

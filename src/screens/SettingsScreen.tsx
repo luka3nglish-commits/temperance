@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Button, Segmented, Toggle, useToast } from '../components/ui'
+import { RotateCcw } from 'lucide-react'
+import { Button, Segmented, Toggle, useStaggerOnce, useToast } from '../components/ui'
 import type { EnergyUnit, HeroFigure, MacroTargets, MotionPref, OpeningPref } from '../lib/types'
 import { fromInputEnergy, parseNumber, toDisplayEnergy, unitLabel } from '../lib/units'
 import { requestTiltPermission } from '../lib/tilt'
 import { useStore } from '../store/useStore'
-import { SettingsNote, SettingsRow, SmallInput } from './SettingsRow'
+import { SettingsGroup, SettingsRow, SmallInput } from './SettingsRow'
 import { SettingsData } from './SettingsData'
 import { SettingsFooter } from './SettingsFooter'
+import { SettingsSafeMode } from './SettingsSafeMode'
 
 const UNIT_OPTIONS = [
   { value: 'kcal', label: 'kcal' },
@@ -32,7 +34,7 @@ const OPENING_OPTIONS = [
 ] as const satisfies readonly { value: OpeningPref; label: string }[]
 
 const MACRO_KEYS = ['protein', 'carbs', 'fat'] as const
-const MACRO_LETTER: Record<keyof MacroTargets, string> = { protein: 'P', carbs: 'C', fat: 'F' }
+const MACRO_LABEL: Record<keyof MacroTargets, string> = { protein: 'Protein', carbs: 'Carbs', fat: 'Fat' }
 
 /** The store keeps weights above 0 and under 500 kg; anything else it would drop. */
 const MAX_KG = 500
@@ -58,9 +60,12 @@ export function parseTargetWeight(draft: string): TargetWeightCommit {
 }
 
 /**
- * SETTINGS. A quiet column of 56 px rows ruled with --gold-line, in the order of spec section 13
- * (TARGET WEIGHT sits under MACRO TARGETS), then the data rows (export, import, erase) and the
- * footer. Entrance stagger on mount only.
+ * SETTINGS (polish-spec 6.6). A centred screen title over a header that fades into the page, then
+ * three bracketed stone tablets 16 px apart: I · GOALS (daily goal, macro targets, target weight),
+ * II · DISPLAY (units, hero figure, gold follows tilt, motion, opening, replay opening) and
+ * III · DATA (install, export, import, erase all), then the footer. Value controls share one
+ * 168 px right column; three-way switches sit full width under their label. The tablets rise in
+ * once per session (reduced motion: no stagger).
  */
 export function SettingsScreen() {
   const settings = useStore((s) => s.settings)
@@ -74,6 +79,7 @@ export function SettingsScreen() {
   const setOpening = useStore((s) => s.setOpening)
   const resetIntro = useStore((s) => s.resetIntro)
   const toast = useToast((s) => s.show)
+  const stagger = useStaggerOnce('settings')
 
   const { goalKcal, targets, unit } = settings
 
@@ -138,106 +144,94 @@ export function SettingsScreen() {
 
   return (
     <section data-testid="tp-settings" aria-label="Settings" className="px-5 pb-6">
-      <header className="rise-in sticky top-0 z-10 -mx-5 flex h-14 items-center justify-center bg-obsidian-950/95 px-5 backdrop-blur-[20px]" style={{ marginTop: 'var(--safe-top)' }}>
-        <h1 className="font-display inscribed text-[14px] tracking-[0.35em] text-bone">Settings</h1>
+      <header
+        className="sticky top-0 z-10 -mx-5 flex h-16 items-start justify-center bg-linear-to-b from-obsidian-950 from-55% to-obsidian-950/0 px-5 pt-[18px]"
+        style={{ marginTop: 'var(--safe-top)' }}
+      >
+        <h1 className="title-screen inscribed">Settings</h1>
       </header>
 
-      <div className="rise-in rise-in-1">
-        <SettingsRow label="Daily goal" htmlFor="set-goal">
-          <SmallInput
-            id="set-goal"
-            testId="tp-settings-goal"
-            label={`Daily goal in ${unitLabel(unit)}`}
-            value={goalDraft}
-            onChange={setGoalDraft}
-            onCommit={commitGoal}
-            suffix={unitLabel(unit)}
-            width={132}
-          />
-        </SettingsRow>
+      <div className={`flex flex-col gap-4 ${stagger}`}>
+        <SettingsSafeMode />
+        <SettingsGroup numeral="I" title="Goals" id="settings-goals" testId="tp-settings-group-goals">
+          <SettingsRow label="Daily goal" htmlFor="set-goal">
+            <SmallInput
+              id="set-goal"
+              testId="tp-settings-goal"
+              label={`Daily goal in ${unitLabel(unit)}`}
+              value={goalDraft}
+              onChange={setGoalDraft}
+              onCommit={commitGoal}
+              suffix={unitLabel(unit)}
+              className="w-full"
+            />
+          </SettingsRow>
 
-        <SettingsRow label="Macro targets">
-          <div role="group" aria-label="Macro targets in grams" className="flex items-center gap-1.5">
-            {MACRO_KEYS.map((k) => (
-              <SmallInput
-                key={k}
-                id={`set-target-${k}`}
-                testId={`tp-settings-target-${k}`}
-                label={`${k} target in grams`}
-                value={targetDraft[k]}
-                onChange={(v) => setTargetDraft((d) => ({ ...d, [k]: v }))}
-                onCommit={() => commitTarget(k)}
-                prefix={MACRO_LETTER[k]}
-                width={68}
-              />
-            ))}
-          </div>
-        </SettingsRow>
+          <SettingsRow label="Macro targets" layout="stack">
+            <div role="group" aria-label="Macro targets in grams" className="grid w-full grid-cols-3 gap-2">
+              {MACRO_KEYS.map((k) => (
+                <SmallInput
+                  key={k}
+                  id={`set-target-${k}`}
+                  testId={`tp-settings-target-${k}`}
+                  label={`${k} target in grams`}
+                  value={targetDraft[k]}
+                  onChange={(v) => setTargetDraft((d) => ({ ...d, [k]: v }))}
+                  onCommit={() => commitTarget(k)}
+                  innerLabel={MACRO_LABEL[k]}
+                  suffix="g"
+                />
+              ))}
+            </div>
+          </SettingsRow>
 
-        <SettingsRow label="Target weight" htmlFor="set-target-weight">
-          <SmallInput
-            id="set-target-weight"
-            testId="tp-settings-target-weight"
-            label="Target weight in kilograms"
-            value={weightDraft}
-            onChange={setWeightDraft}
-            onCommit={commitWeight}
-            suffix="kg"
-            width={112}
-            inputMode="decimal"
-          />
-        </SettingsRow>
+          <SettingsRow label="Target weight" htmlFor="set-target-weight">
+            <SmallInput
+              id="set-target-weight"
+              testId="tp-settings-target-weight"
+              label="Target weight in kilograms"
+              value={weightDraft}
+              onChange={setWeightDraft}
+              onCommit={commitWeight}
+              suffix="kg"
+              inputMode="decimal"
+              className="w-full"
+            />
+          </SettingsRow>
+        </SettingsGroup>
 
-        <SettingsRow label="Units">
-          <span data-testid="tp-settings-unit" className="contents">
-            <Segmented size="md" label="Energy unit" value={unit} options={UNIT_OPTIONS} onChange={setUnit} />
-          </span>
-        </SettingsRow>
+        <SettingsGroup numeral="II" title="Display" id="settings-display" testId="tp-settings-group-display">
+          <SettingsRow label="Units">
+            <Segmented<EnergyUnit> testId="tp-settings-unit" full label="Energy unit" value={unit} options={UNIT_OPTIONS} onChange={setUnit} />
+          </SettingsRow>
 
-        <SettingsRow label="Hero figure">
-          <span data-testid="tp-settings-hero" className="contents">
-            <Segmented size="md" label="Hero figure" value={settings.hero} options={HERO_OPTIONS} onChange={setHero} />
-          </span>
-        </SettingsRow>
-      </div>
+          <SettingsRow label="Hero figure" layout="stack">
+            <Segmented<HeroFigure> testId="tp-settings-hero" full label="Hero figure" value={settings.hero} options={HERO_OPTIONS} onChange={setHero} />
+          </SettingsRow>
 
-      <div className="rise-in rise-in-2">
-        <SettingsRow label="Gold follows tilt">
-          <span data-testid="tp-settings-tilt" className="contents">
-            <Toggle label="Gold follows tilt" hideLabel checked={settings.tilt} onChange={onTilt} />
-          </span>
-        </SettingsRow>
+          <SettingsRow label="Gold follows tilt" col="auto">
+            <Toggle testId="tp-settings-tilt" label="Gold follows tilt" hideLabel checked={settings.tilt} onChange={onTilt} />
+          </SettingsRow>
 
-        <SettingsRow label="Motion">
-          <span data-testid="tp-settings-motion" className="contents">
-            <Segmented size="md" label="Motion" value={settings.motion} options={MOTION_OPTIONS} onChange={setMotion} />
-          </span>
-        </SettingsRow>
+          <SettingsRow label="Motion" layout="stack">
+            <Segmented<MotionPref> testId="tp-settings-motion" full label="Motion" value={settings.motion} options={MOTION_OPTIONS} onChange={setMotion} />
+          </SettingsRow>
 
-        <SettingsRow label="Opening">
-          <span data-testid="tp-settings-opening" className="contents">
-            <Segmented size="md" label="Opening" value={settings.opening} options={OPENING_OPTIONS} onChange={setOpening} />
-          </span>
-        </SettingsRow>
+          <SettingsRow label="Opening" layout="stack">
+            <Segmented<OpeningPref> testId="tp-settings-opening" full label="Opening" value={settings.opening} options={OPENING_OPTIONS} onChange={setOpening} />
+          </SettingsRow>
 
-        <SettingsRow label="Replay opening">
-          <Button variant="hairline" size="sm" data-testid="tp-settings-replay" onClick={replayOpening}>
-            Replay
-          </Button>
-        </SettingsRow>
+          <SettingsRow label="Replay opening">
+            <Button variant="hairline" size="sm" full data-testid="tp-settings-replay" onClick={replayOpening} icon={<RotateCcw size={16} strokeWidth={1.5} />}>
+              Replay
+            </Button>
+          </SettingsRow>
+        </SettingsGroup>
 
-        <SettingsRow label="Days">
-          <SettingsNote>Days reset at local midnight.</SettingsNote>
-        </SettingsRow>
-      </div>
-
-      <div className="rise-in rise-in-3">
         <SettingsData />
       </div>
 
-      <div className="rise-in rise-in-4">
-        <SettingsFooter />
-      </div>
+      <SettingsFooter />
     </section>
   )
 }

@@ -1,12 +1,20 @@
+import { featureOff, isBare } from '../lib/boot'
 import { useReducedMotion } from '../lib/motion'
 
 /**
- * THE POLISHED CENTRE (docs/design-spec.md section 8). Fixed at z 0, under the shards and the slab.
+ * THE TEMPLE AIR (polish-spec 3.4). Fixed at z 0, under the shards and the slab. Four layers, all
+ * static images (no live filters), drawn once:
+ * 1. Key pool: a 96vmax warm radial (cream to gold to nothing) centred 40 px under the goal line,
+ *    following `--tilt-x` (7vw at full tilt) only while the person has GOLD FOLLOWS TILT live. At rest
+ *    nothing moves, so the layer carries no will-change (at DPR 3 a permanent hint would hold a
+ *    2430 px square compositing layer for nothing).
+ * 2. Floor pool: a low gold ellipse at the plinth, static.
+ * 3. Floor falloff: the bottom of the page sinks into black, static.
+ * 4. Grain: a feTurbulence tile rendered once into a data-URI SVG at opacity 0.055 so black never bands.
+ * Reduced motion keeps every layer; the key pool simply stops following the tilt.
  *
- * Two layers: a 96vmax radial key light (rgba(220,224,230,0.06)) that drifts with `--tilt-x`, and a
- * static feTurbulence grain rendered once into a data-URI SVG and tiled as a background image at
- * opacity 0.05 so pure black never bands. The grain is an image, not a live filter: it costs one
- * rasterisation. Under reduced motion only the grain remains.
+ * Safe mode (src/lib/boot.ts): `data-fx="0"` drops the key pool, and level 2 (`data-bare="1"`) drops
+ * the whole backdrop for the plain obsidian page.
  */
 
 const GRAIN_SVG =
@@ -20,21 +28,32 @@ const GRAIN_URL = `url("data:image/svg+xml,${encodeURIComponent(GRAIN_SVG)}")`
 
 export function Backdrop() {
   const reduced = useReducedMotion()
+  if (isBare()) return null
+  const keyPool = !featureOff('fx')
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[var(--z-backdrop)] overflow-hidden">
-      {!reduced && (
+      {/* 1: key pool under the goal line */}
+      {keyPool && (
         <div
-          className="absolute left-1/2 top-[40%] h-[96vmax] w-[96vmax] rounded-full"
+          className="absolute left-1/2 h-[96vmax] w-[96vmax]"
           style={{
+            top: 'calc(var(--goal-y) + 40px)',
             background:
-              'radial-gradient(circle, rgba(220,224,230,0.06) 0%, rgba(220,224,230,0.028) 28%, rgba(220,224,230,0) 58%)',
-            transform: 'translate(calc(-50% + var(--tilt-x) * 7vw), -50%)',
-            willChange: 'transform',
+              'radial-gradient(closest-side, rgba(255,247,218,0.09) 0%, rgba(216,180,90,0.055) 34%, rgba(122,94,34,0.024) 62%, transparent 100%)',
+            transform: reduced ? 'translate(-50%, -50%)' : 'translate(calc(-50% + var(--tilt-x) * 7vw), -50%)',
           }}
         />
       )}
+      {/* 2: floor pool at the plinth */}
       <div
-        className="absolute inset-0 opacity-[0.05]"
+        className="absolute inset-0"
+        style={{ background: 'radial-gradient(60% 22% at 50% var(--plinth-y), rgba(216,180,90,0.08), transparent 70%)' }}
+      />
+      {/* 3: floor falloff */}
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(80% 50% at 50% 100%, rgba(0,0,0,0.5), transparent 70%)' }} />
+      {/* 4: grain */}
+      <div
+        className="absolute inset-0 opacity-[0.055]"
         style={{ backgroundImage: GRAIN_URL, backgroundSize: '160px 160px', backgroundRepeat: 'repeat' }}
       />
     </div>

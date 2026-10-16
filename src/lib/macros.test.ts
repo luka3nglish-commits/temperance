@@ -59,14 +59,22 @@ describe('addMacros and scaleMacros', () => {
 })
 
 describe('roundMacros', () => {
-  it('rounds to one decimal place', () => {
-    expect(roundMacros(m(123.44, 1.04, 2.96, 0.01))).toEqual(m(123.4, 1, 3, 0))
+  it('rounds to two decimal places', () => {
+    expect(roundMacros(m(123.44, 1.04, 2.96, 0.01))).toEqual(m(123.44, 1.04, 2.96, 0.01))
+    expect(roundMacros(m(123.444, 1.046, 2.961, 0.004))).toEqual(m(123.44, 1.05, 2.96, 0))
   })
 
-  it('rounds half up at one decimal', () => {
+  it('rounds half up at two decimals', () => {
     // these halves are exact in binary so the rule is observable
-    expect(roundMacros(m(6.75, 1.25, 2.75, 0.5))).toEqual(m(6.8, 1.3, 2.8, 0.5))
-    expect(roundMacros(m(0.25, 10.75, 3.125, 7.5))).toEqual(m(0.3, 10.8, 3.1, 7.5))
+    expect(roundMacros(m(6.75, 1.25, 2.75, 0.5))).toEqual(m(6.75, 1.25, 2.75, 0.5))
+    expect(roundMacros(m(0.25, 10.75, 3.125, 7.5))).toEqual(m(0.25, 10.75, 3.13, 7.5))
+  })
+
+  it('keeps enough precision that integer display rounds the true value once', () => {
+    // 180 g of a 3.6 g-per-100 g yoghurt is 6.48 g of carbs: shown as 6, never 7
+    const r = roundMacros(m(174.6, 16.2, 6.48, 9))
+    expect(r.carbs).toBe(6.48)
+    expect(Math.round(r.carbs)).toBe(6)
   })
 
   it('leaves whole numbers alone', () => {
@@ -99,7 +107,7 @@ describe('sumMacros and isZeroMacros', () => {
 
 describe('ingredientMacrosFor', () => {
   it('scales per 100 g', () => {
-    expect(ingredientMacrosFor(ing(), 50)).toEqual(m(189.5, 6.6, 33.9, 3.3))
+    expect(ingredientMacrosFor(ing(), 50)).toEqual(m(189.5, 6.6, 33.85, 3.25))
     expect(ingredientMacrosFor(ing(), 100)).toEqual(m(379, 13.2, 67.7, 6.5))
     expect(ingredientMacrosFor(ing(), 0)).toEqual(ZERO_MACROS)
   })
@@ -115,10 +123,10 @@ describe('ingredientMacrosFor', () => {
     expect(ingredientMacrosFor(bad, 2)).toEqual(m(20, 2, 2, 2))
   })
 
-  it('rounds the result to one decimal', () => {
+  it('rounds the result to two decimals', () => {
     const r = ingredientMacrosFor(ing(), 33)
-    expect(r.kcal).toBe(125.1)
-    expect(r.carbs).toBe(22.3)
+    expect(r.kcal).toBe(125.07)
+    expect(r.carbs).toBe(22.34)
   })
 })
 
@@ -130,7 +138,7 @@ describe('makeComponent', () => {
       name: 'Oats',
       amount: 250,
       unit: 'g',
-      macros: m(947.5, 33, 169.3, 16.3),
+      macros: m(947.5, 33, 169.25, 16.25),
     })
   })
 

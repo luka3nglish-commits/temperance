@@ -2,6 +2,88 @@
 <html lang="en-AU">
   <head>
     <meta charset="UTF-8" />
+    <script id="tp-boot">
+      /* Crash-loop guard (src/lib/boot.ts, docs/test-hooks.md). Runs before any stylesheet, font or module.
+         A previous boot that never became stable and is under 90 s old means the page crashed: step up
+         one safe level (1: no WebGL, no effects, no sweep, no opening; 2: also no backdrop or shards).
+         Plain ES5 on purpose, and every storage call is guarded: without storage the app boots at 0. */
+      (function (w, root) {
+        var BOOT = 'temperance.boot', SAFE = 'temperance.safe', FLAGS = 'temperance.flags'
+        var CRASH_MS = 90000, STICKY_MS = 14 * 86400000, NAMES = /^(safe|gl|fx|sweep|intro)$/
+        var now = new Date().getTime(), level = 0, reason = 'none', flags = {}, ls = null, ss = null
+        function get(st, k) {
+          try {
+            var v = st ? st.getItem(k) : null
+            return v ? JSON.parse(v) : null
+          } catch (e) {
+            return null
+          }
+        }
+        function put(st, k, v) {
+          try {
+            if (st) st.setItem(k, JSON.stringify(v))
+          } catch (e) {}
+        }
+        function drop(st, k) {
+          try {
+            if (st) st.removeItem(k)
+          } catch (e) {}
+        }
+        function lvl(n) {
+          return typeof n === 'number' && n >= 1 ? (n >= 2 ? 2 : 1) : 0
+        }
+        try {
+          ls = w.localStorage
+        } catch (e) {}
+        try {
+          ss = w.sessionStorage
+        } catch (e) {}
+        try {
+          var saved = get(ss, FLAGS), k, m, fresh = false
+          if (saved && typeof saved === 'object') for (k in saved) if (NAMES.test(k) && typeof saved[k] === 'string') flags[k] = saved[k]
+          var q = String((w.location && w.location.search) || ''), re = /[?&]([a-z]+)=([^&#]*)/g
+          while ((m = re.exec(q))) {
+            if (NAMES.test(m[1])) {
+              flags[m[1]] = m[2]
+              fresh = true
+            }
+          }
+          // a reload in the same tab keeps the switches, except safe=0, which acts once: a tab left on
+          // safe=0 would clear the sticky level on every reload and flip between crash and safe mode
+          if (fresh) {
+            var keep = {}
+            for (k in flags) if (!(k === 'safe' && flags[k] === '0')) keep[k] = flags[k]
+            put(ss, FLAGS, keep)
+          }
+
+          var prev = get(ls, BOOT), crash = 0, sticky = 0, url = flags.safe === '2' ? 2 : flags.safe === '1' ? 1 : 0
+          if (prev && prev.stable === false && typeof prev.at === 'number' && now >= prev.at && now - prev.at < CRASH_MS) crash = Math.min(2, lvl(prev.level) + 1)
+          // safe=0 clears the sticky level; a crash seen in this session still steps up, so a tab
+          // reloaded on ?safe=0 can never loop on the same crash
+          if (flags.safe === '0') drop(ls, SAFE)
+          else {
+            var st = get(ls, SAFE)
+            if (st && typeof st.at === 'number' && now >= st.at && now - st.at < STICKY_MS) sticky = lvl(st.level)
+            else if (st) drop(ls, SAFE)
+          }
+          level = Math.max(crash, sticky, url)
+          reason = level > 0 ? (url === level ? 'url' : crash === level ? 'crash' : 'sticky') : flags.safe === '0' ? 'url' : 'none'
+          put(ls, BOOT, { at: now, stable: false, level: level })
+          // only a real crash makes safe mode stick (14 days from the crash); a URL test never does
+          if (crash > sticky) put(ls, SAFE, { level: crash, at: now })
+        } catch (e) {
+          level = 0
+          reason = 'none'
+        }
+        try {
+          root.setAttribute('data-safe', String(level))
+          var names = ['gl', 'fx', 'sweep', 'intro']
+          for (var i = 0; i < names.length; i++) if (level >= 1 || flags[names[i]] === '0') root.setAttribute('data-' + names[i], '0')
+          if (level >= 2) root.setAttribute('data-bare', '1')
+        } catch (e) {}
+        w.__tpBoot = { level: level, flags: flags, reason: reason }
+      })(window, document.documentElement)
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#050507" />
     <meta name="color-scheme" content="dark" />
@@ -25,7 +107,6 @@
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%icons/icon.svg" />
     <link rel="apple-touch-icon" href="%BASE_URL%icons/apple-touch-icon.png" />
     <link rel="preload" as="font" type="font/woff2" crossorigin href="%BASE_URL%fonts/cinzel-700.woff2" />
-    <link rel="preload" as="font" type="font/woff2" crossorigin href="%BASE_URL%fonts/cinzel-400.woff2" />
     <link rel="preload" as="font" type="font/woff2" crossorigin href="%BASE_URL%fonts/cormorant-500.woff2" />
     <link rel="preload" as="font" type="font/woff2" crossorigin href="%BASE_URL%fonts/cormorant-400.woff2" />
     <link rel="preload" as="font" type="font/woff2" crossorigin href="%BASE_URL%fonts/cormorant-400-italic.woff2" />

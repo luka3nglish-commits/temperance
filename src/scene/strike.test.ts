@@ -104,6 +104,71 @@ describe('Monument choreography', () => {
     expect(m.mon.rotY).toBeCloseTo(0.035, 5)
   })
 
+  it('an over-goal crack never keeps the demand loop alive on its own (design-spec 7, rest rule)', () => {
+    const m = new Monument(hooks(false))
+    m.mon.crack = 1
+    m.mon.trauma = 0
+    const t0 = m.mon.crackTime
+    expect(m.tick(0.016, true, false)).toBe(false)
+    expect(m.mon.crackTime - t0).toBeCloseTo(0.016)
+  })
+
+  it('the ghost waits for the opening: hidden at mount, revealed by setInstant or playGhostReveal', () => {
+    const live = new Monument(hooks(false))
+    expect(live.mon.ghost).toBe(0)
+    live.playGhostReveal(440)
+    expect(live.mon.ghost).toBe(0)
+    live.killAll()
+    live.setInstant()
+    expect(live.mon.ghost).toBe(1)
+    const reduced = new Monument(hooks(true))
+    reduced.playGhostReveal(440)
+    expect(reduced.mon.ghost).toBe(1)
+  })
+
+  it('polish-spec 5.4: the strike window is 1600 ms; a live strike charges the glint, reduced motion never does', () => {
+    expect(MS.always).toBe(1600)
+    const h = hooks(false)
+    const m = new Monument(h)
+    m.setTargets(1.0, 0)
+    m.setInstant()
+    m.setTargets(2.2, 0.4)
+    m.strikeLog()
+    // the strike crosses the line: an ember glint rides the rising stone
+    expect(m.mon.glintOn).toBe(1)
+    expect(m.mon.glintEmber).toBe(1)
+    m.killAll()
+    m.setInstant()
+    expect(m.mon.glintOn).toBe(0)
+    expect(m.mon.reflectK).toBe(1)
+    expect(m.mon.fovPunch).toBe(0)
+    expect(m.mon.shock).toBe(-1)
+
+    const r = new Monument(hooks(true))
+    r.setTargets(1.0, 0)
+    r.setInstant()
+    r.setTargets(1.6, 0)
+    r.strikeLog()
+    expect(r.mon.glintOn).toBe(0)
+    expect(r.mon.reflectK).toBe(1)
+    expect(r.mon.shock).toBe(-1)
+    r.setTargets(1.0, 0)
+    r.strikeRemove()
+    expect(r.mon.shimmerX).toBeNull()
+  })
+
+  it('a live removal sinks, then holds the frameloop through the shimmer', () => {
+    const h = hooks(false)
+    const m = new Monument(h)
+    m.setTargets(1.6, 0)
+    m.setInstant()
+    m.setTargets(1.0, 0)
+    m.strikeRemove()
+    expect(h.holds).toContain(MS.sink + MS.shimmer + 100)
+    m.killAll()
+    expect(m.mon.shimmerX).toBeNull()
+  })
+
   it('the crack clock only runs while cracked', () => {
     const h = hooks(false)
     const m = new Monument(h)

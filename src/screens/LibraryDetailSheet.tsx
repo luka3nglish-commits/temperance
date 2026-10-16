@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChevronRight, Pencil, SquarePlus, Star, X } from 'lucide-react'
+import { ChevronRight, Pencil, Star, X } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import type { Ingredient, Macros, Meal } from '../lib/types'
+import type { AmountUnit, EnergyUnit, Ingredient, Macros, Meal } from '../lib/types'
 import { ingredientMacrosFor, scaleMacros } from '../lib/macros'
-import { formatEnergy, parseNumber, unitLabel } from '../lib/units'
+import { formatEnergy, unitLabel } from '../lib/units'
+import { formatAmount } from '../lib/portion'
 import { vibrate } from '../lib/motion'
-import { Input, Sheet, Stepper, decimalInputProps, useToast } from '../components/ui'
-import { amountLabel, basisLabel, energyText, fmtGrams } from './LibraryFormat'
+import { Button, PortionField, PortionPicks, SectionHeading, Sheet, Tablet, ValueUnit, useStaggerOnce, useToast } from '../components/ui'
+import { amountLabel, basisLabel, energyText, fmtGrams, loggedText } from './LibraryFormat'
 
 export type DetailTarget = { kind: 'meal'; id: string } | { kind: 'ingredient'; id: string }
 
@@ -22,7 +23,12 @@ type Props = {
 
 const DELETE_ARM_MS = 3500
 
-/** The MEAL DETAIL / INGREDIENT sheet: name, numbers, portion or amount, four hairline actions. */
+/**
+ * The MEAL DETAIL / INGREDIENT sheet (polish-spec 6.3): the name, the numbers tablet (energy in flat
+ * gold, protein, carbs and fat in bone) scaling live with the portion, the PORTION label row with the
+ * basis at the right, the PortionField in the item's basis with its quick picks, LOG in gold with the
+ * amount and energy under it, then EDIT, FAVOURITE and DELETE (two-step) and the quiet note.
+ */
 export function LibraryDetailSheet({ target, onClose, onClosed, onEdit, onBuild }: Props) {
   // keep the last target so the sheet can animate out after it is cleared
   const [held, setHeld] = useState<DetailTarget | null>(target)
@@ -72,81 +78,32 @@ function useLast<T>(value: T | undefined): T | undefined {
 
 /* ---------------- shared pieces ---------------- */
 
-function Numbers({ macros }: { macros: Macros }) {
-  const unit = useStore((s) => s.settings.unit)
+/** The raised numbers tablet: energy in flat gold-300 32 px, then protein, carbs and fat in bone. */
+function Numbers({ macros, eu }: { macros: Macros; eu: EnergyUnit }) {
   return (
-    <div className="mt-4 flex items-end justify-between gap-4">
-      <div className="min-w-0">
-        <div className="font-display text-[10px] tracking-[0.4em] text-bone-dim">{unitLabel(unit)}</div>
-        <div className="font-display inscribed num mt-1.5 text-[32px] leading-[1.1] tracking-[0.02em] text-gold-400">{formatEnergy(macros.kcal, unit)}</div>
-      </div>
-      <dl className="flex shrink-0 gap-5">
+    <Tablet className="mt-4" testId="tp-detail-numbers">
+      <ValueUnit value={formatEnergy(macros.kcal, eu)} unit={unitLabel(eu)} size={32} tone="gold" className="leading-none" testId="tp-detail-kcal" />
+      <dl className="mt-4 grid grid-cols-3 gap-3">
         {(
           [
-            ['Protein', 'P', macros.protein],
-            ['Carbs', 'C', macros.carbs],
-            ['Fat', 'F', macros.fat],
+            ['Protein', macros.protein],
+            ['Carbs', macros.carbs],
+            ['Fat', macros.fat],
           ] as const
-        ).map(([full, short, v]) => (
-          <div key={short} className="text-right">
-            <dt className="font-display text-[10px] tracking-[0.4em] text-bone-dim">
-              <span aria-hidden="true">{short}</span>
-              <span className="sr-only">{full}</span>
-            </dt>
-            <dd className="font-display inscribed num mt-1.5 text-[20px] leading-[1.1] tracking-[0.02em] text-bone">
-              {fmtGrams(v)}
-              <span className="ml-0.5 font-body text-[14px] text-bone-dim">g</span>
+        ).map(([full, v]) => (
+          <div key={full} className="min-w-0">
+            <dt className="label">{full}</dt>
+            <dd className="mt-2">
+              <ValueUnit value={fmtGrams(v)} unit="g" size={20} />
             </dd>
           </div>
         ))}
       </dl>
-    </div>
+    </Tablet>
   )
 }
 
-type ActionProps = {
-  icon: ReactNode
-  label: string
-  onClick(): void
-  tone?: 'default' | 'ember'
-  /** replaces the label while armed */
-  armed?: boolean
-  note?: ReactNode
-  pressed?: boolean
-  testId?: string
-}
-
-/** One of the four 56 px hairline actions. */
-function Action({ icon, label, onClick, tone = 'default', armed, note, pressed, testId }: ActionProps) {
-  const ember = tone === 'ember'
-  return (
-    <li data-delete={ember ? '' : undefined} className={`border-t transition-colors duration-150 ${armed ? 'border-ember' : 'border-[var(--gold-line)]'}`}>
-      <button
-        type="button"
-        data-testid={testId}
-        data-armed={armed ? '' : undefined}
-        onClick={onClick}
-        aria-pressed={pressed}
-        className={`flex h-14 w-full items-center gap-4 text-left transition-colors duration-150 hover:bg-[var(--gold-line)] active:bg-[var(--gold-line)] cursor-pointer ${
-          ember ? 'text-ember-text' : 'text-gold-400'
-        }`}
-      >
-        <span aria-hidden="true" className="flex w-6 shrink-0 justify-center">
-          {icon}
-        </span>
-        <span
-          data-testid={armed ? 'tp-meal-delete-confirm' : undefined}
-          className={`font-display inscribed flex-1 ${armed ? 'text-[10px] tracking-[0.4em] text-ember' : 'text-[14px] tracking-[0.3em]'}`}
-        >
-          {armed ? 'Delete?' : label}
-        </span>
-      </button>
-      {note ? <p className="-mt-1 pb-3 pl-10 font-body text-[14px] italic leading-[1.4] text-bone-dim">{note}</p> : null}
-    </li>
-  )
-}
-
-/** Two-step delete: first tap arms (rule turns ember, DELETE?), second tap within 3.5 s deletes. */
+/** Two-step delete: first tap arms (DELETE? on an ember wash), second tap within 3.5 s deletes. */
 function useArmedDelete(onDelete: () => void) {
   const [armed, setArmed] = useState(false)
   const timer = useRef(0)
@@ -161,6 +118,7 @@ function useArmedDelete(onDelete: () => void) {
       onDelete()
       return
     }
+    vibrate(10)
     setArmed(true)
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => setArmed(false), DELETE_ARM_MS)
@@ -172,25 +130,123 @@ function Title({ name, favourite }: { name: string; favourite: boolean }) {
   return (
     <h3 className="flex items-start gap-2 font-body text-[26px] font-medium leading-[1.2] text-bone">
       <span className="min-w-0 break-words">{name}</span>
-      {favourite ? <Star aria-label="Favourite" size={14} strokeWidth={1.5} className="mt-2 shrink-0 fill-current text-gold-400" /> : null}
+      {favourite ? <Star aria-label="Favourite" size={14} strokeWidth={1.5} className="mt-2.5 shrink-0 fill-current text-gold-400" /> : null}
     </h3>
+  )
+}
+
+type PortionProps = {
+  testId: string
+  unit: AmountUnit
+  value: number
+  onChange(v: number): void
+  onPreview(n: number | null): void
+  /** right side of the label row: the basis and its energy */
+  basis: string
+  usual?: number
+  picks?: readonly number[]
+}
+
+/** PORTION label row (basis at the right), the 64 px PortionField and the four picks under it. */
+function PortionBlock({ testId, unit, value, onChange, onPreview, basis, usual, picks }: PortionProps) {
+  return (
+    <div className="mt-5">
+      <div className="mb-2 flex h-5 items-baseline justify-between gap-3">
+        <span className="label">Portion</span>
+        <span className="hint num truncate" data-testid={`${testId}-basis`}>
+          {basis}
+        </span>
+      </div>
+      <PortionField testId={testId} unit={unit} value={value} onChange={onChange} onPreview={onPreview} />
+      <PortionPicks testId={testId} unit={unit} value={value} usual={usual} picks={picks} onChange={onChange} className="mt-2" />
+    </div>
+  )
+}
+
+type ActionsProps = {
+  kind: 'meal' | 'ingredient'
+  onLog(): void
+  /** `180 g · 175 kcal` under LOG */
+  meta: string
+  onEdit(): void
+  favourite: boolean
+  onFavourite(): void
+  del: { armed: boolean; tap(): void }
+  note: ReactNode
+}
+
+/** Under 380 px the half-width EDIT and FAVOURITE buttons take 12 px sides and a 6 px gap so FAVOURITE fits whole. */
+const NARROW_PAD = 'max-[379px]:px-3! max-[379px]:gap-1.5'
+
+/** LOG (gold) with its meta line, then EDIT and FAVOURITE side by side, DELETE under them, then the note. */
+function Actions({ kind, onLog, meta, onEdit, favourite, onFavourite, del, note }: ActionsProps) {
+  return (
+    <div className="mt-6">
+      <Button variant="gold" full data-testid={`tp-${kind}-detail-log`} onClick={onLog}>
+        Log
+      </Button>
+      <p className="hint num mt-2 text-center" data-testid={`tp-${kind}-detail-meta`}>
+        {meta}
+      </p>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <Button variant="hairline" size="lg" full className={NARROW_PAD} data-testid={`tp-${kind}-detail-edit`} icon={<Pencil size={16} strokeWidth={1.5} />} onClick={onEdit}>
+          Edit
+        </Button>
+        <Button
+          variant="hairline"
+          size="lg"
+          full
+          className={NARROW_PAD}
+          data-testid={`tp-${kind}-detail-fav`}
+          aria-pressed={favourite}
+          icon={<Star size={16} strokeWidth={1.5} className={favourite ? 'fill-current' : ''} />}
+          onClick={onFavourite}
+        >
+          Favourite
+        </Button>
+        {/* DELETE sits alone and centred at half width: there, never loud */}
+        <div data-delete="" className="col-span-2 w-[calc(50%-6px)] justify-self-center">
+          <Button
+            variant="danger"
+            size="lg"
+            full
+            armed={del.armed}
+            data-testid={`tp-${kind}-detail-delete`}
+            data-armed={del.armed ? '' : undefined}
+            icon={<X size={16} strokeWidth={1.5} />}
+            onClick={del.tap}
+          >
+            {del.armed ? <span data-testid={`tp-${kind}-delete-confirm`}>Delete?</span> : 'Delete'}
+          </Button>
+        </div>
+      </div>
+      <p className="mt-4 text-center font-body text-[16px] font-medium italic leading-[1.4] text-bone-soft">{note}</p>
+    </div>
   )
 }
 
 /* ---------------- meal ---------------- */
 
 function MealDetail({ meal, onClose, onEdit, onBuild }: { meal: Meal; onClose(): void; onEdit(): void; onBuild(): void }) {
-  const unit = useStore((s) => s.settings.unit)
+  const eu = useStore((s) => s.settings.unit)
   const ingredients = useStore((s) => s.ingredients)
-  const [portion, setPortion] = useState(1)
-  const scaled = useMemo(() => scaleMacros(meal.macros, portion), [meal.macros, portion])
+  const stagger = useStaggerOnce()
+  // the meal's basis: per serve, or per an amount (per 100 g) as printed on a label
+  const unit: AmountUnit = meal.per?.unit ?? 'serve'
+  const base = meal.per && meal.per.amount > 0 ? meal.per.amount : 1
+  const [amount, setAmount] = useState(() => meal.usual ?? meal.per?.amount ?? 1)
+  const [preview, setPreview] = useState<number | null>(null)
+  const shown = preview ?? amount
+  // what the amount multiplies: servings, or amount over the basis amount
+  const factor = unit === 'serve' && !meal.per ? shown : shown / base
+  const scaled = useMemo(() => scaleMacros(meal.macros, factor), [meal.macros, factor])
 
   const log = () => {
-    const entry = useStore.getState().logMeal(meal.id, portion)
+    const entry = useStore.getState().logMeal(meal.id, meal.per ? { amount, unit } : amount)
     if (!entry) return
     vibrate(8)
     useToast.getState().show({
-      text: `Logged · ${energyText(entry.macros.kcal, unit)}`,
+      text: loggedText(entry, eu),
       action: { label: 'Undo', icon: 'undo', onClick: () => useStore.getState().deleteEntry(entry.id) },
     })
     onClose()
@@ -208,98 +264,104 @@ function MealDetail({ meal, onClose, onEdit, onBuild }: { meal: Meal; onClose():
     <div
       data-testid="tp-meal-detail"
       data-kind={meal.kind}
+      data-unit={unit}
       onClickCapture={(e) => {
         // any other tap in the sheet disarms a pending delete
         if (del.armed && !(e.target as HTMLElement).closest('[data-delete]')) del.disarm()
       }}
     >
       <Title name={meal.name} favourite={meal.favourite} />
-      <Numbers macros={scaled} />
+      <Numbers macros={scaled} eu={eu} />
 
-      <div className="mt-5">
-        <div className="mb-1.5 flex items-baseline justify-between">
-          <span className="font-display text-[10px] tracking-[0.35em] text-bone-dim">Portion</span>
-          {portion !== 1 ? (
-            <span className="num font-body text-[14px] text-bone-dim">
-              one is {energyText(meal.macros.kcal, unit)}
-            </span>
-          ) : null}
-        </div>
-        <Stepper value={portion} onChange={setPortion} />
-      </div>
+      <PortionBlock
+        testId="tp-meal-detail-portion"
+        unit={unit}
+        value={amount}
+        onChange={setAmount}
+        onPreview={setPreview}
+        basis={`${basisLabel(meal.per)} · ${energyText(meal.macros.kcal, eu)}`}
+        usual={meal.usual}
+      />
+
+      <Actions
+        kind="meal"
+        onLog={log}
+        meta={`${formatAmount(shown, unit)} · ${energyText(scaled.kcal, eu)}`}
+        onEdit={onEdit}
+        favourite={meal.favourite}
+        onFavourite={() => {
+          vibrate(8)
+          useStore.getState().toggleFavouriteMeal(meal.id)
+        }}
+        del={del}
+        note="Edits change future logs only. Past days keep their numbers."
+      />
 
       {components.length ? (
-        <div className="mt-5">
-          <div className="flex items-end justify-between border-b border-[var(--gold-line-strong)]">
-            <span className="font-display pb-2 text-[10px] tracking-[0.4em] text-bone-dim">Built from</span>
-            <button
-              type="button"
-              data-testid="tp-meal-detail-build"
-              onClick={onBuild}
-              className="font-display -mr-2 inline-flex h-11 min-w-11 items-center justify-center gap-1.5 px-2 text-[10px] tracking-[0.3em] text-gold-400 hover:text-gold-300 cursor-pointer"
-            >
-              Build
-              <ChevronRight size={12} strokeWidth={1.5} aria-hidden="true" />
-            </button>
-          </div>
-          <ul>
+        <section className="mt-7" aria-labelledby="lib-detail-built">
+          <SectionHeading
+            as="h3"
+            id="lib-detail-built"
+            right={
+              <button
+                type="button"
+                data-testid="tp-meal-detail-build"
+                onClick={onBuild}
+                className="label press -my-2.5 -mr-2 inline-flex h-11 min-w-11 items-center justify-center gap-1 px-2 text-gold-300 cursor-pointer"
+              >
+                Build
+                <ChevronRight size={16} strokeWidth={1.5} aria-hidden="true" />
+              </button>
+            }
+          >
+            Built from
+          </SectionHeading>
+          <ul className={stagger}>
             {components.map((c, i) => {
               const gone = !ingredients[c.ingredientId]
-              const amount = c.amount * portion
-              const kcal = c.macros.kcal * portion
               return (
-                <li key={`${c.ingredientId}:${i}`} className="flex min-h-11 items-center gap-3 border-b border-[var(--gold-line)] py-1.5">
-                  <span className={`min-w-0 flex-1 truncate font-body text-[17px] font-medium ${gone ? 'text-bone-mute' : 'text-bone'}`}>{c.name}</span>
-                  {gone ? <span className="font-body text-[13px] italic text-bone-mute">removed</span> : null}
-                  <span className="num shrink-0 font-body text-[14px] text-bone-dim">{amountLabel(amount, c.unit)}</span>
-                  <span className="font-display inscribed num w-16 shrink-0 text-right text-[15px] tracking-[0.02em] text-gold-400">{formatEnergy(kcal, unit)}</span>
+                <li key={`${c.ingredientId}:${i}`} className="row-rule grid min-h-[52px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-1.5">
+                  <span className="min-w-0">
+                    <span className={`block truncate font-body text-[18px] font-medium leading-[1.3] ${gone ? 'text-bone-mute' : 'text-bone'}`}>{c.name}</span>
+                    {gone ? <span className="hint block italic">removed from the library</span> : null}
+                  </span>
+                  <span className="meta shrink-0">{amountLabel(c.amount * factor, c.unit)}</span>
+                  <ValueUnit value={formatEnergy(c.macros.kcal * factor, eu)} unit={unitLabel(eu)} className="min-w-[72px] justify-end" />
                 </li>
               )
             })}
           </ul>
-        </div>
+        </section>
       ) : null}
-
-      <ul className="mt-6 border-b border-[var(--gold-line)]">
-        <Action testId="tp-meal-detail-log" icon={<SquarePlus size={20} strokeWidth={1.5} />} label="Log" onClick={log} />
-        <Action
-          testId="tp-meal-detail-edit"
-          icon={<Pencil size={18} strokeWidth={1.5} />}
-          label="Edit"
-          onClick={onEdit}
-          note="Edits change future logs only. Past days keep their numbers."
-        />
-        <Action
-          testId="tp-meal-detail-fav"
-          icon={<Star size={18} strokeWidth={1.5} className={meal.favourite ? 'fill-current' : ''} />}
-          label="Favourite"
-          pressed={meal.favourite}
-          onClick={() => {
-            vibrate(8)
-            useStore.getState().toggleFavouriteMeal(meal.id)
-          }}
-        />
-        <Action testId="tp-meal-detail-delete" icon={<X size={18} strokeWidth={1.5} />} label="Delete" tone="ember" armed={del.armed} onClick={del.tap} />
-      </ul>
     </div>
   )
 }
 
 /* ---------------- ingredient ---------------- */
 
+/**
+ * Quick picks for an ingredient: whole items for a per-serve basis (1, 2, 3, 4 eggs), multiples of a
+ * small basis (olive oil per 10 ml: 10, 20, 30, 40), else the standard four (100, 150, 200, 250 g).
+ */
+function ingredientPicks(per: Ingredient['per']): readonly number[] | undefined {
+  if (per.unit !== 'serve' && per.amount >= 50) return undefined
+  return [1, 2, 3, 4].map((k) => k * per.amount)
+}
+
 function IngredientDetail({ ingredient, onClose, onEdit }: { ingredient: Ingredient; onClose(): void; onEdit(): void }) {
-  const unit = useStore((s) => s.settings.unit)
-  const [amountText, setAmountText] = useState(() => fmtGrams(ingredient.per.amount))
-  const amount = parseNumber(amountText)
-  const effective = amount && amount > 0 ? amount : ingredient.per.amount
-  const scaled = useMemo(() => ingredientMacrosFor(ingredient, effective), [ingredient, effective])
-  const suffix = ingredient.per.unit === 'serve' ? (effective === 1 ? 'serve' : 'serves') : ingredient.per.unit
+  const eu = useStore((s) => s.settings.unit)
+  const unit = ingredient.per.unit
+  const [amount, setAmount] = useState(() => (ingredient.per.amount > 0 ? ingredient.per.amount : 1))
+  const [preview, setPreview] = useState<number | null>(null)
+  const shown = preview ?? amount
+  const scaled = useMemo(() => ingredientMacrosFor(ingredient, shown), [ingredient, shown])
 
   const log = () => {
-    const entry = useStore.getState().logQuick({ name: `${ingredient.name} · ${amountLabel(effective, ingredient.per.unit)}`, macros: scaled, servings: 1 })
+    // the entry records the amount eaten (180 g), so the TODAY sheet and recents can show it
+    const entry = useStore.getState().logQuick({ name: ingredient.name, macros: ingredient.macros, per: ingredient.per, amount })
     vibrate(8)
     useToast.getState().show({
-      text: `Logged · ${energyText(entry.macros.kcal, unit)}`,
+      text: loggedText(entry, eu),
       action: { label: 'Undo', icon: 'undo', onClick: () => useStore.getState().deleteEntry(entry.id) },
     })
     onClose()
@@ -314,55 +376,37 @@ function IngredientDetail({ ingredient, onClose, onEdit }: { ingredient: Ingredi
   return (
     <div
       data-testid="tp-ingredient-detail"
+      data-unit={unit}
       onClickCapture={(e) => {
         if (del.armed && !(e.target as HTMLElement).closest('[data-delete]')) del.disarm()
       }}
     >
       <Title name={ingredient.name} favourite={ingredient.favourite} />
-      <Numbers macros={scaled} />
+      <Numbers macros={scaled} eu={eu} />
 
-      <div className="mt-5">
-        <div className="mb-1.5 flex items-baseline justify-between">
-          <label htmlFor="lib-ing-amount" className="font-display text-[10px] tracking-[0.35em] text-bone-dim">
-            Amount
-          </label>
-          <span className="num font-body text-[14px] text-bone-dim">{basisLabel(ingredient.per)} · {energyText(ingredient.macros.kcal, unit)}</span>
-        </div>
-        <Input
-          id="lib-ing-amount"
-          {...decimalInputProps}
-          value={amountText}
-          onChange={(e) => setAmountText(e.target.value)}
-          onFocus={(e) => e.currentTarget.select()}
-          suffix={suffix}
-          enterKeyHint="done"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') log()
-          }}
-        />
-      </div>
+      <PortionBlock
+        testId="tp-ingredient-detail-portion"
+        unit={unit}
+        value={amount}
+        onChange={setAmount}
+        onPreview={setPreview}
+        basis={`${basisLabel(ingredient.per)} · ${energyText(ingredient.macros.kcal, eu)}`}
+        picks={ingredientPicks(ingredient.per)}
+      />
 
-      <ul className="mt-6 border-b border-[var(--gold-line)]">
-        <Action testId="tp-ingredient-detail-log" icon={<SquarePlus size={20} strokeWidth={1.5} />} label="Log" onClick={log} />
-        <Action
-          testId="tp-ingredient-detail-edit"
-          icon={<Pencil size={18} strokeWidth={1.5} />}
-          label="Edit"
-          onClick={onEdit}
-          note="Edits change future logs only. Past days and saved meals keep their numbers."
-        />
-        <Action
-          testId="tp-ingredient-detail-fav"
-          icon={<Star size={18} strokeWidth={1.5} className={ingredient.favourite ? 'fill-current' : ''} />}
-          label="Favourite"
-          pressed={ingredient.favourite}
-          onClick={() => {
-            vibrate(8)
-            useStore.getState().toggleFavouriteIngredient(ingredient.id)
-          }}
-        />
-        <Action testId="tp-ingredient-detail-delete" icon={<X size={18} strokeWidth={1.5} />} label="Delete" tone="ember" armed={del.armed} onClick={del.tap} />
-      </ul>
+      <Actions
+        kind="ingredient"
+        onLog={log}
+        meta={`${formatAmount(shown, unit)} · ${energyText(scaled.kcal, eu)}`}
+        onEdit={onEdit}
+        favourite={ingredient.favourite}
+        onFavourite={() => {
+          vibrate(8)
+          useStore.getState().toggleFavouriteIngredient(ingredient.id)
+        }}
+        del={del}
+        note="Edits change future logs only. Past days and saved meals keep their numbers."
+      />
     </div>
   )
 }

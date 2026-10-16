@@ -1,7 +1,7 @@
 import { RotateCcw } from 'lucide-react'
 import type { EnergyUnit, LogEntry } from '../lib/types'
 import { DOT, energyLine } from '../components/MealForm'
-import { CHIP_CLASS, CHIP_ENERGY_CLASS, CHIP_LABEL_CLASS } from './LogFavourites'
+import { Chip } from '../components/ui'
 
 /** What REPEAT YESTERDAY would copy: how many entries `day` holds and their energy in kcal. */
 export function daySummary(entries: readonly LogEntry[], day: string): { count: number; kcal: number } {
@@ -36,18 +36,16 @@ type Props = {
 export function RepeatYesterdayChip({ kcal, count, unit, onRepeat }: Props) {
   const energy = energyLine(kcal, unit)
   return (
-    <button
-      type="button"
-      data-testid="tp-repeat-yesterday"
+    <Chip
+      testId="tp-repeat-yesterday"
       data-count={count}
       data-kcal={Math.round(kcal)}
       onClick={onRepeat}
       aria-label={`Repeat yesterday's meals, ${energy}`}
-      className={CHIP_CLASS}
-    >
-      <RotateCcw aria-hidden="true" size={14} strokeWidth={1.5} className="shrink-0 text-gold-400" />
-      <span className={`${CHIP_LABEL_CLASS} whitespace-nowrap`}>Repeat yesterday</span>
-      <span className={CHIP_ENERGY_CLASS}>{energy}</span>
-    </button>
+      icon={<RotateCcw aria-hidden="true" size={16} strokeWidth={1.5} className="text-gold-400" />}
+      label="Repeat"
+      trailing={<span className="num">{energy}</span>}
+      maxWidth={200}
+    />
   )
 }

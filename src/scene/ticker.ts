@@ -23,7 +23,8 @@ export type Ticker = {
 
 export const LIVE_IDLE_CAP = 90_000
 
-export function createTicker(onTick: () => void, fps = 24): Ticker {
+/** `onRunChange` hears when the interval starts or stops (the DOM shaft breathes only while it runs). */
+export function createTicker(onTick: () => void, fps = 24, onRunChange?: (running: boolean) => void): Ticker {
   let rate = fps
   let enabled = false
   let visible = true
@@ -42,6 +43,7 @@ export function createTicker(onTick: () => void, fps = 24): Ticker {
     if (timer) {
       window.clearInterval(timer)
       timer = 0
+      onRunChange?.(false)
     }
   }
   const start = () => {
@@ -50,6 +52,7 @@ export function createTicker(onTick: () => void, fps = 24): Ticker {
       if (gatesOpen()) onTick()
       else stop()
     }, 1000 / rate)
+    onRunChange?.(true)
   }
   const evaluate = () => {
     if (disposed) return

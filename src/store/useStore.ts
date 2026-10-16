@@ -14,6 +14,7 @@ import type {
   MealComponent,
   MotionPref,
   OpeningPref,
+  Portion,
   Settings,
   WeightEntry,
 } from '../lib/types'
@@ -22,6 +23,7 @@ import { newId } from '../lib/id'
 import { localDayKey } from '../lib/day'
 import { roundMacros, scaleMacros, sumMacros } from '../lib/macros'
 import { validateExportFile } from '../lib/exportFile'
+import { cleanAmount, cleanServings, resolvePortion } from '../lib/portion'
 
 export const STORAGE_KEY = 'temperance.v1'
 
@@ -72,9 +74,11 @@ export interface TemperanceStore extends Data {
   persistFailed: boolean
 
   // meals
-  addQuickMeal(input: { name: string; macros: Macros; favourite?: boolean }, now?: number): Meal
+  /** `per` makes the macros count per that amount (e.g. per 100 g); `usual` is the amount usually eaten. */
+  addQuickMeal(input: { name: string; macros: Macros; favourite?: boolean; per?: Portion; usual?: number }, now?: number): Meal
   addBuiltMeal(input: { name: string; components: MealComponent[]; favourite?: boolean }, now?: number): Meal
-  updateMeal(id: string, patch: Partial<Pick<Meal, 'name' | 'macros' | 'components' | 'favourite'>>, now?: number): void
+  /** Pass `per: undefined` to make a meal count per serve again. */
+  updateMeal(id: string, patch: Partial<Pick<Meal, 'name' | 'macros' | 'components' | 'favourite' | 'per' | 'usual'>>, now?: number): void
   deleteMeal(id: string): void
   toggleFavouriteMeal(id: string, now?: number): void
 
@@ -85,12 +89,34 @@ export interface TemperanceStore extends Data {
   toggleFavouriteIngredient(id: string, now?: number): void
 
   // log
-  logMeal(mealId: string, servings?: number, now?: number): LogEntry | null
+  /**
+   * Log a library meal. `portion`: a number is servings (or bases for a per-100 g meal); a Portion
+   * is an amount, e.g. { amount: 180, unit: 'g' }; omitted, the meal's usual amount is used.
+   * An explicit portion becomes the meal's new usual amount. Null when the meal is gone or the
+   * portion cannot apply (grams for a per-serve meal).
+   */
+  logMeal(mealId: string, portion?: number | Portion, now?: number): LogEntry | null
+  /**
+   * Log typed numbers. With `per` (e.g. { amount: 100, unit: 'g' }) the macros are per that amount
+   * and `amount` is what was eaten in `per.unit`; without it `servings` multiplies the macros.
+   */
   logQuick(
-    input: { name: string; macros: Macros; servings?: number; components?: MealComponent[]; saveToLibrary?: boolean; favourite?: boolean },
+    input: {
+      name: string
+      macros: Macros
+      servings?: number
+      per?: Portion
+      amount?: number
+      components?: MealComponent[]
+      saveToLibrary?: boolean
+      favourite?: boolean
+    },
     now?: number,
   ): LogEntry
-  updateEntry(id: string, patch: { name?: string; servings?: number; macros?: Macros }, now?: number): void
+  /** Log an earlier entry again today, exactly as it was (recents). */
+  relogEntry(entryId: string, now?: number): LogEntry | null
+  /** `portion` rescales a gram or millilitre entry by amount; `servings` rescales by multiplier. */
+  updateEntry(id: string, patch: { name?: string; servings?: number; portion?: Portion; macros?: Macros }, now?: number): void
   deleteEntry(id: string, now?: number): void
   /** Remove several entries in one write with one pulse (UNDO of a repeated day). */
   deleteEntries(ids: readonly string[], now?: number): void
@@ -130,9 +156,16 @@ export interface TemperanceStore extends Data {
   resetAll(): void
 }
 
-const clampServings = (s: number | undefined) => {
-  const n = typeof s === 'number' && Number.isFinite(s) && s > 0 ? s : 1
-  return Math.round(n * 100) / 100
+const clampServings = cleanServings
+
+/** A meal basis made safe: positive amount, known unit; a 1-serve basis is the same as none. */
+function cleanPer(per: Portion | undefined): Portion | undefined {
+  if (!per) return undefined
+  const unit = per.unit === 'ml' || per.unit === 'serve' ? per.unit : 'g'
+  const amount = cleanAmount(per.amount, unit)
+  if (amount === null) return undefined
+  if (unit === 'serve' && amount === 1) return undefined
+  return { amount, unit }
 }
 
 const cleanName = (s: string) => s.trim().replace(/\s+/g, ' ').slice(0, 80)
@@ -187,12 +220,16 @@ export const useStore = create<TemperanceStore>()(
       persistFailed: false,
 
       // ---------- meals ----------
-      addQuickMeal({ name, macros, favourite = false }, now = Date.now()) {
+      addQuickMeal({ name, macros, favourite = false, per, usual }, now = Date.now()) {
+        const basis = cleanPer(per)
+        const usualAmount = typeof usual === 'number' ? cleanAmount(usual, basis ? basis.unit : 'serve') : null
         const meal: Meal = {
           id: newId(),
           name: cleanName(name) || 'Meal',
           kind: 'quick',
           macros: roundMacros(macros),
+          ...(basis ? { per: basis } : {}),
+          ...(usualAmount !== null ? { usual: usualAmount } : {}),
           favourite,
           createdAt: now,
           updatedAt: now,
@@ -225,6 +262,18 @@ export const useStore = create<TemperanceStore>()(
           if (!cur) return {}
           const next: Meal = { ...cur, ...patch, updatedAt: now }
           if (patch.name !== undefined) next.name = cleanName(patch.name) || cur.name
+          if ('per' in patch) {
+            const basis = cleanPer(patch.per)
+            if (basis) next.per = basis
+            else delete next.per
+            // a usual amount in the old unit means nothing in the new one
+            if ((basis?.unit ?? 'serve') !== (cur.per?.unit ?? 'serve') && !('usual' in patch)) delete next.usual
+          }
+          if ('usual' in patch) {
+            const u = typeof patch.usual === 'number' ? cleanAmount(patch.usual, next.per ? next.per.unit : 'serve') : null
+            if (u === null) delete next.usual
+            else next.usual = u
+          }
           if (patch.components) {
             const rounded = patch.components.map((c) => ({ ...c, macros: roundMacros(c.macros) }))
             next.components = rounded
@@ -300,10 +349,12 @@ export const useStore = create<TemperanceStore>()(
       },
 
       // ---------- log ----------
-      logMeal(mealId, servings, now = Date.now()) {
+      logMeal(mealId, portionArg, now = Date.now()) {
         const meal = get().meals[mealId]
         if (!meal) return null
-        const n = clampServings(servings)
+        const resolved = resolvePortion(meal.per, portionArg, meal.usual)
+        if (!resolved) return null
+        const n = resolved.servings
         const entry: LogEntry = {
           id: newId(),
           day: localDayKey(new Date(now)),
@@ -313,10 +364,13 @@ export const useStore = create<TemperanceStore>()(
           servings: n,
           macros: roundMacros(scaleMacros(meal.macros, n)),
           components: meal.components?.map((c) => ({ ...c, amount: c.amount * n, macros: roundMacros(scaleMacros(c.macros, n)) })),
+          ...(resolved.portion ? { portion: resolved.portion } : {}),
         }
         set((s) => {
           const entries = [...s.entries, entry]
           const touched: Meal = { ...meal, lastUsedAt: now, useCount: meal.useCount + 1 }
+          // an explicit amount becomes the usual one, so the next one-tap log matches it
+          if (portionArg !== undefined) touched.usual = resolved.portion ? resolved.portion.amount : n
           const ingredients = { ...s.ingredients }
           for (const c of meal.components ?? []) {
             const ing = ingredients[c.ingredientId]
@@ -332,15 +386,25 @@ export const useStore = create<TemperanceStore>()(
         return entry
       },
 
-      logQuick({ name, macros: givenMacros, servings, components, saveToLibrary = false, favourite = false }, now = Date.now()) {
-        const n = clampServings(servings)
+      logQuick({ name, macros: givenMacros, servings, per, amount, components, saveToLibrary = false, favourite = false }, now = Date.now()) {
+        const built = !!(components && components.length)
+        // a built meal is always per serve; a per-100 g basis needs an amount eaten
+        const basis = built ? undefined : cleanPer(per)
+        const resolved = basis && typeof amount === 'number' ? resolvePortion(basis, { amount, unit: basis.unit }) : null
+        // a one-serve basis (eggs, a banana) is no basis at all: the amount typed is the servings
+        const oneServe = !built && !basis && !!per && per.unit === 'serve' && typeof amount === 'number' ? cleanAmount(amount, 'serve') : null
+        const n = resolved ? resolved.servings : clampServings(oneServe ?? servings)
+        const portion = resolved?.portion
         // a built meal's numbers are its components; never let a caller's total drift from them
-        const macros = components && components.length ? sumMacros(components.map((c) => roundMacros(c.macros))) : givenMacros
+        const macros = built ? sumMacros(components!.map((c) => roundMacros(c.macros))) : givenMacros
         let mealId: string | undefined
         if (saveToLibrary) {
-          const meal = components && components.length
-            ? get().addBuiltMeal({ name, components, favourite }, now)
-            : get().addQuickMeal({ name, macros, favourite }, now)
+          const meal = built
+            ? get().addBuiltMeal({ name, components: components!, favourite }, now)
+            : get().addQuickMeal(
+                { name, macros, favourite, ...(resolved && basis ? { per: basis, usual: portion?.amount } : { usual: n }) },
+                now,
+              )
           mealId = meal.id
         }
         const entry: LogEntry = {
@@ -352,12 +416,34 @@ export const useStore = create<TemperanceStore>()(
           servings: n,
           macros: roundMacros(scaleMacros(macros, n)),
           components: components?.map((c) => ({ ...c, amount: c.amount * n, macros: roundMacros(scaleMacros(c.macros, n)) })),
+          ...(portion ? { portion } : {}),
         }
         set((s) => {
           const entries = [...s.entries, entry]
           const meals = { ...s.meals }
           if (mealId && meals[mealId]) meals[mealId] = { ...meals[mealId], lastUsedAt: now, useCount: 1 }
           return { entries, meals, pulse: makePulse('log', entry.macros.kcal, entries, s.settings, now) }
+        })
+        return entry
+      },
+
+      relogEntry(entryId, now = Date.now()) {
+        const src = get().entries.find((e) => e.id === entryId)
+        if (!src) return null
+        const entry: LogEntry = { ...src, id: newId(), day: localDayKey(new Date(now)), at: now }
+        set((s) => {
+          const entries = [...s.entries, entry]
+          const meals = { ...s.meals }
+          const ingredients = { ...s.ingredients }
+          if (entry.mealId && meals[entry.mealId]) {
+            const m = meals[entry.mealId]
+            meals[entry.mealId] = { ...m, lastUsedAt: now, useCount: m.useCount + 1 }
+          }
+          for (const c of entry.components ?? []) {
+            const ing = ingredients[c.ingredientId]
+            if (ing) ingredients[c.ingredientId] = { ...ing, lastUsedAt: now, useCount: ing.useCount + 1 }
+          }
+          return { entries, meals, ingredients, pulse: makePulse('log', entry.macros.kcal, entries, s.settings, now) }
         })
         return entry
       },
@@ -369,8 +455,25 @@ export const useStore = create<TemperanceStore>()(
           const cur = s.entries[idx]
           let next: LogEntry = { ...cur }
           if (patch.name !== undefined) next.name = cleanName(patch.name) || cur.name
-          if (patch.servings !== undefined) {
-            const n = clampServings(patch.servings)
+          // the new multiplier: from an amount (same unit as recorded) or straight from servings
+          let n: number | null = null
+          let portion: Portion | undefined = cur.portion
+          if (patch.portion) {
+            const amount = cleanAmount(patch.portion.amount, patch.portion.unit)
+            if (amount !== null && cur.portion && patch.portion.unit === cur.portion.unit && cur.portion.amount > 0) {
+              n = clampServings((cur.servings * amount) / cur.portion.amount)
+              portion = { amount, unit: cur.portion.unit }
+            } else if (amount !== null && !cur.portion && patch.portion.unit === 'serve') {
+              n = clampServings(amount)
+            }
+          } else if (patch.servings !== undefined) {
+            n = clampServings(patch.servings)
+            if (cur.portion && cur.servings > 0) {
+              const amount = cleanAmount((cur.portion.amount * n) / cur.servings, cur.portion.unit)
+              portion = amount === null ? undefined : { amount, unit: cur.portion.unit }
+            }
+          }
+          if (n !== null) {
             const f = cur.servings > 0 ? n / cur.servings : 1
             next = {
               ...next,
@@ -378,6 +481,8 @@ export const useStore = create<TemperanceStore>()(
               macros: roundMacros(scaleMacros(cur.macros, f)),
               components: cur.components?.map((c) => ({ ...c, amount: c.amount * f, macros: roundMacros(scaleMacros(c.macros, f)) })),
             }
+            if (portion) next.portion = portion
+            else delete next.portion
           }
           if (patch.macros) next.macros = roundMacros(patch.macros)
           const entries = s.entries.slice()
@@ -629,7 +734,7 @@ export const useStore = create<TemperanceStore>()(
       version: SCHEMA_VERSION,
       storage: createJSONStorage(safeStorage),
       partialize: (s) => ({ settings: s.settings, meals: s.meals, ingredients: s.ingredients, entries: s.entries, weights: s.weights }),
-      // v1 -> v2 -> v3: new fields are filled by `merge` below; nothing changed shape.
+      // v1 -> v4: new fields are optional or filled by `merge` below; nothing changed shape.
       migrate: (persisted) => persisted as Data,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<Data>

@@ -13,12 +13,14 @@ import {
   buildTotals,
   canLogDraft,
   componentFromRow,
+  draftForEntry,
+  draftForMeal,
   draftFrom,
-  draftMacros,
-  draftUntouched,
-  energyLine,
+  liveMealFor,
+  loggedToastText,
   perServingComponents,
   perServingMacros,
+  quickSubmission,
   rowFromComponent,
   saveToLibraryFor,
   type BuildRow,
@@ -39,17 +41,6 @@ const MODES: readonly { value: Mode; label: string }[] = [
 const FORM_ID = 'log-form'
 const CONTENT_ID = 'log-sheet-content'
 const RECENT_LIMIT = 12
-
-const sameMacros = (a: { kcal: number; protein: number; carbs: number; fat: number }, b: typeof a) =>
-  Math.abs(a.kcal - b.kcal) < 0.6 && Math.abs(a.protein - b.protein) < 0.06 && Math.abs(a.carbs - b.carbs) < 0.06 && Math.abs(a.fat - b.fat) < 0.06
-
-/** The meal a logged entry still points at, only when the library copy matches the snapshot per serving. */
-function liveMealFor(entry: LogEntry, meals: Record<string, Meal>): Meal | undefined {
-  if (!entry.mealId) return undefined
-  const m = meals[entry.mealId]
-  if (!m) return undefined
-  return sameMacros(m.macros, perServingMacros(entry)) ? m : undefined
-}
 
 /**
  * THE LOG SHEET. Opens from the keystone (or a prefill from TODAY and LIBRARY), QUICK or BUILD,
@@ -83,6 +74,8 @@ export function LogSheet() {
   const [buildName, setBuildName] = useState('')
   const [buildSave, setBuildSave] = useState<boolean | null>(null)
   const caloriesRef = useRef<HTMLInputElement | null>(null)
+  /** the recent being edited first: read once by the prefill it triggers */
+  const editRef = useRef<LogEntry | null>(null)
 
   const recents = useMemo(() => recentEntries(entries, RECENT_LIMIT, settings.hiddenRecents), [entries, settings.hiddenRecents])
   const suggestFrom = useMemo(() => recentEntries(entries, 40, settings.hiddenRecents), [entries, settings.hiddenRecents])
@@ -120,7 +113,19 @@ export function LogSheet() {
         return
       }
       setMode('quick')
-      setDraft(draftFrom({ name: p.name ?? meal?.name, macros: p.macros ?? meal?.macros, servings: p.servings, mealId: meal ? p.mealId : undefined }, unit))
+      // a long-pressed recent: its basis and the amount eaten come through (LogPrefill has no portion)
+      const held = editRef.current
+      editRef.current = null
+      if (held) {
+        setDraft(draftForEntry(held, meals, unit))
+        return
+      }
+      // a library meal keeps its basis (Meal.per) and usual amount (Meal.usual)
+      if (meal && !p.macros) {
+        setDraft({ ...draftForMeal(meal, unit, p.servings), ...(p.name ? { name: p.name } : {}) })
+        return
+      }
+      setDraft(draftFrom({ name: p.name ?? meal?.name, macros: p.macros ?? meal?.macros, amount: p.servings, mealId: meal ? p.mealId : undefined, usual: meal?.per ? undefined : meal?.usual }, unit))
     },
     [meals, ingredients, unit],
   )
@@ -128,7 +133,7 @@ export function LogSheet() {
   useEffect(() => {
     if (!open || !prefill) return
     applyPrefill(prefill)
-    document.getElementById(CONTENT_ID)?.scrollTo({ top: 0 })
+    document.getElementById(CONTENT_ID)?.scrollTo?.({ top: 0 })
     if (prefill.mode !== 'build') {
       const id = window.setTimeout(() => caloriesRef.current?.focus({ preventScroll: true }), 340)
       return () => window.clearTimeout(id)
@@ -164,7 +169,7 @@ export function LogSheet() {
       closeLog()
       if (warnIfSessionOnly()) return
       toast({
-        text: `Logged · ${energyLine(entry.macros.kcal, unit)}`,
+        text: loggedToastText(entry, unit),
         action: { label: 'Undo', icon: 'undo', onClick: () => deleteEntry(entry.id) },
       })
     },
@@ -176,22 +181,16 @@ export function LogSheet() {
 
   const submit = useCallback(() => {
     if (mode === 'quick') {
-      const macros = draftMacros(draft, unit)
-      if (!macros) return
-      if (draft.source && draftUntouched(draft, unit)) {
-        const entry = logMeal(draft.source.mealId, draft.servings)
+      const plan = quickSubmission(draft, unit, meals)
+      if (!plan) return
+      if (plan.meal) {
+        const entry = logMeal(plan.meal.id, plan.meal.portion)
         if (entry) {
           afterLog(entry)
           return
         }
       }
-      const entry = logQuick({
-        name: draft.name,
-        macros,
-        servings: draft.servings,
-        saveToLibrary: saveToLibraryFor(draft, meals),
-      })
-      afterLog(entry)
+      afterLog(logQuick(plan.quick))
       return
     }
     const components = rows.map((r) => componentFromRow(r, ingredients)).filter((c) => c.amount > 0)
@@ -209,11 +208,7 @@ export function LogSheet() {
   // ---------- chips and recents ----------
   const onSuggestion = useCallback(
     (e: LogEntry) => {
-      const live = liveMealFor(e, meals)
-      setDraft((d) => ({
-        ...draftFrom({ name: e.name, macros: perServingMacros(e), servings: d.servings, mealId: live?.id }, unit),
-        saveOverride: d.saveOverride,
-      }))
+      setDraft((d) => ({ ...draftForEntry(e, meals, unit), saveOverride: d.saveOverride }))
       caloriesRef.current?.focus({ preventScroll: true })
     },
     [meals, unit],
@@ -221,7 +216,8 @@ export function LogSheet() {
 
   const onFavourite = useCallback(
     (m: Meal) => {
-      const entry = logMeal(m.id, 1)
+      // one tap logs the meal's usual amount (the last one he chose)
+      const entry = logMeal(m.id)
       if (entry) afterLog(entry)
     },
     [afterLog, logMeal],
@@ -229,7 +225,8 @@ export function LogSheet() {
 
   const onRelog = useCallback(
     (e: LogEntry) => {
-      const entry = logQuick({ name: e.name, macros: perServingMacros(e), servings: e.servings, components: perServingComponents(e) })
+      // exactly what he had last time: amount, portion and components included
+      const entry = useStore.getState().relogEntry(e.id) ?? logQuick({ name: e.name, macros: perServingMacros(e), servings: e.servings, components: perServingComponents(e) })
       afterLog(entry)
     },
     [afterLog, logQuick],
@@ -237,6 +234,9 @@ export function LogSheet() {
 
   const onEditFirst = useCallback(
     (e: LogEntry) => {
+      // a long-press timer landing during the close animation must not reopen the sheet
+      if (!useUI.getState().logOpen) return
+      editRef.current = e
       openLog({ name: e.name, macros: perServingMacros(e), servings: e.servings, mealId: liveMealFor(e, meals)?.id, mode: 'quick' })
     },
     [meals, openLog],

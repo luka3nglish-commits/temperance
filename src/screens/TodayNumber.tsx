@@ -1,21 +1,28 @@
 /**
- * THE HERO (spec section 6, y 103 to 247): label, the brushed gold number, the radial scrim and the
- * sub-line. The block is anchored to the gold goal line: its bottom sits 16 px above --goal-y (the
- * scene writes that variable in frame coordinates; the stage starts 40 px under the top safe area),
+ * THE HERO (polish-spec 6.1, y 101 to 251): eyebrow, the gold number, the radial scrim and the
+ * sub-line. The block is anchored to the gold goal line: its bottom sits GAP_ABOVE_LINE above --goal-y
+ * (the scene writes that variable in frame coordinates; the stage starts 40 px under the top safe area),
  * so on a short phone, where the monument layer scales down, the number shrinks to fit above the line
  * instead of colliding with it.
  *
- * Over the line always wins: label OVER THE LINE in ember-text, the magnitude in ember at 88 px.
- * Under it, the hero figure (settings.hero) decides REMAINING or EATEN; tapping the number swaps it.
- * The number counts old to new over --t-count (380 ms, --ease-count) and after every log pulse one
- * brushed highlight sweeps across it by animating --tilt-x on its wrapper (skipped under reduced motion).
+ *   REMAINING        Cinzel 700 13 px 0.22em bone-dim (OVER THE LINE in ember-text with a 14 px flame)
+ *   1 272            Cinzel 700 96 px gold foil (72 px under 700 px tall; 88 px ember when over), odometer
+ *   51% of goal      Cormorant 500 18 px roman bone-soft, the percent of the goal eaten
+ *
+ * Over the line always wins: the crown of the column rises above the line (up to OVER_MAX_PX, the
+ * scene's renderH asymptote), so the block keeps that much more air and the sub-line wears a dark halo
+ * to read through the cracks. Under it, the hero figure (settings.hero) decides REMAINING or EATEN;
+ * tapping the number swaps it. Each log sweeps one highlight across the foil by animating --tilt-x on
+ * its wrapper (skipped under reduced motion).
  */
 import { useRef } from 'react'
-import { GoldNumber } from '../components/ui'
+import { Flame } from 'lucide-react'
 import type { EnergyUnit, HeroFigure } from '../lib/types'
-import { formatEnergy, formatInt, toDisplayEnergy, unitLabel } from '../lib/units'
-import { isReducedMotion, useReducedMotion } from '../lib/motion'
-import { easeCount, useCounted, useLogPulse } from './TodayMotion'
+import { formatInt, toDisplayEnergy, unitLabel } from '../lib/units'
+import { isReducedMotion } from '../lib/motion'
+import { GOAL_Y, OVER_MAX_PX, PX_PER_UNIT } from '../scene/tokens'
+import { useLogPulse } from './TodayMotion'
+import { TodayOdometer } from './TodayOdometer'
 
 type Props = {
   /** kcal left today; negative once over */
@@ -34,24 +41,51 @@ export function heroLabel(over: boolean, hero: HeroFigure): string {
   return hero === 'eaten' ? 'Eaten' : 'Remaining'
 }
 
+/** The percent of the goal eaten, whole: `51%`. 0 with no goal. */
+export function goalPercent(eaten: number, goal: number): number {
+  if (!(goal > 0) || !(eaten > 0)) return 0
+  return Math.round((eaten / goal) * 100)
+}
+
+/** The sub-line under the hero: `51% of goal` (the same whichever figure the hero shows). */
+export function sublineText(eaten: number, goal: number): string {
+  return `${goalPercent(eaten, goal)}% of goal`
+}
+
 /** the goal line in stage coordinates: the stage starts 40 px under the top safe area */
 export const GOAL_IN_STAGE = 'calc(var(--goal-y) - var(--safe-top) - 40px)'
-/** the hero block ends this far above the line (spec: sub-line ends at 247, line at 263) */
-const GAP_ABOVE_LINE = 16
-/** label line 18 px + sub-line 22 px + 4 px of slack around the number */
-const CHROME = 44
+/** the hero block ends this far above the line at full scale; over the line the crown takes OVER_MAX_PX of it */
+export function gapAboveLine(over: boolean): number {
+  return over ? OVER_MAX_PX + 7 : 16
+}
+/**
+ * The same gap as a CSS expression, scaled with the monument on a short phone: the crown rises
+ * OVER_MAX_PX times the stage scale, and the scale is the plinth-to-line distance over its full 244 px.
+ */
+export function gapCss(over: boolean): string {
+  if (!over) return '16px'
+  const perPx = Math.round((OVER_MAX_PX / (GOAL_Y * PX_PER_UNIT)) * 10000) / 10000
+  return `(min(${OVER_MAX_PX}px, (var(--plinth-y) - var(--goal-y)) * ${perPx}) + 7px)`
+}
+/** eyebrow 18 + 2 + number + 4 + sub-line 22 (short phones: 16 + 1 + number + 2 + 20) */
+const CHROME = 46
+const CHROME_SHORT = 39
+/** air always kept between the header and the eyebrow */
+const TOP_AIR = 8
+
+const OVER_HALO = '0 0 2px var(--color-obsidian-950), 0 0 10px var(--color-obsidian-950), 0 0 18px rgba(5, 5, 7, 0.9)'
 
 export function TodayNumber({ remaining, eaten, goal, unit, hero, short, onSwap }: Props) {
-  const reduced = useReducedMotion()
   const over = remaining < 0
   const magnitude = over ? -remaining : hero === 'eaten' ? eaten : remaining
   const label = heroLabel(over, hero)
   const display = Math.round(toDisplayEnergy(magnitude, unit))
-  const shown = Math.round(useCounted(display, 380, easeCount, reduced))
+  const gap = gapCss(over)
+  const chrome = short ? CHROME_SHORT : CHROME
   const base = short ? (over ? 66 : 72) : over ? 88 : 96
-  // never larger than the room above the line: (room - chrome) / line-height 1.08
-  const size = `min(${base}px, calc((${GOAL_IN_STAGE} - ${GAP_ABOVE_LINE + CHROME}px) / 1.08))`
-  const blockHeight = `calc(${GOAL_IN_STAGE} - ${GAP_ABOVE_LINE}px)`
+  // never larger than the room above the line: (room - gap - chrome - air) / line-height 1.08
+  const size = `max(32px, min(${base}px, calc((${GOAL_IN_STAGE} - ${gap} - ${chrome + TOP_AIR}px) / 1.08)))`
+  const blockHeight = `calc(${GOAL_IN_STAGE} - ${gap})`
 
   const wrapRef = useRef<HTMLDivElement>(null)
   useLogPulse(() => {
@@ -69,13 +103,6 @@ export function TodayNumber({ remaining, eaten, goal, unit, hero, short, onSwap 
   })
 
   const unitText = unitLabel(unit)
-  const goalText = formatEnergy(goal, unit)
-  const subline = over
-    ? `of ${goalText} · ${formatEnergy(eaten, unit)} eaten`
-    : hero === 'eaten'
-      ? `of ${goalText} · ${formatEnergy(remaining, unit)} left`
-      : `of ${goalText} · ${formatEnergy(eaten, unit)} eaten`
-
   const swapHint = over ? '' : hero === 'eaten' ? ' Show remaining.' : ' Show eaten.'
 
   return (
@@ -84,7 +111,7 @@ export function TodayNumber({ remaining, eaten, goal, unit, hero, short, onSwap 
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0"
         style={{
-          height: `calc(${blockHeight} + ${GAP_ABOVE_LINE}px)`,
+          height: GOAL_IN_STAGE,
           background: 'radial-gradient(ellipse 60% 70% at 50% 50%, var(--scrim), transparent 72%)',
         }}
       />
@@ -92,10 +119,11 @@ export function TodayNumber({ remaining, eaten, goal, unit, hero, short, onSwap 
         <p
           data-intro="label"
           data-testid="tp-hero-label"
-          className={`font-display inscribed w-full text-center text-[11px] leading-[18px] tracking-[0.4em] ${over ? 'text-ember-text' : 'text-bone-dim'}`}
-          style={{ marginRight: '-0.4em' }}
+          className={`eyebrow inscribed flex w-full shrink-0 items-center justify-center gap-2 ${short ? 'h-4' : 'h-[18px]'} ${over ? 'text-ember-text' : ''}`}
+          style={{ paddingLeft: '0.22em' }}
         >
-          {label}
+          {over ? <Flame aria-hidden="true" size={14} strokeWidth={1.5} className="shrink-0" /> : null}
+          <span>{label}</span>
         </p>
         <div
           ref={wrapRef}
@@ -103,23 +131,24 @@ export function TodayNumber({ remaining, eaten, goal, unit, hero, short, onSwap 
           data-testid="tp-hero-number"
           data-value={display}
           data-over={over ? 'true' : 'false'}
-          className="flex w-full justify-center"
+          className={`flex w-full justify-center ${short ? 'mt-px' : 'mt-[2px]'}`}
         >
           <button
             type="button"
             onClick={onSwap}
             aria-label={`${formatInt(display)} ${unitText} ${label.toLowerCase()}.${swapHint}`}
-            className="block cursor-pointer select-none rounded-[4px] active:scale-[0.99] transition-transform duration-150"
+            className="block cursor-pointer select-none rounded-[4px] transition-transform duration-150 active:scale-[0.99]"
           >
-            <GoldNumber value={shown} ember={over} size={size} />
+            <TodayOdometer value={display} ember={over} size={size} />
           </button>
         </div>
         <p
           data-intro="subline"
           data-testid="tp-subline"
-          className="num font-body w-full text-center text-[17px] italic leading-[22px] text-bone-dim"
+          className={`num font-body w-full shrink-0 text-center text-[18px] font-medium ${short ? 'mt-0.5 h-5 leading-5' : 'mt-1 h-[22px] leading-[22px]'} ${over ? 'text-ember-text' : 'text-bone-soft'}`}
+          style={over ? { textShadow: OVER_HALO } : undefined}
         >
-          {subline}
+          {sublineText(eaten, goal)}
         </p>
       </div>
     </>

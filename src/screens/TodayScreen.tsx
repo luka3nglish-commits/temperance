@@ -1,19 +1,23 @@
 /**
- * TODAY: the home screen (spec section 6). One fixed, non-scrolling frame; the parent <main> is
- * overflow hidden. The monument canvas (scene agent, app root) sits behind at top --safe-top,
- * 513 px tall; everything here is DOM inscriptions above it.
+ * TODAY: the home screen (polish-spec 6.1). One fixed, non-scrolling frame; the parent <main> is
+ * overflow hidden. The monument canvas and its temple (scene agent, app root) sit behind at top
+ * --safe-top, 513 px tall; everything here is DOM inscriptions above them. Its only background is the
+ * number scrim: the shaft, colonnade and pools belong to the scene.
  *
  * Vertical rhythm, relative to the top safe area (the spec assumes 47 px):
- *   header 40 | stage 460 (the monument, shrinks to a 280 px floor) | ring row 124 | stoic 64 | air
- * On a 390 x 844 phone with a 47 px safe area the rows land exactly on the spec y values; on shorter
- * phones only the stage gives. Under 700 px the number drops to 72 px and the flanks share one row.
+ *   header 40 | stage 460 (the monument, shrinks to a 280 px floor) | ring row 132 | stoic (flex; floor
+ *   108 on a frame of 780 px and up, 67 below, stoicMinFor) | air 72 + safe bottom (bar 56, the keystone
+ *   rising 8 above it, 8 of air)
+ * The non-stage rows add up to the 352 px (tall) or 311 px (short) the monument layer budgets for when
+ * it scales the stage, so the inscriptions and the scaled monument stay registered. Under 700 px tall the
+ * number drops to 72 px and the flanks tighten; under 372 px wide the ring row goes compact.
  * The final layout IS the home screen: nothing re-lays out after the opening.
  */
 import { useMemo } from 'react'
 import { useStore } from '../store/useStore'
 import { useUI } from '../store/useUI'
 import { useToday } from '../lib/useToday'
-import { remainingKcal, totalsForDay } from '../store/selectors'
+import { disciplineStreak, remainingKcal, totalsForDay } from '../store/selectors'
 import { TodayHeader } from './TodayHeader'
 import { TodayNumber } from './TodayNumber'
 import { TodayFlanks, TodayGoalLabel } from './TodayFlanks'
@@ -29,13 +33,15 @@ export function TodayScreen() {
   const setHero = useStore((s) => s.setHero)
   const openToday = useUI((s) => s.openToday)
   const short = useMediaQuery('(max-height: 699px)')
+  const narrow = useMediaQuery('(max-width: 371px)')
 
   const totals = useMemo(() => totalsForDay(entries, today), [entries, today])
+  const streak = useMemo(() => disciplineStreak(entries, settings.goalKcal, today), [entries, settings.goalKcal, today])
   const remaining = remainingKcal(totals, settings.goalKcal)
 
   return (
     <div data-testid="tp-today" className="relative flex h-full w-full flex-col overflow-hidden" style={{ paddingTop: 'var(--safe-top)' }}>
-      <TodayHeader today={today} />
+      <TodayHeader today={today} streak={streak} />
 
       {/* data-stage: the scene toggles .shake here; data-intro="stage": the opening's landing shake (targets.ts queryStage) */}
       <div data-stage data-intro="stage" className="relative w-full" style={{ flex: '0 1 460px', minHeight: 280 }}>
@@ -48,14 +54,22 @@ export function TodayScreen() {
           short={short}
           onSwap={() => setHero(settings.hero === 'eaten' ? 'remaining' : 'eaten')}
         />
-        <TodayFlanks eaten={totals.kcal} goal={settings.goalKcal} unit={settings.unit} compact={short} onEaten={openToday} />
+        <TodayFlanks
+          eaten={totals.kcal}
+          remaining={remaining}
+          goal={settings.goalKcal}
+          unit={settings.unit}
+          swapped={settings.hero === 'eaten'}
+          compact={short}
+          onEaten={openToday}
+        />
       </div>
 
-      <TodayRingRow totals={totals} targets={settings.targets} onOpen={openToday} />
+      <TodayRingRow totals={totals} targets={settings.targets} compact={narrow} onOpen={openToday} />
       <TodayStoic today={today} />
 
-      {/* air above the entablature: 19 px plus the 56 px bar and the bottom safe area */}
-      <div aria-hidden="true" style={{ flex: '1 0 calc(75px + var(--safe-bottom))' }} />
+      {/* the tab bar (56 px), the keystone rising 8 px above it, 8 px of air, and the bottom safe area */}
+      <div aria-hidden="true" className="shrink-0" style={{ flex: '0 0 calc(72px + var(--safe-bottom))' }} />
 
       <TodayGoalLabel goal={settings.goalKcal} unit={settings.unit} />
       <TodaySheet today={today} />

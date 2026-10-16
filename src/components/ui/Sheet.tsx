@@ -1,8 +1,11 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { IconButton } from './Button'
+import { useSheets } from './useSheets'
 import { useReducedMotion } from '../../lib/motion'
+
+export { useSheets } from './useSheets'
 
 type Props = {
   open: boolean
@@ -13,9 +16,9 @@ type Props = {
   /** right side of the header (a Segmented switch, an action) */
   headerRight?: ReactNode
   children: ReactNode
-  /** sticky footer inside the sheet; stays above the keyboard */
+  /** sticky footer inside the sheet; stays above the keyboard; rows dissolve under it */
   footer?: ReactNode
-  /** 'tall' = min(92svh, --vv-h); 'auto' = content height up to the same cap */
+  /** 'tall' = min(92svh, --vv-h minus the toast lane); 'auto' = content height up to the same cap */
   height?: 'tall' | 'auto'
   /** label for the close button */
   closeLabel?: string
@@ -24,15 +27,18 @@ type Props = {
   contentId?: string
   /** data-testid for the dialog panel */
   testId?: string
+  /** the 72 px meander under the title (default on when there is a title) */
+  ornament?: boolean
 }
 
-/** The visual viewport is shorter than this when a keyboard is up (spec section 10). */
+/** The visual viewport is shorter than this when a keyboard is up. */
 const KEYBOARD_UP_PX = 620
 const SHEET_OUT_MS = 200
 const REDUCED_FADE_MS = 160
-/** drag the grab bar this far (or flick faster than DISMISS_VELOCITY px/ms) to dismiss */
-const DISMISS_PX = 96
-const DISMISS_VELOCITY = 0.6
+/** release closes when the drag is over 30 percent of the sheet or faster than 0.5 px/ms (over the last 80 ms) */
+const DISMISS_FRACTION = 0.3
+const DISMISS_VELOCITY = 0.5
+const VELOCITY_WINDOW_MS = 80
 const DRAG_START_PX = 8
 
 let vvInstalled = false
@@ -84,13 +90,36 @@ export function useKeyboardUp(): boolean {
 const canAnimate = (el: Element | null): el is HTMLElement => !!el && typeof (el as HTMLElement).animate === 'function'
 
 /**
- * Bottom sheet: obsidian-900, 1 px strong gold top edge, 16 px top corners, 36 x 3 px grab bar.
- * Rises 320 ms (--ease-sheet), dismisses 200 ms; reduced motion fades 160 ms instead. Height binds
- * to the visual viewport so the footer (LOG) is always above the keyboard; under 620 px it pins to
- * the visual viewport itself. Escape, the scrim, the close button and a drag down on the grab bar
- * close it. On desktop it hugs the 430 px slab. Side gutters are 20 px because the shard strips run the full height.
+ * Bottom sheet, polish-spec 4.12 and 7.2 item 3.
+ * - Panel: a lit top (#15151B fading to #0B0B0F over 160 px), a light lip, a gold top edge
+ *   (rgba(216,180,90,0.55)) and a deep shadow; 16 px top corners; 20 px side gutters.
+ * - Grab bar 40 x 3 in the gold text gradient. Header row 56 px: the title (Cinzel 700 16 px 0.2em
+ *   bone) with a 72 px meander 8 px under it, actions on the right, the close X (22 px) in a 44 px target.
+ * - Rises 420 ms on --ease-spring with an underfill below the panel so the overshoot never shows a
+ *   gap; closes 200 ms ease-in; reduced motion fades 160 ms. Scrim rgba(5,5,7,0.74), no blur.
+ * - Drag the grab bar or header down: release closes past 30 percent of the height or faster than
+ *   0.5 px/ms over the last 80 ms, otherwise it springs back.
+ * - Footer: no rule; rows dissolve under a 20 px fade into the sheet colour.
+ * - Height binds to the visual viewport so the footer is always above the keyboard; under 620 px it
+ *   pins to the visual viewport. Escape, the scrim and the close button close it.
+ * - Registers in `useSheets` while open (the Toaster docks at the top). Content may use `.tp-stagger`:
+ *   `--stagger-delay` is 120 ms inside a sheet so lists start after the rise.
  */
-export function Sheet({ open, onClose, onClosed, title, headerRight, children, footer, height = 'tall', closeLabel = 'Close', className = '', contentId, testId }: Props) {
+export function Sheet({
+  open,
+  onClose,
+  onClosed,
+  title,
+  headerRight,
+  children,
+  footer,
+  height = 'tall',
+  closeLabel = 'Close',
+  className = '',
+  contentId,
+  testId,
+  ornament = true,
+}: Props) {
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -108,12 +137,27 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
     installVisualViewport()
   }, [])
 
+  // the open count the Toaster reads (App makes the frame behind a sheet inert on it). The opener is
+  // taken first: once the frame goes inert, a focused control inside it loses focus.
+  useEffect(() => {
+    if (!open) return
+    restoreFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    useSheets.getState().add()
+    return () => useSheets.getState().remove()
+  }, [open])
+
   // open: mount, then slide (or fade) in on the next frame. close: slide (or fade) out, then unmount.
   useEffect(() => {
     if (open) {
       setMounted(true)
-      const id = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)))
-      return () => cancelAnimationFrame(id)
+      let inner = 0
+      const outer = requestAnimationFrame(() => {
+        inner = requestAnimationFrame(() => setShown(true))
+      })
+      return () => {
+        cancelAnimationFrame(outer)
+        cancelAnimationFrame(inner)
+      }
     }
     setShown(false)
     if (!mounted) return
@@ -139,10 +183,10 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
     if (canAnimate(scrimRef.current)) scrimRef.current.animate([{ opacity: 0 }, { opacity: 1 }], timing)
   }, [mounted, open])
 
-  // focus moves into the dialog and returns to the opener on close
+  // focus moves into the dialog and returns to the opener on close (the opener is taken when it opens,
+  // above; this cleanup runs after the sheet has left useSheets, so the frame is no longer inert)
   useEffect(() => {
     if (!mounted || !open) return
-    restoreFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const panel = panelRef.current
     const id = window.setTimeout(() => {
       if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true })
@@ -169,13 +213,16 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
     }
   }, [open, onClose])
 
-  // ---------- drag the grab bar down to dismiss ----------
-  const drag = useRef<{ id: number; y0: number; dy: number; t: number; vy: number; live: boolean } | null>(null)
+  // ---------- drag the grab bar or header down to dismiss ----------
+  type Drag = { id: number; y0: number; dy: number; live: boolean; samples: Array<{ t: number; dy: number }> }
+  const drag = useRef<Drag | null>(null)
 
   const onHandleDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (reducedRef.current || !shown) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
-    drag.current = { id: e.pointerId, y0: e.clientY, dy: 0, t: performance.now(), vy: 0, live: false }
+    // a tap on a header control is a tap, not a drag
+    if ((e.target as Element).closest('button, a, input, [role=radio], [role=switch]')) return
+    drag.current = { id: e.pointerId, y0: e.clientY, dy: 0, live: false, samples: [{ t: performance.now(), dy: 0 }] }
   }
 
   const onHandleMove = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -191,9 +238,9 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
       if (scrimRef.current) scrimRef.current.style.transitionDuration = '0ms'
     }
     const now = performance.now()
-    d.vy = (dy - d.dy) / Math.max(1, now - d.t)
     d.dy = dy
-    d.t = now
+    d.samples.push({ t: now, dy })
+    while (d.samples.length > 2 && now - d.samples[0].t > VELOCITY_WINDOW_MS) d.samples.shift()
     panel.style.transform = `translateY(${dy}px)`
     if (scrimRef.current) scrimRef.current.style.opacity = String(Math.max(0, 1 - dy / Math.max(1, panel.offsetHeight)))
   }
@@ -205,13 +252,19 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
     const panel = panelRef.current
     if (!d.live || !panel) return
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
-    panel.style.transitionDuration = 'var(--t-sheet-out)'
+    const first = d.samples[0]
+    const last = d.samples[d.samples.length - 1]
+    const v = last && first && last.t > first.t ? (last.dy - first.dy) / (last.t - first.t) : 0
+    const h = Math.max(1, panel.offsetHeight)
+    // a system gesture interrupting the drag snaps back; only a finished drag or flick dismisses
+    const dismiss = e.type !== 'pointercancel' && (d.dy >= h * DISMISS_FRACTION || v >= DISMISS_VELOCITY)
+    panel.style.transitionDuration = dismiss ? 'var(--t-sheet-out)' : 'var(--t-sheet-in)'
+    panel.style.transitionTimingFunction = dismiss ? 'cubic-bezier(0.4, 0, 1, 1)' : 'var(--ease-spring)'
     if (scrimRef.current) {
       scrimRef.current.style.transitionDuration = 'var(--t-sheet-out)'
       scrimRef.current.style.opacity = ''
     }
-    // a system gesture interrupting the drag snaps back; only a finished drag or flick dismisses
-    if (e.type !== 'pointercancel' && (d.dy >= DISMISS_PX || d.vy >= DISMISS_VELOCITY)) {
+    if (dismiss) {
       onClose()
     } else {
       panel.style.transform = 'translateY(0)'
@@ -221,8 +274,10 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
   if (!mounted) return null
 
   const pinned = kbUp && open
-  const cap = 'min(92svh, var(--vv-h))'
+  // clear the top-docked toast lane: its 12 px offset, the 56 px toast and a 12 px gap
+  const cap = 'min(92svh, calc(var(--vv-h) - var(--safe-top) - 80px))'
   const transform = reduced ? 'none' : shown ? 'translateY(0)' : 'translateY(100%)'
+  const showOrnament = ornament && !!title
 
   // portal to <body>: <main> is a z 10 stacking context, so a sheet rendered inside it would paint
   // under the tab bar (z 30) and the shards (z 40) and let the bar be tapped through
@@ -230,8 +285,8 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
     <div className="fixed inset-0 z-[var(--z-sheet)]" role="presentation">
       <div
         ref={scrimRef}
-        className={`absolute inset-0 bg-[rgba(5,5,7,0.6)] transition-opacity ${shown ? 'opacity-100' : 'opacity-0'}`}
-        style={{ transitionDuration: shown ? 'var(--t-sheet-in)' : 'var(--t-sheet-out)' }}
+        className={`absolute inset-0 transition-opacity ${shown ? 'opacity-100' : 'opacity-0'}`}
+        style={{ background: 'var(--scrim)', transitionDuration: shown ? '320ms' : 'var(--t-sheet-out)', transitionTimingFunction: 'linear' }}
         onClick={onClose}
       />
       <div
@@ -241,8 +296,8 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
-        className={`absolute inset-x-0 mx-auto flex w-full max-w-[430px] flex-col bg-obsidian-900 shadow-[0_-1px_0_var(--gold-line-strong)] outline-none transition-transform will-change-transform ${
-          pinned ? 'rounded-none' : 'bottom-0 rounded-t-[16px]'
+        className={`sheet-panel absolute inset-x-0 mx-auto flex w-full max-w-[430px] flex-col outline-none transition-transform will-change-transform ${
+          pinned ? 'is-pinned rounded-none' : 'bottom-0 rounded-t-[16px]'
         } ${className}`}
         style={{
           top: pinned ? 'var(--vv-top, 0px)' : undefined,
@@ -250,7 +305,7 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
           height: pinned ? 'var(--vv-h)' : height === 'tall' ? cap : undefined,
           transform,
           transitionDuration: shown ? 'var(--t-sheet-in)' : 'var(--t-sheet-out)',
-          transitionTimingFunction: 'var(--ease-sheet)',
+          transitionTimingFunction: shown ? 'var(--ease-spring)' : 'cubic-bezier(0.4, 0, 1, 1)',
           paddingBottom: pinned ? 0 : 'var(--safe-bottom)',
         }}
       >
@@ -263,26 +318,40 @@ export function Sheet({ open, onClose, onClosed, title, headerRight, children, f
           onPointerCancel={onHandleUp}
         >
           <div className="flex justify-center pt-2.5 pb-1">
-            <div aria-hidden="true" className="h-[3px] w-9 rounded-[2px] bg-gold-400" />
+            <div aria-hidden="true" className="sheet-grab" />
           </div>
           {(title || headerRight) && (
-            <div className="flex h-14 items-center justify-between pl-5 pr-3">
-              <h2 id={titleId} className="font-display inscribed text-[14px] tracking-[0.35em] text-bone">
-                {title}
-              </h2>
-              <div className="flex items-center gap-2">
+            <div className="flex h-14 items-center justify-between gap-3 pl-5 pr-3">
+              <div className="flex min-w-0 flex-col items-start gap-2">
+                {title ? (
+                  <h2 id={titleId} className="title-sheet inscribed min-w-0 truncate">
+                    {title}
+                  </h2>
+                ) : null}
+                {showOrnament ? <span aria-hidden="true" className="meander" style={{ width: 72 }} /> : null}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
                 {headerRight}
                 <IconButton label={closeLabel} onClick={onClose}>
-                  <X size={20} strokeWidth={1.5} />
+                  <X size={22} strokeWidth={1.5} />
                 </IconButton>
               </div>
             </div>
           )}
         </div>
-        <div id={contentId} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 scrollbar-none">
+        <div
+          id={contentId}
+          className="sheet-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 scrollbar-none"
+          style={{ '--stagger-delay': '120ms' } as CSSProperties}
+          onScroll={(e) => {
+            const el = e.currentTarget
+            const v = el.scrollTop > 0 ? '1' : ''
+            if ((el.dataset.scrolled ?? '') !== v) el.dataset.scrolled = v
+          }}
+        >
           {children}
         </div>
-        {footer ? <div className="shrink-0 border-t border-[var(--gold-line)] bg-obsidian-900 px-5 pt-3 pb-3">{footer}</div> : null}
+        {footer ? <div className="sheet-footer shrink-0 px-5 pb-3">{footer}</div> : null}
       </div>
     </div>,
     document.body,

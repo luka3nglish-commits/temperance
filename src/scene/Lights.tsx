@@ -1,8 +1,8 @@
 /**
- * Lights (docs/design-spec.md section 7, Lights). Ambient, the key spot, the rim directional, the
- * one moving sweep point light (idle orbit on the 14 s period, the opening pass, follows the tilt
- * by `T.follow` rad) and the ember point light under the cracks, mounted at intensity 0 so its
- * program compiles in the gate. The drei Environment bakes three Lightformers once (frames 1).
+ * Lights (docs/polish-spec.md section 5.2). Warm ambient, the key spot moved low and right, the
+ * warm rim directional behind left, the one moving sweep point light (idle orbit on the 14 s
+ * period, the opening pass, follows the tilt by `T.follow` rad) and the ember point light under the
+ * cracks, mounted at intensity 0 so its program compiles in the gate. No environment map.
  */
 import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -52,8 +52,10 @@ export function Lights() {
   return (
     <>
       <ambientLight color={COL.ambient} intensity={T.ambient} />
-      <spotLight ref={key} color={COL.keyLight} intensity={T.key} decay={2} angle={0.5} penumbra={0.7} position={[2.4, 4.2, 2.6]} />
-      <directionalLight ref={rim} color={COL.rimLight} intensity={T.rim} position={[-3, 2.5, -2.5]} />
+      {/* key low enough that the GGX lobe reaches the near-horizontal normals of the shaft */}
+      <spotLight ref={key} color={COL.keyLight} intensity={T.key} decay={2} angle={0.5} penumbra={0.8} position={[2.2, 2.6, 3.2]} />
+      {/* rim at about camera height, behind left: a warm edge on the left silhouette */}
+      <directionalLight ref={rim} color={COL.rimLight} intensity={T.rim} position={[-2.6, 1.3, -2.2]} />
       <pointLight ref={sweep} color={COL.sweepLight} intensity={T.sweep} distance={7} decay={2} position={[3.2 * Math.sin(0.6), 3.4, 3.2 * Math.cos(0.6)]} />
       <pointLight ref={ember} color={COL.emberLight} intensity={0} distance={2.2} decay={2} position={[0, 2.05, 0.6]} />
     </>

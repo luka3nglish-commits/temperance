@@ -95,7 +95,10 @@ describe('REPEAT YESTERDAY in the LOG sheet', () => {
     expect(chip).not.toBeNull()
     expect(chip?.dataset.count).toBe('2')
     expect(chip?.dataset.kcal).toBe('1312')
-    expect(chip?.textContent).toContain('Repeat yesterday')
+    // the chip reads REPEAT plus the energy (polish-spec 6.2); its spoken name says what it repeats
+    expect(chip?.textContent).toContain('Repeat')
+    expect(chip?.textContent).toContain(`1${T}312${T}kcal`)
+    expect(chip?.getAttribute('aria-label')).toBe(`Repeat yesterday's meals, 1${T}312${T}kcal`)
     // the first chip of the row, ahead of the favourites
     expect($('tp-fav-chips')?.querySelector('button')).toBe(chip)
     expect($(`tp-fav-chip-${fav.id}`)).not.toBeNull()

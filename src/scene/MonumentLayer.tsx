@@ -14,6 +14,7 @@ import { useUI } from '../store/useUI'
 import { localDayKey } from '../lib/day'
 import { useToday } from '../lib/useToday'
 import { isReducedMotion, useReducedMotion } from '../lib/motion'
+import { featureOff, isBare } from '../lib/boot'
 import { totalsForDay } from '../store/selectors'
 import { BusContext, createBus } from './bus'
 import { type MonumentHandle, type MonumentMode, setMonumentHandle } from './handle'
@@ -23,6 +24,11 @@ import { crackFor, heightFor, GOAL_Y, PX_PER_UNIT, STAGE_H, STAGE_PLINTH_Y } fro
 import { SafeCanvas } from './SafeCanvas'
 import { ColumnScene } from './ColumnScene'
 import { FallbackMonument } from './FallbackMonument'
+import { TempleBack, TempleFront } from './Temple'
+import { DEBUG } from './debugFlags'
+
+/** the stage fades out over its bottom 28 px instead of cutting the plinth (polish-spec C22) */
+const STAGE_MASK = 'linear-gradient(180deg, #000 0, #000 calc(100% - 28px), transparent 100%)'
 
 /** shaders ready inside this many ms of mount: the 3D column takes the rise and the SVG cuts away */
 const EARLY_JOIN_MS = 600
@@ -65,15 +71,23 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
   // the demand ticker: created in an effect (it owns window listeners), never during render
   const tickerRef = useRef<Ticker | null>(null)
   const idleRef = useRef(false)
-  const modeRef = useRef(mode)
-  modeRef.current = mode
   const applyIdle = useCallback(() => {
     bus.idle = idleRef.current
-    tickerRef.current?.setEnabled(idleRef.current && modeRef.current === 'webgl' && !isReducedMotion())
+    // both modes: in SVG mode the ticks are no-ops (no sceneInvalidate), but the ticker still owns
+    // data-live under its gates, so the SVG light band and the temple shaft stop at rest too
+    tickerRef.current?.setEnabled(idleRef.current && !isReducedMotion())
   }, [bus])
 
   useEffect(() => {
-    const t = createTicker(() => bus.sceneInvalidate?.(), mountSettings.tickerFps)
+    const t = createTicker(
+      () => bus.sceneInvalidate?.(),
+      mountSettings.tickerFps,
+      (running) => {
+        // the shaft breathes (and the motes drift) only while live idle runs
+        if (running) root.current?.setAttribute('data-live', '')
+        else root.current?.removeAttribute('data-live')
+      },
+    )
     tickerRef.current = t
     t.observe(root.current)
     t.setVisible(bus.visible)
@@ -83,6 +97,31 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       if (tickerRef.current === t) tickerRef.current = null
     }
   }, [bus, mountSettings.tickerFps, applyIdle])
+
+  // every landing flares the DOM shaft of light: 0 to 0.5 over 60 ms, back to 0 over 320 ms (compositor
+  // opacity only). Both renderers land through the same choreography, so the SVG path gets it too.
+  useEffect(() => {
+    bus.monument.setHooks({
+      onLanding: () => {
+        if (!bus.visible || isReducedMotion()) return
+        const el = root.current?.querySelector<HTMLElement>('[data-tp-flare]')
+        if (!el || typeof el.animate !== 'function') return
+        try {
+          el.animate(
+            [
+              { opacity: 0, offset: 0 },
+              { opacity: 0.5, offset: 60 / 380, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+              { opacity: 0, offset: 1 },
+            ],
+            { duration: 380, easing: 'linear' },
+          )
+        } catch {
+          /* no WAAPI: the flare is decoration */
+        }
+      },
+    })
+    return () => bus.monument.setHooks({ onLanding: undefined })
+  }, [bus])
 
   useEffect(() => {
     bus.layerTop = () => root.current?.offsetTop ?? 0
@@ -119,8 +158,12 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       }
       const safeTop = readSafe('--safe-top')
       const safeBottom = readSafe('--safe-bottom')
-      // header 40, ring row 124, stoic 64, air 19, bar 56
-      const available = frame.clientHeight - safeTop - safeBottom - 40 - 124 - 64 - 19 - 56
+      // The TODAY chrome the stage must leave room for, kept in step with src/screens/TodayStoic.tsx
+      // (stoicMinFor) and TodayScreen: header 40, ring row 132, the stoic floor (108 on a frame of at
+      // least 780 px, else 67), then air 16 + tab bar 56. Off by even a few px and the plinth sits on
+      // the ring row on a real phone with safe areas.
+      const stoic = frame.clientHeight >= 780 ? 108 : 67
+      const available = frame.clientHeight - safeTop - safeBottom - 40 - 132 - stoic - 72
       const k = Math.max(0.55, Math.min(1, available / 460))
       const rounded = Math.round(k * 1000) / 1000
       bus.layerScale = rounded
@@ -138,6 +181,9 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       bus.monument.setTargets(h, crackFor(eaten, goal))
       // test hook: the target height on the layer root (tp-column carries the rendered height)
       root.current?.setAttribute('data-h-target', h.toFixed(3))
+      // the temple's arch haze turns ember on an over day
+      if (eaten > goal && goal > 0) root.current?.setAttribute('data-over', '')
+      else root.current?.removeAttribute('data-over')
     },
     [bus],
   )
@@ -352,6 +398,7 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
       setInstant: () => m.setInstant(),
       playOpeningRise: (ms) => detached(() => m.playOpeningRise(ms))(),
       playGoalLine: (ms) => detached(() => m.playGoalLine(ms))(),
+      playGhostReveal: (ms) => detached(() => m.playGhostReveal(ms))(),
       sweepOnce: (ms) => detached(() => m.sweepOnce(ms))(),
       shake: (trauma) => detached(() => m.shake(trauma))(),
       startIdle: () => {
@@ -369,6 +416,7 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
   }, [mode, bus, applyIdle, joinNow])
 
   const showCanvas = mode === 'webgl'
+  const parallax = tier === 'high' && !reduced
   return (
     <BusContext.Provider value={bus}>
       <div
@@ -377,19 +425,27 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
         data-mode={mode}
         data-ready={ready ? 'true' : 'false'}
         aria-hidden="true"
-        className="pointer-events-none absolute left-0 w-full z-[var(--z-canvas)]"
+        className="pointer-events-none absolute z-[var(--z-canvas)]"
         style={{
+          // scaled stages (short phones): widen the box by 1/k about the centre so that after
+          // scale(k) it still spans the whole frame, and the goal line reaches both gutters
+          left: scale === 1 ? 0 : `${(50 - 50 / scale).toFixed(3)}%`,
+          width: scale === 1 ? '100%' : `${(100 / scale).toFixed(3)}%`,
           top: 'var(--safe-top)',
           height: STAGE_H,
           visibility: visible ? 'visible' : 'hidden',
           transform: scale === 1 ? undefined : `scale(${scale})`,
           transformOrigin: '50% 0',
+          maskImage: DEBUG.nomask ? undefined : STAGE_MASK,
+          WebkitMaskImage: DEBUG.nomask ? undefined : STAGE_MASK,
         }}
       >
+        {/* safe level 2 (bare) drops the temple; fx=0 drops its parallax (and Temple.tsx its masks) */}
+        {DEBUG.notemple || isBare() ? null : <TempleBack parallax={parallax && !featureOff('fx')} />}
         {showCanvas ? (
           <div
             className="absolute inset-0"
-            style={{ opacity: joined ? 1 : 0, transition: lateJoin ? 'opacity 200ms var(--ease-stone)' : 'none' }}
+            style={{ opacity: joined ? 1 : 0, transition: lateJoin ? 'opacity 400ms var(--ease-stone)' : 'none' }}
           >
             <SafeCanvas settings={mountSettings} onFallback={onFallback} onRemount={onRemount}>
               <ColumnScene bus={bus} settings={mountSettings} onReady={onSceneReady} />
@@ -397,6 +453,7 @@ export function MonumentLayer({ visible }: { visible: boolean }) {
           </div>
         ) : null}
         <FallbackMonument hidden={showCanvas && joined} crossfade={lateJoin} />
+        {DEBUG.notemple || isBare() ? null : <TempleFront />}
       </div>
     </BusContext.Provider>
   )

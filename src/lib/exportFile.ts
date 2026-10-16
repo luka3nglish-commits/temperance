@@ -1,6 +1,7 @@
-import type { ExportFile, Ingredient, LogEntry, Macros, Meal, MealComponent, Settings, WeightEntry } from './types'
+import type { ExportFile, Ingredient, LogEntry, Macros, Meal, MealComponent, Portion, Settings, WeightEntry } from './types'
 import { SCHEMA_VERSION } from './types'
 import { isValidDayKey } from './day'
+import { cleanAmount } from './portion'
 
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x)
 const num = (x: unknown, fallback = 0) => (typeof x === 'number' && Number.isFinite(x) ? x : fallback)
@@ -24,15 +25,28 @@ function components(x: unknown): MealComponent[] | undefined {
   return out.length ? out : undefined
 }
 
+/** A { amount, unit } with a positive amount and a known unit, or undefined. */
+function portionOf(x: unknown): Portion | undefined {
+  if (!isObj(x)) return undefined
+  const unit = x.unit === 'ml' || x.unit === 'serve' || x.unit === 'g' ? x.unit : null
+  if (!unit) return undefined
+  const amount = cleanAmount(num(x.amount), unit)
+  return amount === null ? undefined : { amount, unit }
+}
+
 function meal(x: unknown): Meal | null {
   if (!isObj(x) || typeof x.id !== 'string' || !x.id) return null
   const comps = components(x.components)
+  const per = comps ? undefined : portionOf(x.per)
+  const usual = typeof x.usual === 'number' ? cleanAmount(x.usual, per ? per.unit : 'serve') : null
   return {
     id: x.id,
     name: (str(x.name).trim() || 'Meal'),
     kind: x.kind === 'built' || comps ? 'built' : 'quick',
     macros: macros(x.macros),
     components: comps,
+    ...(per && !(per.unit === 'serve' && per.amount === 1) ? { per } : {}),
+    ...(usual !== null ? { usual } : {}),
     favourite: bool(x.favourite),
     createdAt: num(x.createdAt),
     updatedAt: num(x.updatedAt),
@@ -63,6 +77,7 @@ function entry(x: unknown): LogEntry | null {
   if (!isObj(x) || typeof x.id !== 'string' || !x.id) return null
   if (typeof x.day !== 'string' || !isValidDayKey(x.day)) return null
   const servings = num(x.servings, 1)
+  const portion = portionOf(x.portion)
   return {
     id: x.id,
     day: x.day,
@@ -72,6 +87,7 @@ function entry(x: unknown): LogEntry | null {
     servings: servings > 0 ? servings : 1,
     macros: macros(x.macros),
     components: components(x.components),
+    ...(portion ? { portion } : {}),
   }
 }
 
@@ -114,7 +130,7 @@ function weight(x: unknown): WeightEntry | null {
 }
 
 /** Backups from any schema version we know how to read. */
-const READABLE_VERSIONS: readonly number[] = [1, 2, 3]
+const READABLE_VERSIONS: readonly number[] = [1, 2, 3, 4]
 
 /**
  * Validate and sanitise an untrusted parsed JSON value into an ExportFile (current schema).

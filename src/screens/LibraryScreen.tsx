@@ -3,8 +3,8 @@ import { Plus } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useUI } from '../store/useUI'
 import { libraryIngredients, libraryMeals, matchesQuery } from '../store/selectors'
-import { useReducedMotion, vibrate } from '../lib/motion'
-import { IconButton, useToast } from '../components/ui'
+import { vibrate } from '../lib/motion'
+import { Button, EmptyState, IconButton, useStaggerOnce, useToast } from '../components/ui'
 import { LibrarySearch } from './LibrarySearch'
 import { LibraryFavourites } from './LibraryFavourites'
 import { LibraryMeals, type MealSort } from './LibraryMeals'
@@ -12,12 +12,17 @@ import { LibraryIngredients } from './LibraryIngredients'
 import { LibraryAddMenu } from './LibraryAddMenu'
 import { LibraryDetailSheet, type DetailTarget } from './LibraryDetailSheet'
 import { LibraryEditor, type EditorTarget } from './LibraryEditor'
-import { energyText, favouriteItems, mostLogged } from './LibraryFormat'
+import { favouriteItems, loggedText, mostLogged } from './LibraryFormat'
+
+/** The header fades into the page instead of ending on a hard edge (polish-spec 6.3; no blur, C23). */
+const HEADER_FADE = 'linear-gradient(180deg, var(--color-obsidian-950) 0%, var(--color-obsidian-950) 70%, transparent 100%)'
 
 /**
- * THE ARCHIVE. Header 56 px, search 48 px, then three inscribed sections: the FAVOURITES folder,
- * MEALS and INGREDIENTS. Scrolls inside <main>; App pads the bottom for the tab bar.
- * Entrance stagger on mount only (rise-in classes on the five blocks).
+ * THE ARCHIVE (polish-spec 6.3). A 56 px header (LIBRARY, the gold plus) and the carved search stay
+ * put while the archive scrolls beneath them; the header fades to nothing at its foot. Then the
+ * FAVOURITES folder (the screen's one strong gold rule), MEALS (count and sort in the heading) and
+ * INGREDIENTS. An empty library is one bracketed tablet with NEW MEAL and NEW INGREDIENT.
+ * Lists rise in once per session (`useStaggerOnce('library')`).
  */
 export function LibraryScreen() {
   const meals = useStore((s) => s.meals)
@@ -25,7 +30,7 @@ export function LibraryScreen() {
   const unit = useStore((s) => s.settings.unit)
   const libraryFocus = useUI((s) => s.libraryFocus)
   const setLibraryFocus = useUI((s) => s.setLibraryFocus)
-  const reduced = useReducedMotion()
+  const stagger = useStaggerOnce('library')
 
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<MealSort>('alpha')
@@ -38,10 +43,11 @@ export function LibraryScreen() {
 
   const searching = query.trim().length > 0
 
-  const favourites = useMemo(() => {
-    const all = favouriteItems(meals, ingredients)
-    return searching ? all.filter((f) => matchesQuery(f.item.name, query)) : all
-  }, [meals, ingredients, query, searching])
+  const allFavourites = useMemo(() => favouriteItems(meals, ingredients), [meals, ingredients])
+  const favourites = useMemo(
+    () => (searching ? allFavourites.filter((f) => matchesQuery(f.item.name, query)) : allFavourites),
+    [allFavourites, query, searching],
+  )
 
   const mealList = useMemo(() => {
     const base = sort === 'logged' ? mostLogged(Object.values(meals)) : libraryMeals(meals)
@@ -55,6 +61,7 @@ export function LibraryScreen() {
 
   const mealCount = useMemo(() => Object.keys(meals).length, [meals])
   const ingredientCount = useMemo(() => Object.keys(ingredients).length, [ingredients])
+  const empty = mealCount === 0 && ingredientCount === 0
 
   // another screen asked for an item: open it, then clear the request
   useEffect(() => {
@@ -71,11 +78,12 @@ export function LibraryScreen() {
 
   const logOne = useCallback(
     (id: string) => {
-      const entry = useStore.getState().logMeal(id, 1)
+      // one tap logs the meal's usual amount (the last one chosen)
+      const entry = useStore.getState().logMeal(id)
       if (!entry) return
       vibrate(8)
       useToast.getState().show({
-        text: `Logged · ${energyText(entry.macros.kcal, unit)}`,
+        text: loggedText(entry, unit),
         action: { label: 'Undo', icon: 'undo', onClick: () => useStore.getState().deleteEntry(entry.id) },
       })
     },
@@ -126,54 +134,86 @@ export function LibraryScreen() {
     if (next) setEditor(next)
   }, [])
 
-  const rise = (i: number) => (reduced ? '' : i === 0 ? 'rise-in' : `rise-in rise-in-${i}`)
+  const leadIsFavourites = allFavourites.length > 0
 
   return (
-    <div data-testid="tp-library" className="px-5">
+    <div data-testid="tp-library" data-empty={empty || undefined} className="px-5">
       {/* header and search stay put while the archive scrolls beneath them */}
-      <div className="sticky top-0 z-10 -mx-5 bg-obsidian-950/92 px-5 pb-4 backdrop-blur-[12px]" style={{ paddingTop: 'var(--safe-top)' }}>
-        <header className={`flex h-14 items-center justify-between ${rise(0)}`}>
-          <h1 className="font-display inscribed text-[14px] tracking-[0.35em] text-bone">Library</h1>
-          <IconButton label="Add a meal or ingredient" data-testid="tp-library-add" onClick={() => setMenuOpen(true)} className="-mr-2 text-gold-400 hover:text-gold-300">
+      <div className="sticky top-0 z-10 -mx-5 px-5 pb-4" style={{ paddingTop: 'var(--safe-top)', background: HEADER_FADE }}>
+        <header className="flex h-14 items-center justify-between">
+          <h1 className="title-screen inscribed">Library</h1>
+          <IconButton label="Add a meal or ingredient" data-testid="tp-library-add" onClick={() => setMenuOpen(true)} className="-mr-2.5 text-gold-300">
             <Plus size={22} strokeWidth={1.5} />
           </IconButton>
         </header>
-        <div className={`pt-1 ${rise(1)}`}>
-          <LibrarySearch label="Search the library" data-testid="tp-library-search" placeholder="Search" value={query} onChange={setQuery} />
+        {empty ? null : <LibrarySearch label="Search the library" data-testid="tp-library-search" placeholder="Search" value={query} onChange={setQuery} />}
+      </div>
+
+      {empty ? (
+        <EmptyState
+          testId="tp-library-empty"
+          className="mt-12 px-4"
+          action={
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="hairline"
+                size="sm"
+                className="px-3"
+                aria-label="New meal"
+                icon={<Plus size={16} strokeWidth={1.5} />}
+                data-testid="tp-library-empty-meal"
+                onClick={() => setEditor({ kind: 'meal' })}
+              >
+                Meal
+              </Button>
+              <Button
+                variant="hairline"
+                size="sm"
+                className="px-3"
+                aria-label="New ingredient"
+                icon={<Plus size={16} strokeWidth={1.5} />}
+                data-testid="tp-library-empty-ingredient"
+                onClick={() => setEditor({ kind: 'ingredient' })}
+              >
+                Ingredient
+              </Button>
+            </div>
+          }
+        >
+          Nothing saved yet.
+        </EmptyState>
+      ) : (
+        <div className="flex flex-col gap-8 pt-2">
+          <LibraryFavourites
+            items={favourites}
+            total={allFavourites.length}
+            unit={unit}
+            searching={searching}
+            stagger={stagger}
+            onOpenMeal={openMeal}
+            onOpenIngredient={openIngredient}
+            onToggleMeal={toggleMeal}
+            onToggleIngredient={toggleIngredient}
+            onLogMeal={logOne}
+          />
+
+          <LibraryMeals
+            meals={mealList}
+            total={mealCount}
+            unit={unit}
+            sort={sort}
+            searching={searching}
+            lead={!leadIsFavourites}
+            stagger={stagger}
+            onSort={setSort}
+            onOpen={openMeal}
+            onLog={logOne}
+            onToggleFavourite={toggleMeal}
+          />
+
+          <LibraryIngredients ingredients={ingredientList} total={ingredientCount} unit={unit} searching={searching} stagger={stagger} onOpen={openIngredient} onToggleFavourite={toggleIngredient} />
         </div>
-      </div>
-
-      <div className="h-2" aria-hidden="true" />
-
-      <div className={rise(2)}>
-        <LibraryFavourites
-          items={favourites}
-          unit={unit}
-          searching={searching}
-          onOpenMeal={openMeal}
-          onOpenIngredient={openIngredient}
-          onToggleMeal={toggleMeal}
-          onToggleIngredient={toggleIngredient}
-        />
-      </div>
-
-      <div className={`mt-6 ${rise(3)}`}>
-        <LibraryMeals
-          meals={mealList}
-          total={mealCount}
-          unit={unit}
-          sort={sort}
-          searching={searching}
-          onSort={setSort}
-          onOpen={openMeal}
-          onLog={logOne}
-          onToggleFavourite={toggleMeal}
-        />
-      </div>
-
-      <div className={`mt-6 ${rise(4)}`}>
-        <LibraryIngredients ingredients={ingredientList} total={ingredientCount} unit={unit} searching={searching} onOpen={openIngredient} onToggleFavourite={toggleIngredient} />
-      </div>
+      )}
 
       <LibraryAddMenu open={menuOpen} onClose={() => setMenuOpen(false)} onClosed={onMenuClosed} onPick={pickAdd} />
       <LibraryDetailSheet target={detail} onClose={closeDetail} onClosed={onDetailClosed} onEdit={editFromDetail} onBuild={buildFromDetail} />

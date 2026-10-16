@@ -1,4 +1,19 @@
-export type SegmentedOption<T extends string> = { value: T; label: string }
+import type { CSSProperties } from 'react'
+
+/**
+ * Segmented switch, polish-spec 4.4. A carved well with a 1 px gold edge, equal-width segments
+ * divided by `--gold-line`, Cinzel 700 12 px 0.1em labels (bone-dim; the active one gold-200 on a
+ * gold wash). One 2 px gold-400 indicator travels under the active segment (360 ms on the spring),
+ * computed from the index, so it needs no layout measurement.
+ *
+ * Sizes: `sm` h 32 (44 px hit area), `md` h 44 (default), `lg` h 40 (44 px hit area) and full width (the basis switch).
+ * `full` stretches any size to the container. An option may carry its own `testId` and `disabled`.
+ *
+ *   <Segmented label="Basis" size="lg" value={basis} onChange={setBasis} testId="tp-log-basis"
+ *     options={[{ value: 'serve', label: 'Per serve', testId: 'tp-log-basis-serve' }, ...]} />
+ */
+
+export type SegmentedOption<T extends string> = { value: T; label: string; testId?: string; disabled?: boolean }
 
 type Props<T extends string> = {
   value: T
@@ -6,16 +21,32 @@ type Props<T extends string> = {
   onChange(value: T): void
   label?: string
   className?: string
-  /** 32 px inscribed switch (default) or 44 px tall for settings rows */
-  size?: 'sm' | 'md'
+  /** sm 32 (hit 44), md 44 (default), lg 40 full width */
+  size?: 'sm' | 'md' | 'lg'
+  /** stretch to the container width */
+  full?: boolean
   testId?: string
 }
 
-/** Inscribed segmented switch: gold hairline, active = gold text with a 2 px gold underline. */
-export function Segmented<T extends string>({ value, options, onChange, label, className = '', size = 'sm', testId }: Props<T>) {
+const HEIGHT = { sm: 'h-8', md: 'h-11', lg: 'h-10' } as const
+
+/** Inscribed segmented switch: carved well, gold edge, a travelling gold indicator under the active segment. */
+export function Segmented<T extends string>({ value, options, onChange, label, className = '', size = 'md', full, testId }: Props<T>) {
+  const n = Math.max(1, options.length)
+  const index = Math.max(0, options.findIndex((o) => o.value === value))
+  const stretch = full || size === 'lg'
+  const indicator: CSSProperties = {
+    width: `calc(${100 / n}% - 20px)`,
+    transform: `translateX(calc(${index} * (100% + 20px)))`,
+  }
   return (
-    <div role="radiogroup" data-testid={testId} aria-label={label} className={`inline-flex rounded-[4px] border border-[var(--gold-line-strong)] ${className}`}>
-      {options.map((o, i) => {
+    <div
+      role="radiogroup"
+      data-testid={testId}
+      aria-label={label}
+      className={`seg ${stretch ? 'grid w-full' : 'inline-grid'} ${className}`}
+    >
+      {options.map((o) => {
         const active = o.value === value
         return (
           <button
@@ -23,19 +54,22 @@ export function Segmented<T extends string>({ value, options, onChange, label, c
             type="button"
             role="radio"
             aria-checked={active}
+            data-testid={o.testId}
+            disabled={o.disabled}
             onClick={() => onChange(o.value)}
-            className={`relative font-display tracking-[0.25em] text-[11px] pl-4 pr-3 transition-colors duration-150 cursor-pointer ${
-              size === 'sm' ? 'h-8 before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-[""]' : 'h-11'
-            } ${i > 0 ? 'border-l border-[var(--gold-line-strong)]' : ''} ${active ? 'text-gold-300' : 'text-bone-dim hover:text-bone'}`}
+            className={`seg-option press ${HEIGHT[size]} ${
+              size === 'sm'
+                ? 'before:absolute before:inset-x-0 before:-top-1.5 before:-bottom-1.5 before:content-[""]'
+                : size === 'lg'
+                  ? 'before:absolute before:inset-x-0 before:-top-0.5 before:-bottom-0.5 before:content-[""]'
+                  : ''
+            } ${stretch ? '' : 'px-4'}`}
           >
             {o.label}
-            <span
-              aria-hidden="true"
-              className={`absolute inset-x-2 bottom-0 h-[2px] bg-gold-400 transition-opacity duration-150 ${active ? 'opacity-100' : 'opacity-0'}`}
-            />
           </button>
         )
       })}
+      {options.some((o) => o.value === value) ? <span aria-hidden="true" className="seg-indicator" style={indicator} /> : null}
     </div>
   )
 }

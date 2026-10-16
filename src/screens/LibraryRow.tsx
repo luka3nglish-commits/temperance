@@ -1,6 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { Check, SquarePlus, Star } from 'lucide-react'
+import { SquarePlus, Star } from 'lucide-react'
+import type { EnergyUnit } from '../lib/types'
+import { formatEnergy, unitLabel } from '../lib/units'
 import { vibrate } from '../lib/motion'
+import { IconButton, ValueUnit } from '../components/ui'
+import { Rhombus } from '../components/ornaments'
 
 /** Test hooks for one row; each is optional and rendered only when given (never derived, so a meal shown twice is never ambiguous). */
 export type RowTestIds = { row?: string; fav?: string; log?: string }
@@ -8,20 +12,24 @@ export type RowTestIds = { row?: string; fav?: string; log?: string }
 type Props = {
   id: string
   name: string
-  /** `612 kcal · P 32 C 48 F 12` or `per 100 g · 165 kcal · ...` */
-  subline: string
+  /** meta line: `P 69 · C 70 · F 18` or `per 100 g · P 31 · C 0 · F 4` */
+  meta: string
+  /** energy in kcal for the value column (shown in the display unit) */
+  kcal: number
+  unit: EnergyUnit
   favourite: boolean
   onOpen(id: string): void
   onToggleFavourite(id: string): void
-  /** when given, a 44 px square-plus at the trailing edge logs one portion at once */
+  /** when given, a 44 px square-plus at the trailing edge logs the usual amount at once */
   onLog?(id: string): void
-  /** label for the log target, e.g. "Log one portion" */
+  /** label for the log target, e.g. "Log the usual" */
   logLabel?: string
   testIds?: RowTestIds
 }
 
 const LONG_PRESS_MS = 450
 const MOVE_CANCEL_PX = 10
+const FLASH_MS = 900
 
 /**
  * Long press without fighting the click: pointer events start a timer, movement, release or
@@ -80,16 +88,23 @@ function useLongPress(onLongPress: () => void) {
   return { onPointerDown, onPointerMove, onPointerUp: clear, onPointerCancel: clear, onPointerLeave: clear, onClickCapture, onContextMenu }
 }
 
-const TARGET = 'flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-[4px] transition-[color,transform] duration-150 active:scale-[0.9] cursor-pointer'
-
 /**
- * One 60 px library row ruled with --gold-line. The body is a button that opens the detail sheet.
- * At the trailing edge sit the 44 px targets: the star (outline bone-dim off, filled gold-400 on)
- * on every row, and the square-plus that logs one portion when `onLog` is given (meal rows).
- * Long press anywhere on the row toggles the favourite.
+ * One 60 px library row in the shared list grammar (polish-spec 4.11):
+ *
+ *   [mark 14][name                  743 kcal][☆ 44][⊞ 44]
+ *           [meta line, under the value too ]
+ *
+ * The body (mark, name, meta, value) is one button that opens the detail sheet and is the first
+ * button in the row (the tour and the tests click it). The name is Cormorant 500 19 px bone and
+ * truncates (the favourite shows once, on the star toggle, so the name keeps its width). The meta line is Cormorant 600
+ * 16 px bone-soft with whole grams. The value is `ValueUnit` in bone. Then the 44 px targets: the
+ * star toggle (20 px; off bone-dim, on gold-400 with a soft gold fill) and the square-plus that logs
+ * the usual amount (meal rows). Rows without a log action keep the empty cell so every kcal column
+ * lines up down the screen. A one-tap log flashes a solid rhombus in the mark gutter and turns the
+ * plus 90 degrees. Long press anywhere on the row toggles the favourite.
  */
-export const LibraryRow = memo(function LibraryRow({ id, name, subline, favourite, onOpen, onToggleFavourite, onLog, logLabel = 'Log one portion', testIds }: Props) {
-  const [flash, setFlash] = useState(false)
+export const LibraryRow = memo(function LibraryRow({ id, name, meta, kcal, unit, favourite, onOpen, onToggleFavourite, onLog, logLabel = 'Log the usual', testIds }: Props) {
+  const [flash, setFlash] = useState(0)
   const flashTimer = useRef(0)
   useEffect(() => () => window.clearTimeout(flashTimer.current), [])
 
@@ -101,50 +116,59 @@ export const LibraryRow = memo(function LibraryRow({ id, name, subline, favourit
 
   const log = useCallback(() => {
     onLog?.(id)
-    setFlash(true)
+    // a new key remounts the rhombus so the flash replays on every tap
+    setFlash((n) => n + 1)
     window.clearTimeout(flashTimer.current)
-    flashTimer.current = window.setTimeout(() => setFlash(false), 900)
+    flashTimer.current = window.setTimeout(() => setFlash(0), FLASH_MS)
   }, [id, onLog])
+
+  const energy = formatEnergy(kcal, unit)
+  const unitText = unitLabel(unit)
 
   return (
     <li
       data-testid={testIds?.row}
-      className="flex items-stretch border-b border-[var(--gold-line)] select-none [-webkit-touch-callout:none]"
+      className="row-rule grid h-[60px] grid-cols-[1fr_44px_44px] items-center select-none [-webkit-touch-callout:none]"
       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 60px' }}
       {...press}
     >
       <button
         type="button"
         onClick={() => onOpen(id)}
-        className="flex min-h-[60px] min-w-0 flex-1 flex-col justify-center py-1.5 pr-2 text-left transition-colors duration-150 hover:bg-[var(--gold-line)] active:bg-[var(--gold-line)] cursor-pointer"
+        aria-label={`${name}${favourite ? ', favourite' : ''}, ${meta}, ${energy} ${unitText}`}
+        className="row-press grid h-full min-w-0 grid-cols-[14px_minmax(0,1fr)_auto] content-center items-baseline text-left cursor-pointer"
       >
-        <span className="truncate font-body text-[19px] font-medium leading-[1.3] text-bone">{name}</span>
-        <span className="num truncate font-body text-[13px] leading-[1.3] text-bone-dim">{subline}</span>
+        <span aria-hidden="true" className="row-span-2 flex items-center self-center">
+          {flash ? <Rhombus key={flash} solid className="is-flash" /> : null}
+        </span>
+        <span className="min-w-0 truncate font-body text-[19px] font-medium leading-[1.3] text-bone">{name}</span>
+        <ValueUnit value={energy} unit={unitText} className="pl-3" />
+        {/* the meta line runs under the value too, so a long basis line keeps its macros on a narrow phone */}
+        <span className="meta col-span-2 block min-w-0 truncate leading-[1.3]">{meta}</span>
       </button>
 
-      <button
-        type="button"
+      <IconButton
+        label={`Favourite ${name}`}
         data-testid={testIds?.fav}
         aria-pressed={favourite}
-        aria-label={`Favourite ${name}`}
         onClick={toggle}
-        className={`${TARGET} ${favourite ? 'text-gold-400' : 'text-bone-dim hover:text-bone'}`}
+        className={favourite ? 'text-gold-400' : ''}
       >
-        <Star size={20} strokeWidth={1.5} className={`transition-transform duration-150 ${favourite ? 'fill-current' : ''}`} />
-      </button>
+        <Star size={20} strokeWidth={1.5} className={favourite ? 'fill-[rgba(216,180,90,0.28)]' : ''} />
+      </IconButton>
 
       {onLog ? (
-        <button
-          type="button"
+        <IconButton
+          label={`${logLabel}: ${name}`}
           data-testid={testIds?.log}
-          aria-label={`${logLabel} of ${name}`}
-          title={logLabel}
           onClick={log}
-          className={`${TARGET} ${flash ? 'text-gold-300' : 'text-bone-dim hover:text-gold-400'}`}
+          className={`row-action ${flash ? 'is-done text-gold-300' : ''}`}
         >
-          {flash ? <Check size={22} strokeWidth={1.5} /> : <SquarePlus size={22} strokeWidth={1.5} />}
-        </button>
-      ) : null}
+          <SquarePlus size={22} strokeWidth={1.5} />
+        </IconButton>
+      ) : (
+        <span aria-hidden="true" />
+      )}
     </li>
   )
 })

@@ -1,4 +1,4 @@
-// Seeded shard generator for the fractured obsidian edges (docs/design-spec.md section 8).
+// Seeded shard generator for the fractured obsidian edges (docs/design-spec.md section 8, polish-spec 3.5).
 // Writes src/components/ui/shards-data.ts. Deterministic: the same seed gives the same stone
 // on every run, so the committed output is the source of truth and this script is only re-run
 // on purpose.
@@ -80,7 +80,7 @@ function shard(a, b, slantA, slantB, depthAt, place, opts = {}) {
   inner.sort((p, q) => q[0] - p[0])
   const innerPts = inner.map(([s, d]) => place(s, d))
   const pts = [outerA, outerB, ...innerPts]
-  const glint = [outerB, ...innerPts, outerA]
+  const glint = litRuns([outerB, ...innerPts, outerA], pts, opts.strip)
   const maxDepth = Math.max(...inner.map(([, d]) => d))
   const lines = []
   if (maxDepth > 24) {
@@ -96,12 +96,49 @@ function shard(a, b, slantA, slantB, depthAt, place, opts = {}) {
     points: pts.map(([x, y]) => `${r1(x)},${r1(y)}`).join(' '),
     facet: nextFacet(),
     depth: Math.round(maxDepth),
-    glint: glint.map(([x, y]) => `${r1(x)},${r1(y)}`).join(' '),
+    glint: glint.map((run) => run.map(([x, y]) => `${r1(x)},${r1(y)}`).join(' ')),
     lines: lines.map((l) => l.map(([x, y]) => `${r1(x)},${r1(y)}`).join(' ')),
   }
 }
 
-function strip({ length, count, depthRange, deepAt, place, from = 0, to = length, jagLo }) {
+/**
+ * The light comes from the top left (polish-spec 3.5), so only broken edges that face it glint.
+ * Walk the inner edge, take each segment's outward normal (away from the shard, by the polygon's
+ * winding) and drop the segments facing away: positive x on the top and bottom strips, positive y on
+ * the side strips. What is left is split into runs of contiguous lit segments, one polyline each.
+ * Pure geometry: no random draws, so the shards themselves are unchanged.
+ */
+function litRuns(edge, poly, strip) {
+  let area = 0
+  for (let i = 0; i < poly.length; i++) {
+    const [x0, y0] = poly[i]
+    const [x1, y1] = poly[(i + 1) % poly.length]
+    area += x0 * y1 - x1 * y0
+  }
+  const runs = []
+  let run = null
+  for (let i = 0; i < edge.length - 1; i++) {
+    const [x0, y0] = edge[i]
+    const [x1, y1] = edge[i + 1]
+    const dx = x1 - x0
+    const dy = y1 - y0
+    const nx = area > 0 ? dy : -dy
+    const ny = area > 0 ? -dx : dx
+    const away = strip === 'left' || strip === 'right' ? ny > 0 : nx > 0
+    if (away || (dx === 0 && dy === 0)) {
+      run = null
+      continue
+    }
+    if (!run) {
+      run = [edge[i]]
+      runs.push(run)
+    }
+    run.push(edge[i + 1])
+  }
+  return runs
+}
+
+function strip({ length, count, depthRange, deepAt, place, from = 0, to = length, jagLo, id }) {
   const bounds = segments(to - from, count).map((b) => b + from)
   const slants = bounds.map((_, i) => (i === 0 || i === bounds.length - 1 ? 0 : between(-9, 9)))
   const [lo, hi] = depthRange
@@ -114,7 +151,7 @@ function strip({ length, count, depthRange, deepAt, place, from = 0, to = length
       const t = deepAt === 'end' ? smooth(pos) : deepAt === 'start' ? smooth(1 - pos) : 0.5
       return lo + (hi - lo) * (0.2 + 0.8 * t) * between(0.9, 1)
     }
-    out.push(shard(a, b, slants[i], slants[i + 1], depthAt, place, { jagLo, lo }))
+    out.push(shard(a, b, slants[i], slants[i + 1], depthAt, place, { jagLo, lo, strip: id }))
   }
   return out
 }
@@ -126,6 +163,7 @@ function strip({ length, count, depthRange, deepAt, place, from = 0, to = length
 // inscriptions, the ring letters and the week list never sit under stone. The bottom strip lives in
 // the bottom safe area only.
 const top = strip({
+  id: 'top',
   length: 390,
   count: 7,
   depthRange: [10, 44],
@@ -133,6 +171,7 @@ const top = strip({
   place: (s, d) => [s, d],
 })
 const left = strip({
+  id: 'left',
   length: 844,
   count: 13,
   depthRange: [6, 18],
@@ -140,6 +179,7 @@ const left = strip({
   place: (s, d) => [d, s],
 })
 const right = strip({
+  id: 'right',
   length: 844,
   count: 15,
   depthRange: [6, 18],
@@ -147,6 +187,7 @@ const right = strip({
   place: (s, d) => [64 - d, s],
 })
 const bottomLeft = strip({
+  id: 'bottom',
   length: 390,
   count: 3,
   from: 0,
@@ -157,6 +198,7 @@ const bottomLeft = strip({
   jagLo: 0.7,
 })
 const bottomRight = strip({
+  id: 'bottom',
   length: 390,
   count: 3,
   from: 262,
@@ -179,8 +221,8 @@ export type ShardPoly = {
   facet: number
   /** deepest inner point, px */
   depth: number
-  /** polyline along the broken inner edge (never the screen-side edge) */
-  glint: string
+  /** polylines along the broken inner edge that faces the light (top left); never the screen-side edge */
+  glint: string[]
   /** short facet lines inside the bigger shards */
   lines: string[]
 }

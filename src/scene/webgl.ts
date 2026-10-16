@@ -2,7 +2,12 @@
  * WebGL capability detection (docs/design-spec.md section 15). Decided once at boot, before any
  * <Canvas> mounts, so three never throws on context creation. The throwaway context is released
  * with WEBGL_lose_context.
+ *
+ * The crash-loop guard (index.html, src/lib/boot.ts) can switch WebGL off with `data-gl="0"` on
+ * <html> (any safe level, or `?gl=0`). Then the probe creates no context at all, not even this
+ * throwaway one, and every caller (the tier probe, SafeCanvas) takes the SVG monument path.
  */
+import { featureOff } from '../lib/boot'
 
 export type WebGLProbe = {
   /** a webgl2 context without a major performance caveat */
@@ -24,6 +29,8 @@ export function isSoftwareRenderer(renderer: string): boolean {
 export function probeWebGL(): WebGLProbe {
   if (cached) return cached
   let result: WebGLProbe = { ok: false, renderer: '', software: false }
+  // the earliest decision point: switched off by the boot guard, never touch getContext
+  if (featureOff('gl')) return (cached = result)
   try {
     if (typeof document === 'undefined') return (cached = result)
     const canvas = document.createElement('canvas')

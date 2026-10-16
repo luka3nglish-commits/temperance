@@ -7,13 +7,20 @@
  * creation. A class error boundary wraps the canvas; its fallback is the SVG monument. On
  * `webglcontextlost` the canvas is remounted by key once; a second loss within 30 s hands the
  * session to the SVG monument through `onFallback`.
+ *
+ * The renderer is built early. R3F only creates its renderer after a passive-effect measure, by
+ * which time the GPU process is busy rastering the opening's first frames, and every synchronous
+ * call three makes while it initialises (extension strings, parameters, errors) waits behind that
+ * raster: a 450 to 800 ms main-thread stall inside the opening, measured. So the WebGLRenderer is
+ * built on R3F's own canvas in the first commit, before the first paint, while the GPU process is
+ * idle, and handed to R3F through the `gl` factory (R3F still owns and disposes it).
  */
-import { Component, type ReactNode, useCallback, useRef, useState } from 'react'
+import { Component, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { Canvas, type RootState } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
+import { NeutralToneMapping, WebGLRenderer, type WebGLRendererParameters } from 'three'
 import { canUseWebGL } from './webgl'
 import { CAMERA_REST, T } from './tokens'
-import type { TierSettings } from './tier'
+import { tierSettings, useTier, type TierSettings } from './tier'
 import { FallbackMonument } from './FallbackMonument'
 
 export type SafeCanvasProps = {
@@ -46,11 +53,90 @@ class CanvasBoundary extends Component<BoundaryProps, BoundaryState> {
 
 const CONTEXT_LOSS_WINDOW = 30_000
 
+/** extensions three enables lazily later (compileAsync): enabled with the renderer, while the GPU is idle */
+const WARM_EXTENSIONS = ['KHR_parallel_shader_compile', 'EXT_texture_filter_anisotropic']
+
+/**
+ * Production renderers skip three's shader error checks: on each program's first use they make
+ * several synchronous info-log queries, which wait behind the GPU raster queue during the opening.
+ * The shaders are fixed and checked in development.
+ */
+function quiet(r: WebGLRenderer): WebGLRenderer {
+  r.debug.checkShaderErrors = import.meta.env.DEV
+  return r
+}
+
+function rendererParams(settings: TierSettings): WebGLRendererParameters {
+  return {
+    antialias: settings.antialias,
+    alpha: true,
+    powerPreference: 'high-performance',
+    stencil: false,
+    depth: true,
+    failIfMajorPerformanceCaveat: true,
+    preserveDrawingBuffer: false,
+  }
+}
+
 export function SafeCanvas({ children, settings, onFallback, onRemount, onCreated, className }: SafeCanvasProps) {
   const [key, setKey] = useState(0)
   const losses = useRef<number[]>([])
   const canvasOk = useRef<boolean | null>(null)
   if (canvasOk.current === null) canvasOk.current = canUseWebGL()
+  const canvasEl = useRef<HTMLCanvasElement>(null)
+  const early = useRef<WebGLRenderer | null>(null)
+  // the live tier's cap (a mid-session downgrade lowers it); R3F re-applies this prop on every render
+  const tier = useTier()
+  const dprMax = tierSettings(tier === 'high' ? 'high' : 'low').dprMax
+
+  // the frame of the first paint, before it: build the renderer on R3F's canvas (see the header).
+  // A rAF from the first commit runs in that frame's rendering steps, ahead of the opening's own rAF,
+  // in its own task (so the boot task does not grow) and before any raster has been issued.
+  const factoryRan = useRef(false)
+  useLayoutEffect(() => {
+    const el = canvasEl.current
+    if (!el || !canvasOk.current) return
+    factoryRan.current = false
+    const raf = requestAnimationFrame(() => buildEarly(el))
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+
+  const buildEarly = (el: HTMLCanvasElement) => {
+    // R3F got there first (a measure before this frame): it built its own renderer, leave it be
+    if (factoryRan.current || !el.isConnected) return
+    if (early.current && early.current.domElement === el) return
+    try {
+      const r = new WebGLRenderer({ ...rendererParams(settings), canvas: el })
+      quiet(r)
+      for (const name of WARM_EXTENSIONS) r.extensions.get(name)
+      // size it as R3F will (offset size of its container, dpr clamped to the tier) so the drawing
+      // buffer is allocated now rather than reallocated inside the opening
+      const box = el.parentElement
+      if (box && box.offsetWidth > 0 && box.offsetHeight > 0) {
+        // R3F's calculateDpr for [1, dprMax]
+        r.setPixelRatio(Math.min(Math.max(1, window.devicePixelRatio || 2), settings.dprMax))
+        r.setSize(box.offsetWidth, box.offsetHeight, false)
+      }
+      early.current = r
+      performance.mark('tp:gl-context')
+    } catch {
+      early.current = null // R3F tries again itself; a failure there reaches the boundary
+    }
+  }
+
+  const makeRenderer = useCallback(
+    // typed loosely: R3F's OffscreenCanvas type and the DOM lib's are two unrelated declarations
+    (defaults: { canvas?: unknown }) => {
+      factoryRan.current = true
+      const r = early.current
+      early.current = null
+      if (r && r.domElement === defaults.canvas) return r
+      r?.dispose()
+      return quiet(new WebGLRenderer({ ...(defaults as WebGLRendererParameters), ...rendererParams(settings) }))
+    },
+    [settings],
+  )
 
   const handleCreated = useCallback(
     (state: RootState) => {
@@ -88,20 +174,13 @@ export function SafeCanvas({ children, settings, onFallback, onRemount, onCreate
     <CanvasBoundary fallback={<FallbackMonument standalone />} onError={() => onFallback('error')}>
       <Canvas
         key={key}
+        ref={canvasEl}
         className={className}
         style={{ touchAction: 'pan-y', position: 'absolute', inset: 0 }}
-        dpr={[1, settings.dprMax]}
+        dpr={[1, dprMax]}
         // offsetWidth/Height ignore the layer's short-phone CSS scale; getBoundingClientRect would not
         resize={{ offsetSize: true }}
-        gl={{
-          antialias: settings.antialias,
-          alpha: true,
-          powerPreference: 'high-performance',
-          stencil: false,
-          depth: true,
-          failIfMajorPerformanceCaveat: true,
-          preserveDrawingBuffer: false,
-        }}
+        gl={makeRenderer}
         shadows={false}
         frameloop="never"
         flat={false}

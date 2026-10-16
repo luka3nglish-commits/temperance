@@ -105,7 +105,7 @@ describe('MonumentLayer (svg path)', () => {
     act(() => {
       useStore.getState().logQuick({ name: 'Eggs', macros: { kcal: 1250, protein: 0, carbs: 0, fat: 0 } })
     })
-    expect(col.getAttribute('data-h')).toBe('0.180')
+    expect(col.getAttribute('data-h')).toBe(heightFor(0, 2500).toFixed(3))
     act(() => useUI.getState().closeLog())
     await flush()
     expect(col.getAttribute('data-h')).toBe(heightFor(1250, 2500).toFixed(3))

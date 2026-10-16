@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Meander } from '../components/ornaments'
 import { listPhotos, photoStorageBytes, photosSupported } from '../lib/photos'
 import { formatInt } from '../lib/units'
 
@@ -24,7 +25,10 @@ export function photoCountLine(count: number, bytes: number): string | null {
 
 type PhotoStat = { count: number; bytes: number }
 
-/** Version, build, where the data lives (photos included), and the stoic sources. The last thing on the SETTINGS column. */
+/**
+ * The last thing on the SETTINGS column (polish-spec 6.6): a 120 px meander, where the data lives,
+ * when days turn, the photos line, the stoic sources, then the version in Cinzel bone-mute.
+ */
 export function SettingsFooter() {
   const [supported] = useState(photosSupported)
   const [stat, setStat] = useState<PhotoStat | null>(null)
@@ -47,22 +51,28 @@ export function SettingsFooter() {
   const countLine = stat ? photoCountLine(stat.count, stat.bytes) : null
 
   return (
-    <footer className="flex flex-col items-center gap-2 pt-10 pb-4 text-center">
-      <p className="font-display num text-[9px] tracking-[0.3em] text-bone-mute">
-        Temperance · v{__APP_VERSION__} · <span className="normal-case">{__BUILD_HASH__}</span>
+    <footer data-testid="tp-settings-footer" className="flex flex-col items-center px-2 pt-10 pb-6 text-center">
+      <Meander width={120} />
+      <div className="mt-6 flex max-w-[320px] flex-col items-center gap-1">
+        <p className="hint">Data lives on this device.</p>
+        <p className="hint">Days reset at local midnight.</p>
+        {supported ? (
+          <p data-testid="tp-settings-photos" data-count={stat?.count} data-bytes={stat?.bytes} className="hint">
+            {countLine ? (
+              <>
+                <span className="num whitespace-nowrap">{countLine}</span>.{' '}
+              </>
+            ) : null}
+            {PHOTOS_NOTE}
+          </p>
+        ) : null}
+      </div>
+      <p className="mt-5 max-w-[300px] font-body text-[15px] font-medium leading-[1.4] text-bone-soft">
+        Long, Gummere, Carter, Higginson translations, public domain
       </p>
-      <p className="font-body text-[15px] text-bone-dim">Data lives on this device.</p>
-      {supported ? (
-        <p data-testid="tp-settings-photos" data-count={stat?.count} data-bytes={stat?.bytes} className="max-w-[300px] font-body text-[15px] leading-[1.4] text-bone-dim">
-          {countLine ? (
-            <>
-              <span className="num whitespace-nowrap">{countLine}</span>.{' '}
-            </>
-          ) : null}
-          {PHOTOS_NOTE}
-        </p>
-      ) : null}
-      <p className="max-w-[300px] font-body italic text-[14px] leading-[1.4] text-bone-mute">Long, Gummere, Carter, Higginson translations, public domain</p>
+      <p data-testid="tp-settings-version" className="label mt-6 tracking-[0.08em] text-bone-mute">
+        Temperance · v{__APP_VERSION__} · {__BUILD_HASH__}
+      </p>
     </footer>
   )
 }
