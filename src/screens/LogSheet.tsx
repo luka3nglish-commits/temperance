@@ -28,6 +28,7 @@ import {
 } from '../components/MealForm'
 import { MealFormQuick } from '../components/MealFormQuick'
 import { MealFormBuild } from '../components/MealFormBuild'
+import { bootLogDraft, clearLogDraft, saveLogDraft } from '../components/MealFormDraft'
 import { LogFavourites } from './LogFavourites'
 import { LogRecents } from './LogRecents'
 import { RepeatYesterdayChip, daySummary, repeatToastText } from './LogRepeat'
@@ -46,7 +47,8 @@ const RECENT_LIMIT = 12
  * THE LOG SHEET. Opens from the keystone (or a prefill from TODAY and LIBRARY), QUICK or BUILD,
  * the chip row (REPEAT YESTERDAY, then favourites) and the LOG button in a sticky footer, RECENT
  * underneath. Every write is a synchronous store call; the sheet closes and the strike plays from
- * the store pulse.
+ * the store pulse. The form is kept in storage while the sheet is open (MealFormDraft.ts), so a
+ * reload under it brings the sheet back with the half-typed meal.
  */
 export function LogSheet() {
   const open = useUI((s) => s.logOpen)
@@ -54,6 +56,7 @@ export function LogSheet() {
   const closeLog = useUI((s) => s.closeLog)
   const openLog = useUI((s) => s.openLog)
   const setTab = useUI((s) => s.setTab)
+  const introDone = useUI((s) => s.introDone)
 
   const settings = useStore((s) => s.settings)
   const meals = useStore((s) => s.meals)
@@ -68,11 +71,13 @@ export function LogSheet() {
   const today = useToday()
 
   const unit = settings.unit
-  const [mode, setMode] = useState<Mode>('quick')
-  const [draft, setDraft] = useState<QuickDraft>(EMPTY_DRAFT)
-  const [rows, setRows] = useState<BuildRow[]>([])
-  const [buildName, setBuildName] = useState('')
-  const [buildSave, setBuildSave] = useState<boolean | null>(null)
+  // the meal a reload interrupted, if any (read once per page load)
+  const [kept] = useState(() => bootLogDraft(useStore.getState().settings.unit))
+  const [mode, setMode] = useState<Mode>(kept?.mode ?? 'quick')
+  const [draft, setDraft] = useState<QuickDraft>(kept?.draft ?? EMPTY_DRAFT)
+  const [rows, setRows] = useState<BuildRow[]>(kept?.rows ?? [])
+  const [buildName, setBuildName] = useState(kept?.buildName ?? '')
+  const [buildSave, setBuildSave] = useState<boolean | null>(kept?.buildSave ?? null)
   const caloriesRef = useRef<HTMLInputElement | null>(null)
   /** the recent being edited first: read once by the prefill it triggers */
   const editRef = useRef<LogEntry | null>(null)
@@ -141,6 +146,29 @@ export function LogSheet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, prefill])
 
+  // ---------- a reload mid-log ----------
+  // iPhone Safari can reload the page under the open sheet (a swipe that reaches the page, or iOS
+  // reclaiming it while he reads a label in another app). The form is kept on every edit, and the
+  // sheet rises again with it once the opening is out of the way (the opening paints above sheets).
+  // A tap on the keystone before then opens it at once with the same meal.
+  const reopened = useRef(false)
+  useEffect(() => {
+    if (!kept || !introDone || reopened.current) return
+    reopened.current = true
+    if (!useUI.getState().logOpen) openLog()
+  }, [kept, introDone, openLog])
+
+  useEffect(() => {
+    if (open) saveLogDraft({ mode, draft, rows, buildName, buildSave }, unit)
+  }, [open, mode, draft, rows, buildName, buildSave, unit])
+
+  // closed on purpose (X, scrim, drag, Escape, or after a log): nothing to bring back
+  const wasOpen = useRef(open)
+  useEffect(() => {
+    if (wasOpen.current && !open) clearLogDraft()
+    wasOpen.current = open
+  }, [open])
+
   const reset = useCallback(() => {
     setMode('quick')
     setDraft(EMPTY_DRAFT)
@@ -166,6 +194,8 @@ export function LogSheet() {
 
   const afterLog = useCallback(
     (entry: LogEntry) => {
+      // forgotten in the same task as the store write: a reload during the close never logs it twice
+      clearLogDraft()
       closeLog()
       if (warnIfSessionOnly()) return
       toast({
@@ -250,6 +280,7 @@ export function LogSheet() {
     if (!useUI.getState().logOpen) return
     const copies = useStore.getState().repeatDay(yesterdayKey(today))
     if (!copies.length) return
+    clearLogDraft()
     closeLog()
     if (warnIfSessionOnly()) return
     const kcal = copies.reduce((sum, c) => sum + c.macros.kcal, 0)

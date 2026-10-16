@@ -321,6 +321,11 @@ export type BuildRow = {
 let rowSeq = 0
 const nextRowKey = () => `r${++rowSeq}`
 
+/** Rows read back from storage take fresh keys: the counter starts again with every page load. */
+export function rekeyRows(rows: readonly Omit<BuildRow, 'key'>[]): BuildRow[] {
+  return rows.map((r) => ({ ...r, key: nextRowKey() }))
+}
+
 export function rowFromIngredient(ing: Ingredient, amount?: number): BuildRow {
   return {
     key: nextRowKey(),

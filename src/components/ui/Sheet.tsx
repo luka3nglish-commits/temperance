@@ -286,7 +286,8 @@ export function Sheet({
       <div
         ref={scrimRef}
         className={`absolute inset-0 transition-opacity ${shown ? 'opacity-100' : 'opacity-0'}`}
-        style={{ background: 'var(--scrim)', transitionDuration: shown ? '320ms' : 'var(--t-sheet-out)', transitionTimingFunction: 'linear' }}
+        // touch-action none: a swipe on the scrim never pans the page (pull to refresh); a tap still closes
+        style={{ background: 'var(--scrim)', transitionDuration: shown ? '320ms' : 'var(--t-sheet-out)', transitionTimingFunction: 'linear', touchAction: 'none' }}
         onClick={onClose}
       />
       <div
