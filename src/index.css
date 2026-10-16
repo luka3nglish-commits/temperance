@@ -1499,6 +1499,11 @@
        land and the chip row keeps its sideways scroll */
     touch-action: pan-x;
   }
+  /* the chip row scrolls sideways, which resets touch-action for it; restate it so a vertical swipe
+     that starts on a chip does not pan the page either (only here: in the sheet content it must stay auto) */
+  .sheet-footer .chip-row {
+    touch-action: pan-x;
+  }
   /* once scrolled, rows fade out under the header over 20 px instead of a hard cut (matches the footer) */
   .sheet-content[data-scrolled="1"] {
     -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 20px);

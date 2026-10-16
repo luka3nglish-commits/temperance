@@ -32,6 +32,8 @@ type Props = {
   /** the form submits on Enter or Go when calories exist; the sheet owns the handler */
   formId: string
   onSubmit(): void
+  /** the portion amount while it is typed, before it commits (null when nothing is being typed); the sheet keeps it in the reload draft */
+  onTyping?(amount: number | null): void
 }
 
 /** The basis switch: source text as written (the tour clicks `per 100 g`), uppercased by the segment style. */
@@ -48,14 +50,22 @@ const BASES: readonly SegmentedOption<Basis>[] = [
  * Strings stay as typed; the sheet converts on save. The typed numbers are label numbers: switching
  * basis never converts them, it resets the amount.
  */
-export function MealFormQuick({ draft, onChange, unit, meals, suggestFrom, onSuggestion, caloriesRef, formId, onSubmit }: Props) {
+export function MealFormQuick({ draft, onChange, unit, meals, suggestFrom, onSuggestion, caloriesRef, formId, onSubmit, onTyping }: Props) {
   const set = <K extends keyof QuickDraft>(k: K, v: QuickDraft[K]) => onChange({ ...draft, [k]: v })
   const hint = useMemo(() => hintFor(draft, unit), [draft, unit])
   const save = saveToLibraryFor(draft, meals)
   const formRef = useRef<HTMLFormElement>(null)
   const portionRef = useRef<HTMLDivElement>(null)
   // the amount being typed, before it commits: the result line follows every keystroke
-  const [preview, setPreview] = useState<number | null>(null)
+  const [preview, setPreviewState] = useState<number | null>(null)
+  const typingRef = useRef(onTyping)
+  typingRef.current = onTyping
+  const setPreview = (n: number | null) => {
+    setPreviewState(n)
+    typingRef.current?.(n)
+  }
+  // leaving QUICK (BUILD, or the sheet closing) ends any typing
+  useEffect(() => () => typingRef.current?.(null), [])
   const usual = draft.source && draft.source.basis === draft.basis ? draft.source.usual : undefined
 
   const scrollPortion = () => {
