@@ -42,7 +42,7 @@ Shot names. The tour script now captures two extra shots (`log-quick-per100g`, `
 | C13 | Roman numerals: more (WEEK IX, counts) vs Arabic for data | Arabic for every data value (streak 12, MEALS 8, WEEK 9); Roman only as ornament (settings group numerals I, II, III). |
 | C14 | Row grammar: gold bar, rhombus on every row, mark on newest only, kcal gold or bone | One row: a 14 px mark gutter on every row, a 5 px gold rhombus only on the newest or today's row, kcal number in bone Cinzel 700 16 px with a lowercase Cormorant unit. |
 | C15 | Gold restraint vs "gold means it acts" | Both: gold is for things that act (LOG, keystone, chips, segmented edge, hairline buttons, active states, focus) and for the four focal values (hero number, weight hero, live portion result, today's history bar); data values are bone. |
-| C16 | Input borders: gold edge on every input vs neutral 2:1 line | Neutral `--bone-edge` `rgba(231,225,210,0.40)` (3.18:1) on inputs, gold-300 on focus: inputs are stone you write into, and 2:1 fails WCAG 1.4.11. |
+| C16 | Input borders: gold edge on every input vs neutral 2:1 line | Neutral `--bone-edge` `rgba(231,225,210,0.46)` (3.43 to 3.63:1 as rendered on tablets; 0.40 measured 2.86 to 2.98:1 in the round 1 review) on inputs, gold-300 on focus: inputs are stone you write into, and 2:1 fails WCAG 1.4.11. |
 | C17 | Settings groups: THE MEASURE / THE RITE / THE RECORD vs GOALS / DISPLAY / DATA | `I · GOALS`, `II · DISPLAY`, `III · DATA`: plain words he can scan, the numeral carries the Roman voice. |
 | C18 | Settings row labels: Cormorant sentence case vs Cinzel caps | Cinzel 700 12 px caps: copy rule 18 (labels are uppercase Cinzel) is identity. |
 | C19 | TODAY duplicates: drop GOAL flank, drop the line label, or shorten the subline | Keep both flanks (EATEN, GOAL), the line marker becomes a rhombus only, the subline becomes the percent `51% of goal`: each figure appears once and the plaques stay symmetric. |
@@ -90,7 +90,7 @@ Alpha tokens (`:root`), measured as composites:
 | `--gold-line` | 0.16 (1.31:1) | `rgba(216,180,90,0.42)` | `#61522F` | 2.58:1 (Lc 15) | section rules, tab bar top edge, dividers inside controls |
 | `--gold-line-strong` | 0.55 | keep | `#7C6838` | 3.64:1 | one lead rule per screen, sheet top edge |
 | `--gold-edge` (new) | none | `rgba(216,180,90,0.55)` | `#7C6838` | 3.64:1 (3.56 on tablet) | borders of gold controls: segmented, chips, hairline buttons, toggles |
-| `--bone-edge` (new) | none | `rgba(231,225,210,0.40)` | `#63615D` | 3.18:1 (3.18 on inset) | borders of inputs and PortionField at rest |
+| `--bone-edge` (new) | none | `rgba(231,225,210,0.46)` | | 3.43 to 3.63:1 as rendered on tablets (0.40 rendered 2.86 to 2.98:1) | borders of inputs and PortionField at rest |
 | `--rule` (new) | `--bone-08` (1.16:1) | `rgba(231,225,210,0.16)` | `#2E2D2E` | decorative | row rules between list rows (spacing carries the separation) |
 | `--gold-focus` | 0.70 | replaced by `--color-gold-300` | `#E6CB78` | 12.33:1 | focus ring and focused input border |
 | `--scrim` | 0.60 | `rgba(5,5,7,0.74)` | | | sheet scrim and the hero number scrim |
@@ -858,6 +858,8 @@ Every Phase B agent: use only the SYSTEM primitives and tokens; no raw hex in sc
 ### Copy changes needing the owner's sign-off
 
 `51% of goal` subline; `Macros add to 526 kcal.` (hint only when different); `0.5 serve` singular; `Logged · 180 g · 175 kcal`; `Nothing saved yet.`; `Nothing logged this week.`; `The ledger opens with your first meal.`; `No weigh-ins yet.`; `No photos yet.`; group headings `I · GOALS`, `II · DISPLAY`, `III · DATA`; streak replacing the header gear. Flagged, not changed: icon stroke 1.75 for icons of 20 px and under.
+
+Also shipped in the build and the round 1 review, for the same sign-off: the LOG footer chip `REPEAT` with the energy (was REPEAT YESTERDAY; its aria-label keeps `Repeat yesterday's meals`); LIBRARY meal editor kind switch `Numbers | Built`, basis label `Counted per`, usual hint `one tap logs 175 kcal` or `one tap logs this`, a deleted component reading `removed from the library`, the favourites toggle `All 12` / `Fewer`, empty-state buttons `+ MEAL` and `+ INGREDIENT`, and the add menu note `Its numbers per serve or per 100 g, or built from ingredients.`; HISTORY weigh-in deltas `0.4 down` (the kg is on the value beside it); the SAFE MODE tablet `The 3D column and moving gold are off because the app stopped on this phone.` with `Try full mode`; the install prompt as a toast `Keep it on the home screen.` with `Install`.
 
 ---
 

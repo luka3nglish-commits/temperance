@@ -26,7 +26,7 @@ Rules that hold everywhere: nothing under 12 px; no letter-spacing over 0.2em be
 | Gold for text and fills | `var(--gold-grad-text)` (darkest stop `#B8902E`); `var(--gold-grad)` is decoration only |
 | Macro colours (arc and swatch only, never text) | `protein`, `carbs`, `fat` (`#8E7243`) |
 
-Deprecated, removed in Phase C: `--bone-08` (now an alias of `--rule`) and `--gold-focus` (now gold-300). Do not use them in new code.
+Removed: `--bone-08` and `--gold-focus`. Use `--rule` for row rules and `--color-gold-300` for focus.
 
 Motion tokens: `--ease-spring` (overshoot, falls back to `--ease-sheet`), `--ease-press`, `--ease-stone`, `--ease-cut`; `--t-press-in` 70 ms, `--t-press-out` 300 ms, `--t-sheet-in` 420 ms, `--t-tab-out` 120 ms, `--t-tab-in` 260 ms, `--t-indicator` 360 ms, `--t-roll` 560 ms, `--t-row-in` 420 ms, `--t-row-stagger` 35 ms, `--t-new-row` 900 ms, `--t-row-out` 220 ms, `--t-toast-in` 320 ms, `--t-ghost` 440 ms, `--t-shockwave` 480 ms, `--t-always` 1600 ms.
 
@@ -128,7 +128,7 @@ Put the basis on the label row above the field (left PORTION, right the live res
 <PortionPicks testId="tp-log-portion" unit={basis} value={amount} usual={meal?.usual} onChange={setAmount} />
 ```
 
-`Stepper` is deprecated (restyled to the same surface until Phase C deletes it); use PortionField.
+`Stepper` was removed; use `PortionField` and `PortionPicks`.
 
 ### Segmented (`Segmented.tsx`)
 
